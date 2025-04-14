@@ -114,22 +114,26 @@ Simplifies exposing Docker services via Cloudflare Tunnel by automating configur
 ## Example `docker-compose.yml`
 
 ```yaml
-version: "3.8"
-
+version: '3.8'
 services:
-  cloudflare-tunnel-controller:
-    image: alplat/dockflare:stable # Replace with your image or build from Dockerfile
+  cloudflare-tunnel-manager:
+    # build: . # Commented out for not building local docker image
+    container_name: dockflare
+    image: alplat/dockflare:stable
     restart: unless-stopped
     ports:
       - "5000:5000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./state.json:/app/state.json
     env_file:
       - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/app/data
+    networks:
+      - cloudflare-net
     environment:
-      - FLASK_APP=app.py
+      - STATE_FILE_PATH=/app/data/state.json
 
 networks:
-  app-network:
+  cloudflare-net:
     driver: bridge
+    name: cloudflare-net
