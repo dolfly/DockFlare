@@ -52,9 +52,9 @@ Simplifies exposing Docker services via Cloudflare Tunnel by automating configur
     cd <repository_directory>
     ```
 
-2.  **Configure the `.env` file:**
+2.  **Configure the .env file:**
 
-    Create a `.env` file based on the `.env.example` and set the following variables:
+    Copy the example configuration: cp .env.example .env, then edit .env to set the required variables.
 
     ```
     CF_API_TOKEN=<YOUR_CLOUDFLARE_API_TOKEN>
@@ -89,10 +89,12 @@ Simplifies exposing Docker services via Cloudflare Tunnel by automating configur
       cloudflare.tunnel.enable: "true"
       cloudflare.tunnel.hostname: "my-service.example.com"
       cloudflare.tunnel.service: "http://my-service:8080"
+      cloudflare.tunnel.zonename="other-domain.com"
     ```
 
     *   Replace `"my-service.example.com"` with your desired public hostname.
     *   Replace `"http://my-service:8080"` with the internal URL of your service.
+    *   `cloudflare.tunnel.zonename="other-domain.com"`: (Optional) This label is only required when you want to expose the service on a domain different from the primary DNS zone configured via `CF_ZONE_ID` in the `.env` file.  It's used for multi-DNS domain support within the same Cloudflare account.
 
 6. **Restart or redeploy the labeled docker containers**
 
