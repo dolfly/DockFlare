@@ -15,16 +15,22 @@ load_dotenv() # Load environment variables from .env file
 
 CF_API_TOKEN = os.getenv('CF_API_TOKEN')
 TUNNEL_NAME = os.getenv('TUNNEL_NAME')
+CF_ACCOUNT_ID = os.getenv('CF_ACCOUNT_ID') # <-- Read Account ID
+
 # Name for the separate cloudflared container we will manage
 CLOUDFLARED_CONTAINER_NAME = os.getenv('CLOUDFLARED_CONTAINER_NAME', f"cloudflared-agent-{TUNNEL_NAME}")
 # Cloudflared Docker image
 CLOUDFLARED_IMAGE = "cloudflare/cloudflared:latest"
 
+# --- Environment Variable Checks ---
 if not CF_API_TOKEN:
     logging.error("FATAL: CF_API_TOKEN environment variable not set.")
     sys.exit(1)
 if not TUNNEL_NAME:
     logging.error("FATAL: TUNNEL_NAME environment variable not set.")
+    sys.exit(1)
+if not CF_ACCOUNT_ID: # <-- Add Account ID check
+    logging.error("FATAL: CF_ACCOUNT_ID environment variable not set.")
     sys.exit(1)
 
 # --- Docker Client ---
@@ -51,55 +57,67 @@ tunnel_state = {
 
 # --- Cloudflared Helper ---
 def run_cloudflared_command(command_args):
-    """Runs a cloudflared command and returns its output."""
-    command = ['cloudflared'] + command_args
+    """Runs a cloudflared command with debug logging and returns its output."""
+    # Prepend the debug flag and main command
+    base_command = ['cloudflared', '--loglevel', 'debug'] # <-- Add debug flag
+    command = base_command + command_args
+
     env = os.environ.copy()
     env['CF_API_TOKEN'] = CF_API_TOKEN # Ensure token is in environment
+    env['CF_ACCOUNT_ID'] = CF_ACCOUNT_ID # <-- Pass Account ID to environment
     env['NONINTERACTIVE'] = '1'      # Try to prevent interactive prompts
 
-    # Ensure TUNNEL_ORIGIN_CERT is NOT explicitly set here, rely on CF_API_TOKEN
+    # Ensure TUNNEL_ORIGIN_CERT is NOT explicitly set here
 
     logging.info(f"Running command: {' '.join(command)}")
+    logging.info(f"Using environment CF_ACCOUNT_ID={env.get('CF_ACCOUNT_ID')}") # Log Account ID usage
 
     try:
         result = subprocess.run(
-            command,
+            command, # Use the command with debug flag
             capture_output=True,
             text=True,
             check=True,
             env=env, # Pass the modified environment
-            timeout=60
+            timeout=90 # Slightly longer timeout for debug
         )
+        # Log stdout/stderr even on success when debugging might be useful
         logging.info(f"Command successful. stdout:\n{result.stdout}")
         if result.stderr:
-             logging.warning(f"Command stderr:\n{result.stderr}")
+             # stderr might contain debug logs, log as info unless it looks like an error
+             if "ERR" in result.stderr or "error" in result.stderr.lower() or "fail" in result.stderr.lower():
+                  logging.warning(f"Command stderr (potential error):\n{result.stderr}")
+             else:
+                  logging.info(f"Command stderr (debug logs):\n{result.stderr}") # Log debug output from stderr
+
         return result.stdout.strip(), result.stderr.strip()
     except subprocess.CalledProcessError as e:
         logging.error(f"Command failed: {' '.join(command)}")
         logging.error(f"Return code: {e.returncode}")
+        # Log the full stdout/stderr from the failed command
         logging.error(f"stdout:\n{e.stdout}")
-        logging.error(f"stderr:\n{e.stderr}")
-        # Store the stderr in state if it seems relevant
-        if "origin cert" in e.stderr.lower() or "tunnel" in e.stderr.lower() or "failed" in e.stderr.lower():
-             # Prevent overwriting if a more specific error (like Docker API) is already set
-            if "Docker API error" not in str(tunnel_state.get("error","")):
-                tunnel_state["error"] = f"Cloudflared Error: {e.stderr.strip()}"
-        raise # Re-raise the exception to be caught by the caller
+        logging.error(f"stderr:\n{e.stderr}") # This stderr is critical for debugging failure
+        # Store the more detailed stderr in state
+        if "Docker API error" not in str(tunnel_state.get("error","")):
+            error_detail = e.stderr.strip() if e.stderr else f"Exited with status {e.returncode}"
+            tunnel_state["error"] = f"Cloudflared Error: {error_detail}"
+        raise # Re-raise the exception
     except subprocess.TimeoutExpired:
         logging.error(f"Command timed out: {' '.join(command)}")
+        tunnel_state["error"] = "Cloudflared command timed out."
         raise
     except Exception as e:
-        logging.error(f"Error running command {' '.join(command)}: {e}")
+        logging.error(f"Error running command {' '.join(command)}: {e}", exc_info=True)
+        tunnel_state["error"] = f"Subprocess execution error: {e}"
         raise
 
 # --- Tunnel Management Logic ---
+# (No changes needed in find_tunnel_id, create_tunnel, get_tunnel_token itself)
+# (Error logging within initialize_tunnel is slightly refined to rely on run_cloudflared_command setting state['error'])
 def find_tunnel_id(name):
     """Finds the tunnel ID by its name."""
     try:
         stdout, _ = run_cloudflared_command(['tunnel', 'list'])
-        # Example output line:
-        # ID                                   NAME                CREATED              CONNECTIONS
-        # c1a4e7a1-9a2a-4f6b-8c1b-1b8a0e2a4b9e my-automated-tunnel 2023-10-26T15:00:00Z 2xLAX, 1xDEN
         lines = stdout.splitlines()
         for line in lines[1:]: # Skip header
             parts = line.split()
@@ -108,20 +126,16 @@ def find_tunnel_id(name):
                      tunnel_id = parts[0]
                      logging.info(f"Found existing tunnel '{name}' with ID: {tunnel_id}")
                      return tunnel_id
-    except Exception as e:
-        # Avoid overwriting specific cloudflared errors unless it's a different exception
-        if "Cloudflared Error" not in str(tunnel_state.get("error")):
-             logging.error(f"Failed to list tunnels: {e}")
-             tunnel_state["error"] = f"Failed to list tunnels: {e}"
-        # If the error IS a cloudflared error, it's already set in run_cloudflared_command
+    except Exception:
+        # Error is logged and state['error'] is set within run_cloudflared_command
+        # Re-raising allows initialize_tunnel to catch it if needed, but state is set
+        raise
     return None
 
 def create_tunnel(name):
     """Creates a new tunnel."""
     try:
         stdout, _ = run_cloudflared_command(['tunnel', 'create', name])
-        # Example output:
-        # Created tunnel my-automated-tunnel with id c1a4e7a1-9a2a-4f6b-8c1b-1b8a0e2a4b9e
         match = re.search(r'tunnel\s+.*\s+with id\s+([a-f0-9-]+)', stdout, re.IGNORECASE)
         if match:
             tunnel_id = match.group(1)
@@ -129,32 +143,24 @@ def create_tunnel(name):
             return tunnel_id
         else:
              logging.error(f"Could not parse tunnel ID from creation output: {stdout}")
-             # Don't overwrite existing error if it's more specific
-             if not tunnel_state.get("error"):
+             if not tunnel_state.get("error"): # Set error if not already set by subprocess fail
                  tunnel_state["error"] = "Could not parse tunnel ID from creation output."
              return None
-    except Exception as e:
-         # Avoid overwriting specific cloudflared errors
-        if "Cloudflared Error" not in str(tunnel_state.get("error", "")):
-            logging.error(f"Failed to create tunnel '{name}': {e}")
-            tunnel_state["error"] = f"Failed to create tunnel: {e}"
-        # If the error IS a cloudflared error, it's already set in run_cloudflared_command
-        return None
+    except Exception:
+        # Error is logged and state['error'] is set within run_cloudflared_command
+        raise
+    return None # Should be unreachable if exception is raised, but for completeness
 
 def get_tunnel_token(tunnel_identifier):
     """Gets the token for a given tunnel ID or name."""
     try:
-        # Token command works with ID or name
         token, _ = run_cloudflared_command(['tunnel', 'token', tunnel_identifier])
         logging.info(f"Successfully retrieved token for tunnel: {tunnel_identifier}")
         return token
-    except Exception as e:
-        # Avoid overwriting specific cloudflared errors
-        if "Cloudflared Error" not in str(tunnel_state.get("error", "")):
-            logging.error(f"Failed to get token for tunnel '{tunnel_identifier}': {e}")
-            tunnel_state["error"] = f"Failed to get token: {e}"
-        # If the error IS a cloudflared error, it's already set in run_cloudflared_command
-        return None
+    except Exception:
+        # Error is logged and state['error'] is set within run_cloudflared_command
+        raise
+    return None # Should be unreachable
 
 def initialize_tunnel():
     """Checks for the tunnel, creates if needed, and gets the token."""
@@ -163,72 +169,58 @@ def initialize_tunnel():
     tunnel_id = None
     try:
         tunnel_id = find_tunnel_id(TUNNEL_NAME)
-        # If find_tunnel_id failed due to cloudflared error, state['error'] will be set
-    except Exception as e:
-        # Catch other unexpected errors during find_tunnel_id call
-        logging.error(f"Unexpected error during find_tunnel_id: {e}", exc_info=True)
-        if not tunnel_state.get("error"): # Set general error if cloudflared didn't set one
-            tunnel_state["error"] = f"Failed to check tunnels: {e}"
-        tunnel_state["status_message"] = "Failed during tunnel check."
+        # If find_tunnel_id failed, run_cloudflared_command has set state['error'] and raised Exception
+    except Exception:
+        tunnel_state["status_message"] = "Failed during tunnel check (see error details)."
         return # Stop if listing failed
 
-    # Proceed only if listing didn't explicitly fail
-    if not tunnel_id and not tunnel_state.get("error"):
+    # Proceed only if listing didn't explicitly fail (no exception raised)
+    if not tunnel_id:
         tunnel_state["status_message"] = f"Tunnel '{TUNNEL_NAME}' not found. Creating..."
         try:
             tunnel_id = create_tunnel(TUNNEL_NAME)
-            # If create_tunnel failed due to cloudflared error, state['error'] will be set
-        except Exception as e:
-            # Catch other unexpected errors during create_tunnel call
-            logging.error(f"Unexpected error during create_tunnel: {e}", exc_info=True)
-            if not tunnel_state.get("error"): # Set general error if cloudflared didn't set one
-                tunnel_state["error"] = f"Failed to create tunnel: {e}"
-            tunnel_state["status_message"] = "Failed during tunnel creation."
-            return # Stop if creation failed
+             # If create_tunnel failed, run_cloudflared_command has set state['error'] and raised Exception
+        except Exception:
+             tunnel_state["status_message"] = "Failed during tunnel creation (see error details)."
+             return # Stop if creation failed
 
         if not tunnel_id:
-            # If create_tunnel returned None but didn't raise Exception
-            # state['error'] should have been set by run_cloudflared_command if it failed
-            if tunnel_state.get("error"):
-                 tunnel_state["status_message"] = "Failed to create tunnel (see error details)."
-            else:
-                 tunnel_state["status_message"] = "Failed to create tunnel (no specific error)."
-            return # Stop if creation failed
+            # This case happens if create_tunnel didn't raise but returned None (e.g., couldn't parse ID)
+            if not tunnel_state.get("error"): # Check if error was already set
+                 tunnel_state["error"] = "Failed to create tunnel (no specific error)."
+            tunnel_state["status_message"] = "Failed to create tunnel (see error details)."
+            return # Stop
 
-    # Proceed only if we have an ID and no critical error occurred
+    # Proceed only if we have an ID
     if tunnel_id:
         tunnel_state["id"] = tunnel_id
         tunnel_state["status_message"] = f"Fetching token for tunnel ID {tunnel_id}..."
         token = None
         try:
             token = get_tunnel_token(tunnel_id)
-            # If get_tunnel_token failed due to cloudflared error, state['error'] will be set
-        except Exception as e:
-            # Catch other unexpected errors during get_tunnel_token call
-            logging.error(f"Unexpected error during get_tunnel_token: {e}", exc_info=True)
-            if not tunnel_state.get("error"): # Set general error if cloudflared didn't set one
-                 tunnel_state["error"] = f"Failed to retrieve token: {e}"
-            tunnel_state["status_message"] = "Failed during token retrieval."
-            return # Stop if token retrieval failed
+             # If get_tunnel_token failed, run_cloudflared_command has set state['error'] and raised Exception
+        except Exception:
+            tunnel_state["status_message"] = "Failed during token retrieval (see error details)."
+            return # Stop
 
         if token:
             tunnel_state["token"] = token
             tunnel_state["status_message"] = "Tunnel setup complete."
             tunnel_state["error"] = None # Clear errors if we reached success
         else:
-            # If get_tunnel_token returned None but didn't raise Exception
-             if tunnel_state.get("error"):
-                 tunnel_state["status_message"] = "Failed to retrieve tunnel token (see error details)."
-             else:
-                 tunnel_state["status_message"] = "Failed to retrieve tunnel token (no specific error)."
+            # This case happens if get_tunnel_token didn't raise but returned None
+            if not tunnel_state.get("error"): # Check if error was already set
+                 tunnel_state["error"] = "Failed to retrieve tunnel token (no specific error)."
+            tunnel_state["status_message"] = "Failed to retrieve tunnel token (see error details)."
+
+    # If we finish and still have no tunnel_id and no error, something is wrong
     elif not tunnel_state.get("error"):
-         # This state should ideally not be reached if logic is correct
          tunnel_state["status_message"] = "Tunnel initialization incomplete."
          tunnel_state["error"] = "Tunnel ID was not found or created, but no specific error was recorded."
 
 
 # --- Docker Container Management ---
-# (This section remains unchanged from the previous complete version)
+# (This section remains unchanged)
 def get_cloudflared_container():
     """Gets the cloudflared container object if it exists."""
     if not docker_client:
@@ -241,7 +233,7 @@ def get_cloudflared_container():
         return None
     except APIError as e:
         logging.error(f"Docker API error getting container: {e}")
-        tunnel_state["error"] = f"Docker API error: {e}" # Overwrite general errors with specific Docker errors
+        tunnel_state["error"] = f"Docker API error: {e}"
         return None
 
 def update_cloudflared_container_status():
@@ -252,16 +244,12 @@ def update_cloudflared_container_status():
     container = get_cloudflared_container()
     if container:
         try:
-            # Reload attributes to get the latest status
             container.reload()
             tunnel_state["cloudflared_container_status"] = container.status
         except (NotFound, APIError) as e:
             logging.warning(f"Error reloading container status: {e}")
-            # If we can't reload, assume not found for safety
             tunnel_state["cloudflared_container_status"] = "not_found"
-
     else:
-        # Check if the error state already indicates a Docker problem
         if "Docker API error" not in str(tunnel_state.get("error", "")):
              tunnel_state["cloudflared_container_status"] = "not_found"
         else:
@@ -270,7 +258,7 @@ def update_cloudflared_container_status():
 
 def start_cloudflared_container():
     """Starts the cloudflared agent container."""
-    tunnel_state["last_action_status"] = None # Clear previous action status
+    tunnel_state["last_action_status"] = None
     if not docker_client:
         msg = "Docker client not available. Cannot start container."
         logging.error(msg)
@@ -280,13 +268,11 @@ def start_cloudflared_container():
         msg = "Tunnel token not available. Cannot start container."
         logging.error(msg)
         tunnel_state["last_action_status"] = f"Error: {msg}"
-        # Attempt to re-initialize tunnel to get token if possible
         if not tunnel_state.get("id"):
-             initialize_tunnel() # Try to get ID and token again
-             if not tunnel_state.get("token"): # Check again after re-init
+             initialize_tunnel()
+             if not tunnel_state.get("token"):
                  return False
-        else: # ID exists but no token, likely init failed
-             # Maybe try getting token again?
+        else:
              token_retry = get_tunnel_token(tunnel_state.get("id"))
              if token_retry:
                  tunnel_state["token"] = token_retry
@@ -295,7 +281,6 @@ def start_cloudflared_container():
                  logging.error(msg)
                  tunnel_state["last_action_status"] = f"Error: {msg}"
                  return False
-
 
     token = tunnel_state["token"]
     container = get_cloudflared_container()
@@ -327,10 +312,10 @@ def start_cloudflared_container():
                 image=CLOUDFLARED_IMAGE,
                 command=f"tunnel --no-autoupdate run --token {token}",
                 name=CLOUDFLARED_CONTAINER_NAME,
-                network_mode="host", # Ensure this matches your setup needs
+                network_mode="host",
                 restart_policy={"Name": "unless-stopped"},
                 detach=True,
-                remove=False # Keep container unless explicitly removed
+                remove=False
             )
             tunnel_state["last_action_status"] = f"Successfully created and started container '{new_container.name}'."
             logging.info(tunnel_state["last_action_status"])
@@ -367,20 +352,12 @@ def stop_cloudflared_container():
         logging.warning(msg)
         tunnel_state["last_action_status"] = msg
         update_cloudflared_container_status()
-        return True # Considered successful as it's not running
+        return True
 
     if container.status != 'running':
         msg = f"Container '{CLOUDFLARED_CONTAINER_NAME}' is not running (status: {container.status})."
         logging.info(msg)
         tunnel_state["last_action_status"] = msg
-        # If exited, maybe try removing it?
-        # if container.status == 'exited':
-        #     try:
-        #         logging.info(f"Removing exited container '{CLOUDFLARED_CONTAINER_NAME}'...")
-        #         container.remove()
-        #         tunnel_state["last_action_status"] += " Container removed."
-        #     except APIError as rm_err:
-        #         logging.warning(f"Could not remove exited container: {rm_err}")
         update_cloudflared_container_status()
         return True
 
@@ -389,10 +366,6 @@ def stop_cloudflared_container():
         container.stop(timeout=30)
         tunnel_state["last_action_status"] = f"Successfully stopped container '{CLOUDFLARED_CONTAINER_NAME}'."
         logging.info(tunnel_state["last_action_status"])
-        # Optional: remove the container after stopping
-        # logging.info(f"Removing stopped container '{CLOUDFLARED_CONTAINER_NAME}'...")
-        # container.remove()
-        # tunnel_state["last_action_status"] += " Container removed."
         time.sleep(2)
         update_cloudflared_container_status()
         return True
@@ -410,16 +383,15 @@ def stop_cloudflared_container():
         return False
 
 # --- Flask Web Server ---
+# (This section remains unchanged)
 app = Flask(__name__)
-app.secret_key = os.urandom(24) # Needed for flash messages if we add them
+app.secret_key = os.urandom(24)
 
 @app.route('/')
 def status_page():
     """Displays the current tunnel status and controls."""
-    # Update container status before rendering
     update_cloudflared_container_status()
 
-    # Mask token for display purposes
     display_token = "Not available"
     if tunnel_state.get("token"):
         token = tunnel_state["token"]
@@ -432,10 +404,8 @@ def status_page():
     elif tunnel_state.get("id"):
         display_token = "Token not retrieved"
 
-    # Determine overall error state for display class
     display_error = tunnel_state.get("error") or (tunnel_state.get("last_action_status") and "Error" in tunnel_state["last_action_status"])
 
-    # Simple HTML template as a string
     html_template = """
     <!DOCTYPE html>
     <html>
@@ -511,43 +481,36 @@ def status_page():
     """
     return render_template_string(
         html_template,
-        # Tunnel details
         name=tunnel_state["name"],
         id=tunnel_state.get("id"),
         status_message=tunnel_state["status_message"],
         error=tunnel_state.get("error"),
         display_token=display_token,
-        token=tunnel_state.get("token"), # Pass raw token for button logic
-        # Agent details
+        token=tunnel_state.get("token"),
         cloudflared_container_name=CLOUDFLARED_CONTAINER_NAME,
         cloudflared_container_status=tunnel_state["cloudflared_container_status"],
         last_action_status=tunnel_state.get("last_action_status"),
-        # Other state
-        docker_client=docker_client # Pass docker client availability to template
+        docker_client=docker_client
     )
 
 # --- Action Routes ---
-
+# (Unchanged)
 @app.route('/start', methods=['POST'])
 def start_tunnel():
-    """Endpoint to trigger starting the tunnel."""
     logging.info("Received request to start tunnel agent.")
     start_cloudflared_container()
-    # Redirect back to the status page to show the result
     return redirect(url_for('status_page'))
 
 @app.route('/stop', methods=['POST'])
 def stop_tunnel():
-    """Endpoint to trigger stopping the tunnel."""
     logging.info("Received request to stop tunnel agent.")
     stop_cloudflared_container()
-    # Redirect back to the status page
     return redirect(url_for('status_page'))
 
 
 # --- Main Execution ---
+# (Unchanged)
 if __name__ == '__main__':
-    # Initialize tunnel on startup
     try:
          initialize_tunnel()
     except Exception as init_err:
@@ -556,7 +519,6 @@ if __name__ == '__main__':
              tunnel_state["error"] = f"Initialization failed: {init_err}"
          tunnel_state["status_message"] = "Tunnel initialization failed."
 
-    # Ensure initial container status is known if Docker client is available
     if docker_client:
         try:
             update_cloudflared_container_status()
@@ -564,7 +526,5 @@ if __name__ == '__main__':
             logging.error(f"Error getting initial Docker status: {docker_err}", exc_info=True)
             tunnel_state["cloudflared_container_status"] = "docker_error"
 
-
-    # Run Flask app
     logging.info("Starting Flask application server.")
     app.run(host='0.0.0.0', port=5000)
