@@ -6,9 +6,9 @@
 [![Generic badge](https://img.shields.io/badge/Status-Alpha-yellow.svg)](https://shields.io/)
 [![Docker Pulls](https://img.shields.io/docker/pulls/alplat/dockflare)](https://hub.docker.com/r/alplat/dockflare)
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
-[![GitHub issues](https://img.shields.io/github/issues/alplat/dockflare)](https://github.com/alplat/dockflare/issues)
-[![GitHub last commit](https://img.shields.io/github/last-commit/alplat/dockflare)](https://github.com/alplat/dockflare/commits/stable)
-[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/alplat/dockflare)](https://github.com/alplat/dockflare/commits/stable)
+[![GitHub issues](https://img.shields.io/github/issues/ChrispyBacon-dev/dockflare)](https://github.com/ChrispyBacon-dev/dockflare/issues)
+[![GitHub last commit](https://img.shields.io/github/last-commit/ChrispyBacon-dev/dockflare)](https://github.com/ChrispyBacon-dev/dockflare/commits/stable)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ChrispyBacon-dev/dockflare)](https://github.com/ChrispyBacon-dev/dockflare/commits/stable)
 
 
 DockFlare automates Cloudflare Tunnel ingress rule management based on Docker container labels, simplifying public exposure of your Dockerized applications. It eliminates manual Cloudflare configuration, acting as a self-hosted ingress controller.
