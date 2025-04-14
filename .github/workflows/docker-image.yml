@@ -38,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: alplat/baconflip # Your Docker image name
+          images: alplat/dockflare # Your Docker image name
           tags: |
             # --- ADDED THIS LINE ---
             # Create Docker tag from Git SemVer tags (e.g., v1.3.0 -> 1.3.0)
