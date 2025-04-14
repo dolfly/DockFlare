@@ -1,19 +1,93 @@
 <!DOCTYPE html>
-<html lang="en" {% if request.cookies.get('theme') %}data-theme="{{ request.cookies.get('theme') }}"{% endif %}> <!-- Add theme from cookie -->
+<!-- data-theme attribute will be added by JS based on cookie or OS preference -->
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="30"> <!-- Auto-refresh every 30 seconds -->
+    <!-- Auto-refresh every 30 seconds -->
+    <meta http-equiv="refresh" content="30">
+    <!-- Pico.css CDN Link -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@latest/css/pico.min.css">
-    <title>DockFlare Tunnel Manager</title>
+    <title>Cloudflare Tunnel Manager</title>
     <style>
-        /* ... (keep existing styles) ... */
+        /* Basic layout adjustments */
+        body { padding-top: 1rem; padding-bottom: 1rem; }
+        h1, h2, h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
+        h1 { margin-top: 0; text-align: center; }
+        article { margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px dashed var(--pico-form-element-border-color); }
+        article:last-of-type { border-bottom: none; margin-bottom: 0; } /* Remove border from last article */
+        td pre, p pre { margin: 0; white-space: pre-wrap; word-break: break-all; font-family: var(--pico-font-family-monospace); font-size: 0.9em; display: inline-block; background-color: var(--pico-code-background-color); padding: 0.1em 0.4em; border-radius: var(--pico-border-radius); }
+
+        /* Status-specific boxes with left border */
+        .status-box {
+            padding: 1rem 1.25rem;
+            border: 1px solid var(--pico-form-element-border-color);
+            border-radius: var(--pico-border-radius);
+            margin-top: 1rem;
+            margin-bottom: 1rem; /* Added margin bottom */
+            word-wrap: break-word;
+            background-color: var(--pico-form-element-background-color);
+            color: var(--pico-form-element-color);
+            border-left-width: 4px; /* Thicker left border */
+        }
+        .status-box.error { border-left-color: var(--pico-color-red-500); }
+        .status-box.success { border-left-color: var(--pico-color-green-500); }
+        .status-box.info { border-left-color: var(--pico-color-blue-500); }
+        .status-box.warning { border-left-color: var(--pico-color-amber-500); }
+        .status-box p { margin-bottom: 0.5em; } /* Spacing inside box */
+        .status-box p:last-child { margin-bottom: 0; }
+        .status-box strong { color: var(--pico-h_color); }
+        .status-box pre { display: block; white-space: pre-wrap; word-break: break-all; margin-top: 0.5em; } /* Block pre for errors */
+
+        /* Rule Status colors */
+        .status-active { color: var(--pico-color-green-600); font-weight: bold; }
+        .status-pending { color: var(--pico-color-orange-500); font-weight: bold; }
+
+        /* Form styling adjustments */
+        form { display: inline-block; margin: 0; }
+        form button { margin: 0; }
+        .grid > form > button { width: 100%; } /* Make buttons in grid take full width */
+
+        /* Status indicator dots */
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: middle;}
+        .status-indicator.running { background-color: var(--pico-color-green-500); }
+        .status-indicator.exited, .status-indicator.dead, .status-indicator.not_found, .status-indicator.removing { background-color: var(--pico-color-red-500); }
+        .status-indicator.docker_unavailable { background-color: var(--pico-color-gray-500); }
+        .status-indicator.unknown, .status-indicator.created, .status-indicator.paused, .status-indicator.restarting { background-color: var(--pico-color-amber-500); }
+
+        /* Button customizations */
+        button.delete-button {
+            font-size: 0.9em;
+            padding: 0.5rem 0.75rem;
+            line-height: 1; /* Ensure text aligns vertically */
+            vertical-align: middle; /* Align with other elements if needed */
+        }
+
+        /* Theme Toggle Button */
+        #theme-toggle {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem;
+            width: auto;
+            line-height: 1;
+            font-size: 1.2rem;
+            background: transparent;
+            border: none;
+            color: var(--pico-secondary);
+            cursor: pointer;
+        }
+        #theme-toggle:hover {
+            color: var(--pico-secondary-hover);
+             background: transparent;
+             border: none;
+        }
 
         /* Flash message styling */
         .flash-messages {
             list-style: none;
             padding: 0;
-            margin-bottom: 1rem; /* Space below messages */
+            margin: 0 0 1.5rem 0; /* Space below messages */
         }
         .flash-messages li {
             padding: 0.75rem 1.25rem;
@@ -43,18 +117,28 @@
             border-color: var(--pico-color-red-500);
         }
 
-         /* Style for settings form */
+        /* Style for settings form */
         #settings-form label {
-            display: block;
+            display: block; /* Ensure label is on its own line */
             margin-bottom: 0.5rem;
+            font-weight: bold;
         }
         #settings-form input[type="number"] {
             max-width: 150px; /* Limit width of number input */
             display: inline-block; /* Allow button next to it */
             margin-right: 0.5rem;
+            vertical-align: baseline; /* Align input with text/button */
         }
         #settings-form button {
-             vertical-align: bottom; /* Align button nicely with input */
+             vertical-align: baseline; /* Align button nicely with input */
+             margin-left: 0.5rem; /* Add space before button */
+        }
+        #settings-form small {
+            display: block; /* Ensure help text is on its own line */
+            margin-top: 0.5rem;
+        }
+        table td {
+            vertical-align: middle; /* Align table cell content vertically */
         }
 
     </style>
@@ -62,9 +146,10 @@
 <body>
     <main class="container">
 
-        <button id="theme-toggle" aria-label="Toggle theme">🌓</button>
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" aria-label="Toggle theme">🌓</button> <!-- Initial Icon -->
 
-        <h1>DockFlare Tunnel Manager</h1>
+        <h1>Cloudflare Tunnel Manager</h1>
 
         <!-- Flash Messages Section -->
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -80,50 +165,147 @@
 
         <!-- Initialization Status Section -->
         <article>
-            <!-- ... (keep existing content) ... -->
+            <hgroup>
+                <h2>Initialization Status</h2>
+                <h3>Cloudflare Tunnel API Interaction</h3>
+            </hgroup>
+            <!-- Apply status class directly to the box -->
+            <div class="status-box {{ 'error' if tunnel_state.get('error') else ('success' if tunnel_state.get('token') else 'info') }}">
+                <p><strong>Message:</strong> {{ tunnel_state.status_message }}</p>
+                {% if tunnel_state.get('error') %}
+                    <p><strong>Error Details:</strong> <pre>{{ tunnel_state.error }}</pre></p>
+                {% endif %}
+            </div>
+            <h4>Tunnel Details</h4>
+            <p><strong>Desired Tunnel Name:</strong> <pre>{{ tunnel_state.name }}</pre></p>
+            <p><strong>Tunnel ID:</strong> <pre>{{ tunnel_state.id if tunnel_state.id else 'Not Initialized / Error' }}</pre></p>
+            <p><strong>Tunnel Token:</strong> <pre>{{ display_token }}</pre></p>
         </article>
 
         <!-- Tunnel Agent Control Section -->
         <article>
-           <!-- ... (keep existing content) ... -->
+            <hgroup>
+                <h2>Tunnel Agent Control</h2>
+                <h3>Docker Container: <pre>{{ cloudflared_container_name }}</pre></h3>
+            </hgroup>
+            <p>
+                <strong>Agent Container Status:</strong>
+                <span class="status-indicator {{ agent_state.container_status | lower }}"></span>
+                <strong style="text-transform: capitalize;">
+                    {{ agent_state.container_status.replace('_',' ') }}
+                </strong>
+            </p>
+            {% if agent_state.last_action_status %}
+                <!-- Apply status class directly to the box based on keywords -->
+                <div class="status-box {{ 'error' if 'Error:' in agent_state.last_action_status or 'Failed' in agent_state.last_action_status else ('warning' if 'Warning:' in agent_state.last_action_status else 'info') }}">
+                    <p><strong>Last Action Result:</strong> {{ agent_state.last_action_status }}</p>
+                </div>
+            {% endif %}
+
+            <!-- Agent Control Buttons - Grouped with grid -->
+            <div class="grid">
+                 <form action="{{ url_for('start_tunnel') }}" method="post">
+                     <button type="submit"
+                             {{ 'disabled' if not tunnel_state.get('token') or agent_state.container_status=='running' or not docker_available }}>
+                         Start Agent
+                     </button>
+                 </form>
+                 <form action="{{ url_for('stop_tunnel') }}" method="post">
+                     <button type="submit" class="secondary"
+                             {{ 'disabled' if agent_state.container_status != 'running' or not docker_available }}>
+                         Stop Agent
+                     </button>
+                 </form>
+            </div>
+             {% if not docker_available %}
+                <p><small><em>Docker controls disabled (Docker client unavailable).</em></small></p>
+             {% endif %}
         </article>
 
         <!-- Managed Ingress Rules Section -->
         <article>
             <h2>Managed Ingress Rules</h2>
-            <!-- ... (keep existing table structure) ... -->
-             <tbody>
-                {% for hostname, details in rules.items()|sort %} {# Sort by hostname #}
-                    <tr>
-                        <td><pre>{{ hostname }}</pre></td>
-                        <td><pre>{{ details.service }}</pre></td>
-                        <td>
-                            <strong class="{{ 'status-active' if details.status=='active' else 'status-pending' }}">
-                                {{ details.status.replace('_', ' ') }} {# Nicer display for pending_deletion #}
-                            </strong>
-                        </td>
-                        <td><pre title="{{ details.container_id if details.container_id else 'N/A' }}">{{ details.container_id[:12] if details.container_id else 'N/A' }}</pre></td>
-                        <td>
-                            {% if details.status=='pending_deletion' and details.delete_at %}
-                                {# Format the datetime string into a readable format #}
-                                {% set dt = details.delete_at | string %}
-                                {% if dt.endswith('Z') %}
-                                    {% set dt_obj = dt[:-1] + '+00:00' | strptime('%Y-%m-%dT%H:%M:%S%z') %}
-                                {% else %}
-                                     {% set dt_obj = dt | strptime('%Y-%m-%d %H:%M:%S.%f%z') %} {# Adjust format if needed #}
-                                {% endif %}
-                                <span title="{{ dt }}">{{ dt_obj.strftime('%H:%M %d-%b-%Y') }}</span>
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </td>
-                        <td>
-                            <!-- ... (keep existing form) ... -->
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-            <!-- ... (keep existing table closing tags) ... -->
+            {% if rules %}
+                <figure> <!-- Pico styles tables inside figures nicely -->
+                <div class="overflow-auto"> <!-- Make table horizontally scrollable on small screens -->
+                <table role="grid"> <!-- role="grid" for accessibility -->
+                    <thead>
+                        <tr>
+                            <th scope="col">Hostname</th>
+                            <th scope="col">Service Target</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Container</th>
+                            <th scope="col">Delete Scheduled (UTC)</th>
+                            <th scope="col">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {# Sort rules by hostname for consistent display #}
+                        {% for hostname, details in rules.items()|sort %}
+                            <tr>
+                                <td><pre>{{ hostname }}</pre></td>
+                                <td><pre>{{ details.service }}</pre></td>
+                                <td>
+                                    <strong class="{{ 'status-active' if details.status=='active' else 'status-pending' }}">
+                                        {{ details.status.replace('_', ' ') | capitalize }}
+                                    </strong>
+                                </td>
+                                <td>
+                                    {% if details.container_id %}
+                                    <pre title="Container ID: {{ details.container_id }}">{{ details.container_id[:12] }}</pre>
+                                    {% else %}
+                                    N/A
+                                    {% endif %}
+                                </td>
+                                <td style="min-width: 150px;"> {# Give date column some minimum width #}
+                                    {% if details.status=='pending_deletion' and details.delete_at %}
+                                        {# Assuming details.delete_at is an ISO string like 'YYYY-MM-DDTHH:MM:SSZ' #}
+                                        {% set dt_str = details.delete_at | string %}
+                                        {% set dt_obj = None %}
+                                        {% if dt_str %}
+                                            {% set formats_to_try = ['%Y-%m-%dT%H:%M:%SZ', '%Y-%m-%d %H:%M:%S.%f%z'] %}
+                                            {% for fmt in formats_to_try %}
+                                                {% if dt_obj is none %} {# Only try if not already parsed #}
+                                                    {% Try parsing. Use 'none' as default to avoid error propagation #}
+                                                    {% set parsed_dt = dt_str | strptime(fmt, default=none) %}
+                                                    {% if parsed_dt %}
+                                                        {% set dt_obj = parsed_dt %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endfor %}
+                                        {% endif %}
+
+                                        {% if dt_obj %}
+                                             <span title="{{ dt_str }}">{{ dt_obj.strftime('%H:%M:%S %d-%b-%Y') }}</span>
+                                        {% elif dt_str %}
+                                            {# Fallback to raw string if parsing failed #}
+                                            <span title="Could not parse date"><em>{{ dt_str }}</em></span>
+                                        {% else %}
+                                            N/A
+                                        {% endif %}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post"
+                                          onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for \'{{ hostname }}\' immediately? This bypasses the grace period.');">
+                                        <button type="submit" class="delete-button contrast outline"
+                                                title="Force delete rule and DNS immediately"
+                                                {{ 'disabled' if not docker_available or not tunnel_state.id }}>
+                                            Delete Now
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                </div>
+                </figure>
+            {% else %}
+                <p>No ingress rules are currently being managed or pending deletion.</p>
+            {% endif %}
         </article>
 
          <!-- Settings Section -->
@@ -131,54 +313,61 @@
             <h2>Settings</h2>
             <form id="settings-form" action="{{ url_for('update_settings') }}" method="post">
                  <label for="grace_period_hours">Rule Deletion Grace Period (Hours):</label>
-                 <input type="number" id="grace_period_hours" name="grace_period_hours"
-                        value="{{ grace_period_hours }}"
-                        min="0" step="0.1" required>
-                 <button type="submit">Update Grace Period</button>
+                 <div>
+                     <input type="number" id="grace_period_hours" name="grace_period_hours"
+                            value="{{ grace_period_hours }}"
+                            min="0" step="0.1" required aria-describedby="grace-period-help">
+                     <button type="submit">Update Grace Period</button>
+                 </div>
             </form>
-            <small>Time after a container stops before its rule and DNS record are automatically deleted. Default: 2 hours.</small>
+            <small id="grace-period-help">Time after a container stops before its rule and DNS record are automatically deleted. Default: 2 hours.</small>
         </article>
-
 
     </main> <!-- end .container -->
 
     <!-- JavaScript for Theme Toggle -->
     <script>
       const themeToggleButton = document.getElementById('theme-toggle');
-      const htmlElement = document.documentElement;
+      const htmlElement = document.documentElement; // Target the <html> element
 
       // Function to set theme and cookie
       const setTheme = (theme) => {
         htmlElement.setAttribute('data-theme', theme);
-        // Set cookie to remember theme preference
+        // Set cookie to remember theme preference across sessions/refreshes
         document.cookie = `theme=${theme};path=/;max-age=31536000;SameSite=Lax`; // Expires in 1 year
-        themeToggleButton.textContent = theme === 'dark' ? '☀️' : '🌓';
+        themeToggleButton.textContent = theme === 'dark' ? '☀️' : '🌓'; // Update icon
       };
 
       // Function to toggle theme
       const toggleTheme = () => {
-        const currentTheme = htmlElement.getAttribute('data-theme') || 'light';
+        const currentTheme = htmlElement.getAttribute('data-theme') || 'light'; // Check current theme or default
         const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         setTheme(newTheme);
       };
 
-      // Add event listener
+      // Add event listener to the button
       themeToggleButton.addEventListener('click', toggleTheme);
 
-      // Apply theme on initial load (Check cookie first, then OS pref)
+      // Apply theme on initial load: Check Cookie -> Check OS Pref -> Default Light
       const initTheme = () => {
-          const savedTheme = document.cookie.split('; ').find(row => row.startsWith('theme='))?.split('=')[1];
-          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          // Try to get theme from cookie first
+          const savedTheme = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('theme='))
+            ?.split('=')[1];
 
-          if (savedTheme) {
+          if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
             setTheme(savedTheme);
           } else {
+            // If no valid cookie, check OS preference
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             setTheme(prefersDark ? 'dark' : 'light');
           }
       };
 
-      // Run theme initialization
-      initTheme();
+      // Run theme initialization when the DOM is ready
+      document.addEventListener('DOMContentLoaded', initTheme);
+
     </script>
 
 </body>
