@@ -1,0 +1,11 @@
+# Ensure the network 'cloudflare-net' exists (docker-compose up should create it)
+# docker network create cloudflare-net # Only if NOT using compose for the network
+
+# Run Nginx container
+docker run -d \
+  --name my-nginx-app \
+  --network cloudflare-net \
+  -l cloudflare.tunnel.enable="true" \
+  -l cloudflare.tunnel.hostname="nginx.dataverse.icu" \
+  -l cloudflare.tunnel.service="http://my-nginx-app:80" \
+  nginx:latest

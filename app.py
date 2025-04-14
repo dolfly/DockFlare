@@ -956,7 +956,37 @@ def start_cloudflared_container():
                       logging.info(f"Removing misconfigured container '{CLOUDFLARED_CONTAINER_NAME}' before creating a new one.")
                       try: container.remove(force=True)
                       except APIError as rm_err: logging.error(f"Failed to remove misconfigured container: {rm_err}. Proceeding to create might fail."); needs_recreate=False # Reset flag if remove fails maybe? Or let create fail?
-                      container = None # Ensure we enter the creation block
+                      container = None # Ensure we enterLARED_CONTAINER_NAME}': {e}. Assuming it needs creation.")
+                  container = None # Proceed to create block
+
+        # Create container if it doesn't exist or needed recreation
+        if not container and not success_flag: # Only create if not found or not successfully started above
+            # --- THIS LINE IS CORRECTED ---
+            logging.info(f"Container '{CLOUDFLARED_CONTAINER_NAME}' not found or needs creation. Creating...")
+            # --- END CORRECTION ---
+            try:
+                # Pull image first (optional, run will pull if needed but good practice)
+                try: logging.info(f"Pulling image {CLOUDFLARED_IMAGE}..."); docker_client.images.pull(CLOUDFLARED_IMAGE)
+                except APIError as img_err: logging.warning(f"Could not pull image {CLOUDFLARED_IMAGE}: {img_err}. Docker run will attempt to pull.")
+
+                # Run the container - **KEY CHANGE: use network, not network_mode**
+                new_container = docker_client.containers.run(
+                    image=CLOUDFLARED_IMAGE,
+                    command=f"tunnel --no-autoupdate run --token {token}",
+                    name=CLOUDFLARED_CONTAINER_NAME, # Use the correct variable here too
+                    network=CLOUDFLARED_NETWORK_NAME, # Connect to the bridge network
+                    restart_policy={"Name": "unless-stopped"},
+                    detach=True,
+                    remove=False, # Keep container after stop for inspection/restart
+                    # Add labels for potential self-identification? Optional.
+                    labels={"managed-by": "cloudflare-tunnel-ingress-controller"}
+                )
+                msg = f"Created and started container '{new_container.name}' on network '{CLOUDFLARED_NETWORK_NAME}'."; cloudflared_agent_state["last_action_status"] = msg; logging.info(msg); success_flag = True
+
+            except APIError as create_err:
+                # Handle case where name might be taken by a zombie container
+                if "is already in use" in str(create_err):
+                     logging.error(f"Container name '{CLOUDFLARED_ the creation block
                  else:
                       # Container exists, is stopped, and seems correctly configured - just start it
                       logging.info(f"Starting existing correctly configured container '{CLOUDFLARED_CONTAINER_NAME}'..."); container.start(); msg = f"Started existing container '{CLOUDFLARED_CONTAINER_NAME}'."; cloudflared_agent_state["last_action_status"] = msg; logging.info(msg); success_flag = True
@@ -967,7 +997,8 @@ def start_cloudflared_container():
 
         # Create container if it doesn't exist or needed recreation
         if not container and not success_flag: # Only create if not found or not successfully started above
-            logging.info(f"Container '{CLOUDFLARD_CONTAINER_NAME}' not found or needs creation. Creating...")
+            # <<< --- THIS IS THE CORRECTED LINE --- >>>
+            logging.info(f"Container '{CLOUDFLARED_CONTAINER_NAME}' not found or needs creation. Creating...")
             try:
                 # Pull image first (optional, run will pull if needed but good practice)
                 try: logging.info(f"Pulling image {CLOUDFLARED_IMAGE}..."); docker_client.images.pull(CLOUDFLARED_IMAGE)
@@ -985,7 +1016,24 @@ def start_cloudflared_container():
                     # Add labels for potential self-identification? Optional.
                     labels={"managed-by": "cloudflare-tunnel-ingress-controller"}
                 )
-                msg = f"Created and started container '{new_container.name}' on network '{CLOUDFLARED_NETWORK_NAME}'."; cloudflared_agent_state["last_action_status"] = msg; logging.info(msg); success_flag = True
+                msg = f"Created and started container '{new_container.name}' on network '{CLOUDFLARED_NETWORK_NAME}'."; cloudflared_agent_state["CONTAINER_NAME}' is already in use. Attempting to remove existing...") # Use correct variable
+                     try:
+                          stale_container = docker_client.containers.get(CLOUDFLARED_CONTAINER_NAME) # Use correct variable
+                          stale_container.remove(force=True)
+                          logging.info("Removed stale container. Please try starting again.")
+                          msg = f"Error: Container name conflict, removed stale container. Please retry start."
+                     except (NotFound, APIError) as rm_err:
+                          logging.error(f"Failed to remove stale container '{CLOUDFLARED_CONTAINER_NAME}': {rm_err}") # Use correct variable
+                          msg = f"Error: Docker API error creating container: {create_err} (and failed to remove stale)"
+                else:
+                     msg = f"Docker API error creating container: {create_err}"; logging.error(msg, exc_info=True)
+                cloudflared_agent_state["last_action_status"] = msg; success_flag = False
+    except APIError as e:
+        # Catch API errors from get/start/remove calls
+        msg = f"Docker API error during start sequence: {e}"; logging.error(msg, exc_info=True); cloudflared_agent_state["last_action_status"] = f"Error: {msg}"; success_flag = False
+    except Exception as e:
+        # Catch unexpected errors
+        msg = f"Unexpectedlast_action_status"] = msg; logging.info(msg); success_flag = True
 
             except APIError as create_err:
                 # Handle case where name might be taken by a zombie container
@@ -1009,6 +1057,8 @@ def start_cloudflared_container():
         # Catch unexpected errors
         msg = f"Unexpected error starting container: {e}"; logging.error(msg, exc_info=True); cloudflared_agent_state["last_action_status"] = f"Error: {msg}"; success_flag = False
     finally:
+        # Update status after a short delay to allow container error starting container: {e}"; logging.error(msg, exc_info=True); cloudflared_agent_state["last_action_status"] = f"Error: {msg}"; success_flag = False
+    finally:
         # Update status after a short delay to allow container state to settle
         if docker_client:
              logging.debug("Updating container status after start attempt...")
@@ -1016,7 +1066,7 @@ def start_cloudflared_container():
              update_cloudflared_container_status()
         logging.info(f"Exiting start_cloudflared_container function (Success: {success_flag}).")
         return success_flag
-
+        
 def stop_cloudflared_container():
     logging.info(f"Attempting to stop cloudflared agent container '{CLOUDFLARED_CONTAINER_NAME}'...")
     cloudflared_agent_state["last_action_status"] = "Stopping..."
