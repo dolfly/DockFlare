@@ -5,6 +5,7 @@
 docker run -d \
   --name my-nginx-app \
   --network cloudflare-net \
+  --port
   -l cloudflare.tunnel.enable="true" \
   -l cloudflare.tunnel.hostname="nginx.dataverse.icu" \
   -l cloudflare.tunnel.service="http://my-nginx-app:80" \
