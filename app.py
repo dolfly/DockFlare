@@ -1407,6 +1407,7 @@ def start_cloudflared_container():
              msg = "Tunnel token not available."; logging.error(msg); cloudflared_agent_state["last_action_status"] = f"Error: {msg}"; return False
 
         # Ensure the target Docker network exists
+        # Moved network check here, as it's essential before starting
         if not ensure_docker_network_exists(CLOUDFLARED_NETWORK_NAME):
              # Error message already set by ensure_docker_network_exists
              logging.error(f"Failed to ensure Docker network '{CLOUDFLARED_NETWORK_NAME}' exists. Cannot start agent.")
@@ -1759,12 +1760,12 @@ if __name__ == '__main__':
          # --- Normal Startup Flow ---
          logging.info("Docker client available.")
 
-         # Ensure network exists early
-         logging.info(f"Ensuring Docker network '{CLOUDFLARED_NETWORK_NAME}' exists...")
-         ensure_docker_network_exists(CLOUDFLARED_NETWORK_NAME) # Log errors inside function
+         # Ensure network exists early - Temporarily Commented Out
+         logging.info(f"Ensuring Docker network '{CLOUDFLARED_NETWORK_NAME}' exists... (Check deferred)")
+         # ensure_docker_network_exists(CLOUDFLARED_NETWORK_NAME) # <-- Temporarily commented out
 
          # Initialize Cloudflare Tunnel (find or create, get token)
-         # ADDED DEBUG LOGGING HERE
+         # ADDED DEBUG LOGGING HERE (Keep this line for now)
          logging.info("[DEBUG] >>> About to call initialize_tunnel()...")
          initialize_tunnel()
          logging.info(f"Tunnel initialization process complete. Status: {tunnel_state.get('status_message')}")
