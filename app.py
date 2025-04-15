@@ -66,22 +66,29 @@ class QueueLogHandler(logging.Handler):
         self.log_queue = log_queue
 
     def emit(self, record):
+        # Check if the message is already formatted for SSE (our custom events)
+        # This prevents double-formatting log messages if they somehow contain "event:"
         log_entry = self.format(record)
         if "event:" not in log_entry and "data:" not in log_entry:
-             message_payload = json.dumps(log_entry)
+            # Format as a standard SSE message event if it's a normal log record
+             message_payload = json.dumps(log_entry) # Ensure valid JSON payload
              sse_message = f"event: message\ndata: {message_payload}\n\n"
         else:
-             sse_message = log_entry
+             # Assume it's a pre-formatted SSE event (like rules_update)
+             sse_message = log_entry # Pass it through directly
+
         try:
             self.log_queue.put_nowait(sse_message)
         except queue.Full:
-            try: self.log_queue.get_nowait(); self.log_queue.put_nowait(sse_message)
+            try:
+                self.log_queue.get_nowait() # Discard oldest item
+                self.log_queue.put_nowait(sse_message) # Try putting again
             except queue.Empty: pass
             except queue.Full: print(f"Log queue full, dropping message: {log_entry[:100]}...", file=sys.stderr)
 
 queue_handler = QueueLogHandler(log_queue)
 queue_handler.setFormatter(log_formatter)
-queue_handler.setLevel(logging.INFO)
+queue_handler.setLevel(logging.INFO) # Only push INFO and above to the web UI
 root_logger = logging.getLogger()
 root_logger.addHandler(queue_handler)
 
@@ -96,11 +103,13 @@ tunnel_state = { "name": TUNNEL_NAME, "id": None, "token": None, "status_message
 cloudflared_agent_state = { "container_status": "unknown", "last_action_status": None }
 managed_rules = {}; zone_id_cache = {}; state_lock = threading.Lock(); stop_event = threading.Event()
 
+# --- NEW: Helper to Send SSE Events ---
 def send_sse_event(event_type, data=""):
     """Puts a specially formatted message into the log queue for SSE."""
     sse_message = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
     try: log_queue.put_nowait(sse_message); logging.debug(f"Sent SSE event: {event_type}")
     except queue.Full: logging.warning(f"Log queue full when trying to send SSE event: {event_type}. Event lost.")
+
 
 def load_state():
     global managed_rules; state_dir = os.path.dirname(STATE_FILE_PATH)
@@ -186,7 +195,8 @@ def get_zone_id_from_name(zone_name):
             # *** CORRECTED BLOCK ***
             if zone_id and zone_actual_name == zone_name:
                 logging.info(f"Found Zone ID for '{zone_name}': {zone_id}")
-                with state_lock: # Acquire lock to safely update cache
+                # Acquire lock ONLY to update the shared cache
+                with state_lock:
                     zone_id_cache[zone_name] = zone_id
                 # Return the zone_id *after* the lock is released
                 return zone_id
@@ -658,19 +668,27 @@ def status_page():
                  except Exception as date_parse_err: logging.warning(f"Error parsing delete_at ('{rule['delete_at']}') for template: {date_parse_err}"); rule["delete_at"] = None
         template_tunnel_state = tunnel_state.copy(); template_agent_state = cloudflared_agent_state.copy()
     display_token = get_display_token(template_tunnel_state.get("token")); docker_available = docker_client is not None
-    # Pass docker_available needed for the partial template too
     return render_template('status_page.html', tunnel_state=template_tunnel_state, agent_state=template_agent_state, display_token=display_token, cloudflared_container_name=CLOUDFLARED_CONTAINER_NAME, docker_available=docker_available, rules=rules_for_template)
 
 @app.route('/start-tunnel', methods=['POST'])
 def start_tunnel():
-    logging.info("UI request: Start tunnel agent."); start_cloudflared_container(); time.sleep(1); return jsonify(success=True) # Return JSON for fetch
+    # Return simple success/failure for JS fetch call
+    logging.info("UI request: Start tunnel agent.")
+    success = start_cloudflared_container()
+    time.sleep(1) # Allow status to potentially update
+    return jsonify(success=success)
 
 @app.route('/stop-tunnel', methods=['POST'])
 def stop_tunnel():
-    logging.info("UI request: Stop tunnel agent."); stop_cloudflared_container(); time.sleep(1); return jsonify(success=True) # Return JSON for fetch
+    # Return simple success/failure for JS fetch call
+    logging.info("UI request: Stop tunnel agent.")
+    success = stop_cloudflared_container()
+    time.sleep(1) # Allow status to potentially update
+    return jsonify(success=success)
 
 @app.route('/force_delete_rule/<hostname>', methods=['POST'])
 def force_delete_rule(hostname):
+    # Keep redirect for this as it's a standard form submission
     logging.info(f"UI request: Force delete rule for hostname: {hostname}"); rule_removed_from_state = False; dns_delete_success = False; zone_id_for_delete = None
     with state_lock:
         rule_details = managed_rules.get(hostname)
@@ -687,9 +705,8 @@ def force_delete_rule(hostname):
         logging.info(f"Triggering Cloudflare tunnel config update after force deleting {hostname}.")
         if update_cloudflare_config(): logging.info(f"CF tunnel config update successful after force deleting {hostname}."); status_msg = f"Successfully force deleted rule for {hostname} and updated Cloudflare."; status_msg += " (Note: DNS deletion failed or was skipped)." if not dns_delete_success else ""; cloudflared_agent_state["last_action_status"] = status_msg
         else: logging.error(f"CRITICAL: State updated after force delete of {hostname} (DNS delete success: {dns_delete_success}), but subsequent tunnel config update FAILED!"); cloudflared_agent_state["last_action_status"] = f"Error: Removed {hostname} locally (DNS delete: {dns_delete_success}), but FAILED tunnel config update! Reconciliation needed."
-    time.sleep(1); return redirect(url_for('status_page')) # Force delete still uses standard redirect
+    time.sleep(1); return redirect(url_for('status_page'))
 
-# --- NEW Endpoint: Render just the rules table ---
 @app.route('/get_rules_table')
 def get_rules_table():
     with state_lock:
@@ -702,10 +719,8 @@ def get_rules_table():
                      rule["delete_at"] = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
                  except Exception: rule["delete_at"] = None
     docker_available = docker_client is not None
-    # Use render_template with the partial file
     return render_template('rules_table_partial.html', rules=rules_for_template, docker_available=docker_available)
 
-# --- MODIFIED SSE stream endpoint ---
 @app.route('/stream-logs')
 def stream_logs():
     @stream_with_context
