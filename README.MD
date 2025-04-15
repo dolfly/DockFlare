@@ -32,33 +32,6 @@ DockFlare automates Cloudflare Tunnel ingress rule management based on Docker co
 
 ![Web ui example](images/status_web.png)
 
-**Core Problem Solved:**
-
-Simplifies exposing Docker services via Cloudflare Tunnel by automating configuration changes based on Docker container lifecycle events.
-## Technical Implementation
-
-*   **Language:** Python 3
-*   **Core Libraries:**
-    *   `requests`: Cloudflare API interaction.
-    *   `docker`: Docker API interaction and event handling.
-    *   `Flask`: Web UI.
-    *   `python-dotenv`: Configuration management.
-    *   `threading`: Background tasks.
-*   **Deployment:** Runs as a Docker container, typically managed by `docker-compose.yml`. Requires mounting the Docker socket (`/var/run/docker.sock`) to interact with the Docker daemon.
-*   **Configuration:**
-    *   Primarily via an `.env` file (API Token, Account ID, Tunnel Name, optional grace period, labels, etc.).
-    *   Docker labels on target application containers.
-*   **Authentication:** Uses a Cloudflare API Token with Account:Cloudflare Tunnel:Edit permissions (and potentially Zone:DNS:Edit if explicit DNS management were added).
-
-## Key Files
-
-*   `app.py`: Main Python application code (Flask routes, API logic, Docker event handling, state management).
-*   `Dockerfile`: Builds the application container, installing Python, dependencies, and `cloudflared`.
-*   `docker-compose.yml`: Defines the service for running the application container and mounts the Docker socket.
-*   `requirements.txt`: Lists Python dependencies.
-*   `.env`: Stores sensitive configuration and parameters (API keys, IDs, tunnel name). **Do not commit this file!**
-*   `state.json`: (Created at runtime) Persists the managed rules state.
-
 ## Getting Started
 
 There are two main ways to get DockFlare running:
@@ -213,3 +186,27 @@ This method involves cloning the repository, which gives you access to the examp
 
 3.  **Restart or Deploy Labeled Containers:**
     After adding the labels, (re)start the labeled containers (e.g., `docker-compose up -d my-web-app`). DockFlare will detect the labels and automatically configure the Cloudflare Tunnel ingress rules.
+
+## Technical Implementation
+
+*   **Language:** Python 3
+*   **Core Libraries:**
+    *   `requests`: Cloudflare API interaction.
+    *   `docker`: Docker API interaction and event handling.
+    *   `Flask`: Web UI.
+    *   `python-dotenv`: Configuration management.
+    *   `threading`: Background tasks.
+*   **Deployment:** Runs as a Docker container, typically managed by `docker-compose.yml`. Requires mounting the Docker socket (`/var/run/docker.sock`) to interact with the Docker daemon.
+*   **Configuration:**
+    *   Primarily via an `.env` file (API Token, Account ID, Tunnel Name, optional grace period, labels, etc.).
+    *   Docker labels on target application containers.
+*   **Authentication:** Uses a Cloudflare API Token with Account:Cloudflare Tunnel:Edit permissions (and potentially Zone:DNS:Edit if explicit DNS management were added).
+
+## Key Files
+
+*   `app.py`: Main Python application code (Flask routes, API logic, Docker event handling, state management).
+*   `Dockerfile`: Builds the application container, installing Python, dependencies, and `cloudflared`.
+*   `docker-compose.yml`: Defines the service for running the application container and mounts the Docker socket.
+*   `requirements.txt`: Lists Python dependencies.
+*   `.env`: Stores sensitive configuration and parameters (API keys, IDs, tunnel name). **Do not commit this file!**
+*   `state.json`: (Created at runtime) Persists the managed rules state.
