@@ -23,10 +23,13 @@
           --button-color-red-hover: var(--pico-color-red-400);
         }
 
-        body { padding-top: 1.5rem; padding-bottom: 2rem; display: flex; flex-direction: column; min-height: 100vh; }
+        body { padding-top: 1.5rem; padding-bottom: 2rem; display: flex; flex-direction: column; min-height: 100vh; font-size: 1rem; /* Standard base font size */ }
         main.container { flex-grow: 1; max-width: var(--container-max-width); width: 100%; padding-bottom: 2rem; margin-left: auto; margin-right: auto; }
         h1, h2, h3, h4 { margin-top: 1.5em; margin-bottom: 0.6em; color: var(--pico-h_color); }
-        h1 { margin-top: 0; text-align: center; margin-bottom: 1.5rem; font-weight: 600; }
+        h1 { margin-top: 0; text-align: center; margin-bottom: 1.5rem; font-weight: 600; font-size: 2.25em; /* Slightly larger H1 */ }
+        h2 { font-size: 1.75em; }
+        h3 { font-size: 1.4em; }
+        h4 { font-size: 1.15em; }
         article {
             margin-bottom: 2rem;
             padding: 1.5rem;
@@ -36,12 +39,12 @@
             box-shadow: var(--pico-box-shadow);
         }
         hgroup { margin-bottom: 1rem; }
-        p { line-height: 1.6; }
+        p { line-height: 1.6; margin-bottom: 1em; } /* Standard paragraph spacing */
 
-        /* --- Code & Pre Styling --- */
-        code { background-color: var(--pico-code-background-color); color: var(--pico-code-color); padding: 0.15em 0.4em; border-radius: var(--pico-border-radius); font-size: 0.9em; font-family: var(--pico-font-family-monospace); word-break: break-word; }
-        td code, h3 code, h4 code { background-color: transparent; padding: 0; font-family: var(--pico-font-family-monospace); font-size: 0.95em; }
-        pre { background-color: var(--pico-code-background-color); border: 1px solid var(--pico-form-element-border-color); border-radius: var(--pico-border-radius); padding: 0.75rem 1rem; color: var(--pico-color); margin-top: 0.25rem; white-space: pre-wrap; word-break: break-all; font-family: var(--pico-font-family-monospace); font-size: 0.9em; line-height: 1.5; }
+        /* --- Code & Pre Styling (More Consistent) --- */
+        code { background-color: var(--pico-code-background-color); color: var(--pico-code-color); padding: 0.15em 0.4em; border-radius: var(--pico-border-radius); font-size: 0.9em; /* Consistent code size */ font-family: var(--pico-font-family-monospace); word-break: break-word; }
+        /* Removed specific rule for td/h3/h4 code */
+        pre { background-color: var(--pico-code-background-color); border: 1px solid var(--pico-form-element-border-color); border-radius: var(--pico-border-radius); padding: 0.75rem 1rem; color: var(--pico-color); margin-top: 0.25rem; white-space: pre-wrap; word-break: break-all; font-family: var(--pico-font-family-monospace); font-size: 0.9em; /* Consistent pre size */ line-height: 1.5; }
         .token-display { margin-top: 0.5rem; }
         .token-display strong { display: block; margin-bottom: 0.2rem; }
 
@@ -67,49 +70,55 @@
         form { display: inline-block; margin: 0; }
         .agent-control-section { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; }
         .agent-status-info { flex-grow: 1; }
-        .agent-action-button { margin-left: 1rem; /* Add some space next to status text */ }
+        .agent-action-button { margin-left: 1rem; }
 
-        /* Custom Button Styles */
+        /* Custom Button Styles - Ensures background color is applied in base state */
         button.button-start {
             --pico-color: white; /* Text color */
-            --pico-background-color: var(--button-color-green);
-            --pico-border-color: var(--button-color-green);
+            background-color: var(--button-color-green); /* Apply base background */
+            border-color: var(--button-color-green); /* Apply base border */
              --pico-color-hover: white;
             --pico-background-color-hover: var(--button-color-green-hover);
             --pico-border-color-hover: var(--button-color-green-hover);
         }
         button.button-stop {
              --pico-color: white; /* Text color */
-             --pico-background-color: var(--button-color-red);
-             --pico-border-color: var(--button-color-red);
+             background-color: var(--button-color-red); /* Apply base background */
+             border-color: var(--button-color-red); /* Apply base border */
              --pico-color-hover: white;
              --pico-background-color-hover: var(--button-color-red-hover);
              --pico-border-color-hover: var(--button-color-red-hover);
         }
-        /* Ensure disabled states use standard Pico disabled style */
+        /* Ensure disabled states use standard Pico disabled style (important!) */
         button.button-start:disabled,
         button.button-stop:disabled {
+            color: var(--pico-form-element-disabled-color) !important; /* Use !important if needed to override */
+            background-color: var(--pico-form-element-disabled-background-color) !important;
+            border-color: var(--pico-form-element-disabled-border-color) !important;
+            cursor: not-allowed;
+            opacity: 0.5;
+            /* Reset custom vars just in case, though overrides above should work */
             --pico-color: var(--pico-form-element-disabled-color);
             --pico-background-color: var(--pico-form-element-disabled-background-color);
             --pico-border-color: var(--pico-form-element-disabled-border-color);
-            cursor: not-allowed;
-            opacity: 0.5;
+            --pico-color-hover: var(--pico-form-element-disabled-color);
+            --pico-background-color-hover: var(--pico-form-element-disabled-background-color);
+            --pico-border-color-hover: var(--pico-form-element-disabled-border-color);
         }
 
         button.delete-button { font-size: 0.85em; padding: 0.4rem 0.6rem; --pico-color: var(--pico-color-red-600); --pico-color-hover: var(--pico-color-red-700); --pico-color-focus: var(--pico-color-red-700); }
 
         /* --- Table Styling --- */
         figure { margin: 1.5rem 0; overflow-x: auto; }
-        table { white-space: nowrap; width: 100%; }
+        table { white-space: nowrap; width: 100%; font-size: 0.95em; /* Slightly smaller table text */ }
         table th { font-weight: 600; background-color: var(--pico-table-header-background); color: var(--pico-table-header-color); }
         table td, table th { padding: 0.75rem 1rem; vertical-align: middle; }
         table tbody tr:hover { background-color: var(--pico-table-row-striping-background-color); }
-        table td:nth-child(1), table td:nth-child(2) { white-space: normal; }
+        table td:nth-child(1), table td:nth-child(2) { white-space: normal; } /* Allow wrap for hostname/service */
         table td a { text-decoration: none; color: var(--pico-primary); }
         table td a:hover { text-decoration: underline; color: var(--pico-primary-hover); }
-        table td a code { color: inherit; background: none; padding: 0; }
-        .countdown-timer { font-size: 0.8em; color: var(--pico-muted-color); display: block; margin-top: 0.2rem; }
-        .absolute-time { font-size: 0.9em; }
+        .countdown-timer { font-size: 0.85em; /* Smaller countdown relative to table */ color: var(--pico-muted-color); display: block; margin-top: 0.2rem; }
+        .absolute-time { font-size: 0.95em; /* Absolute time slightly larger than countdown */ }
 
         /* --- Theme Toggle Button --- */
         #theme-toggle { position: fixed; top: 1rem; right: 1rem; z-index: 100; padding: 0.6rem; width: auto; line-height: 1; font-size: 1.3rem; background: var(--pico-card-background-color); border: 1px solid var(--pico-form-element-border-color); border-radius: 50%; color: var(--pico-secondary); cursor: pointer; box-shadow: var(--pico-box-shadow); transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease; }
@@ -117,7 +126,7 @@
         #theme-toggle:focus { outline: 2px solid var(--pico-primary-focus); outline-offset: 2px; }
 
         /* --- Footer Styling --- */
-        footer { margin-top: auto; padding-top: 1.5rem; padding-bottom: 1rem; border-top: 1px solid var(--pico-form-element-border-color); text-align: center; font-size: 0.9em; color: var(--pico-muted-color); width: 100%; }
+        footer { margin-top: auto; padding-top: 1.5rem; padding-bottom: 1rem; border-top: 1px solid var(--pico-form-element-border-color); text-align: center; font-size: 0.9em; /* Smaller footer */ color: var(--pico-muted-color); width: 100%; }
         footer a { color: var(--pico-secondary); text-decoration: none; }
         footer a:hover { color: var(--pico-secondary-hover); text-decoration: underline; }
         footer a.secondary { text-decoration: none; }
@@ -134,7 +143,7 @@
             border-radius: var(--pico-border-radius);
             padding: 1rem;
             font-family: var(--pico-font-family-monospace);
-            font-size: 0.85em;
+            font-size: 0.85em; /* Keep logs smaller */
             line-height: 1.5;
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -259,7 +268,7 @@
       function formatTimeDifference(diffMillis) { const totalSeconds = Math.round(Math.abs(diffMillis / 1000)); if (totalSeconds < 60) { return diffMillis >= 0 ? 'in <1m' : 'Expired <1m ago'; } const days = Math.floor(totalSeconds / (3600 * 24)); const hours = Math.floor((totalSeconds % (3600 * 24)) / 3600); const minutes = Math.floor((totalSeconds % 3600) / 60); let parts = []; if (days > 0) parts.push(`${days}d`); if (hours > 0) parts.push(`${hours}h`); if (minutes > 0 || (days === 0 && hours === 0)) parts.push(`${minutes}m`); const timeString = parts.join(' '); return diffMillis >= 0 ? `in ${timeString}` : `Expired ${timeString} ago`; }
       function updateCountdowns() { const now = new Date(); countdownElements.forEach(span => { const td = span.closest('td'); if (!td) return; const deleteAtISO = td.dataset.deleteAt; if (!deleteAtISO) return; try { const targetDate = new Date(deleteAtISO); if (isNaN(targetDate.getTime())) { throw new Error("Invalid date parsed"); } const diff = targetDate - now; span.textContent = `(${formatTimeDifference(diff)})`; if (diff < 0) { span.classList.add('expired'); } else { span.classList.remove('expired'); } } catch (e) { console.error("Error parsing date for countdown:", deleteAtISO, e); span.textContent = "(invalid date)"; } }); }
       updateCountdowns(); // Run once on load
-      // const countdownInterval = setInterval(updateCountdowns, 30000); // Keep commented unless needed
+      // const countdownInterval = setInterval(updateCountdowns, 30000);
 
 
       // --- Real-time Log Streaming ---
