@@ -11,12 +11,14 @@ services:
       - .env
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./data:/app/data
+      - dockflare_data:/app/data
     networks:
       - cloudflare-net
     environment:
       - STATE_FILE_PATH=/app/data/state.json
       - TZ=Europe/Zurich # Set the timezone to Zurich
+volumes:
+  dockflare_data:
 networks:
   cloudflare-net:
     driver: bridge

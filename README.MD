@@ -70,16 +70,18 @@ This method allows you to run DockFlare quickly without cloning the entire repos
           - .env
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock:ro # Required to monitor Docker events
-          - ./data:/app/data # Persistent storage for state
+          - dockflare_data:/app/data # Persistent storage for state
         networks:
           - cloudflare-net
         environment:
           - STATE_FILE_PATH=/app/data/state.json # Path to state file inside the container
           - TZ=Europe/Zurich # Optional: Set your timezone, e.g., America/New_York
+    volumes:
+      dockflare_data:
     networks:
       cloudflare-net:
-        driver: bridge
-        name: cloudflare-net # Creates/uses a dedicated network for the tunnel
+      driver: bridge
+      name: cloudflare-net # Creates/uses a dedicated network for the tunnel
     ```
 
 2.  **Create and Configure `.env`:**
