@@ -540,8 +540,12 @@ def update_cloudflare_config():
         for hostname, rule_details in managed_rules.items():
             if rule_details.get("status") == "active":
                 service = rule_details.get("service")
+                no_tls_verify = rule_details.get("no_tls_verify", False)
                 if service:
-                    desired_ingress_rules.append({"hostname": hostname, "service": service})
+                    rule = {"hostname": hostname, "service": service}
+                    if no_tls_verify:
+                        rule["noTLSVerify"] = True
+                    desired_ingress_rules.append(rule)
                 else:
                     logging.warning(f"Rule {hostname} is active but missing 'service' detail. Skipping.")
 
@@ -556,7 +560,7 @@ def update_cloudflare_config():
         current_cf_ingress = [r for r in current_config.get("ingress", []) if r.get("service") != catch_all_rule["service"]]
 
         def rule_to_canonical(rule):
-            items = sorted([(k, v) for k, v in rule.items() if k in ["hostname", "service"]])
+            items = sorted([(k, v) for k, v in rule.items() if k in ["hostname", "service", "noTLSVerify"]])
             return tuple(items)
 
         try:
@@ -662,12 +666,15 @@ def process_container_start(container):
         hostname_label = f"{LABEL_PREFIX}.hostname"
         service_label = f"{LABEL_PREFIX}.service"
         zone_name_label = f"{LABEL_PREFIX}.zonename"
+        no_tls_verify_label = f"{LABEL_PREFIX}.no_tls_verify"
 
         is_enabled = labels.get(enabled_label, "false").lower() in ["true", "1", "t", "yes"]
         hostname = labels.get(hostname_label)
         service = labels.get(service_label)
         zone_name = labels.get(zone_name_label)
+        no_tls_verify = labels.get(no_tls_verify_label, "false").lower() in ["true", "1", "t", "yes"]
 
+        # Add no_tls_verify to the rule if specified
         if not is_enabled:
             logging.debug(f"Ignoring start: {container_name} ({container_id[:12]}): '{enabled_label}' not true.")
             return
@@ -713,6 +720,7 @@ def process_container_start(container):
                     existing_rule["service"] = service
                     existing_rule["container_id"] = container_id
                     existing_rule["zone_id"] = target_zone_id
+                    existing_rule["no_tls_verify"] = no_tls_verify
                     state_changed_locally = True
                     needs_cf_update = True
                     if zone_id_changed:
@@ -735,6 +743,11 @@ def process_container_start(container):
                          existing_rule["zone_id"] = target_zone_id
                          state_changed_locally = True
                          needs_cf_update = True
+                    if no_tls_verify != existing_rule.get("no_tls_verify", False):
+                        logging.info(f"Updating no_tls_verify for active rule {hostname}: '{existing_rule.get('no_tls_verify')}' -> '{no_tls_verify}'.")
+                        existing_rule["no_tls_verify"] = no_tls_verify
+                        state_changed_locally = True
+                        needs_cf_update = True
             else:
                 logging.info(f"Adding new active rule for hostname: {hostname}")
                 managed_rules[hostname] = {
@@ -742,7 +755,8 @@ def process_container_start(container):
                     "container_id": container_id,
                     "status": "active",
                     "delete_at": None,
-                    "zone_id": target_zone_id
+                    "zone_id": target_zone_id,
+                    "no_tls_verify": no_tls_verify
                 }
                 state_changed_locally = True
                 needs_cf_update = True
@@ -999,6 +1013,7 @@ def reconcile_state():
                      hostname = labels.get(f"{LABEL_PREFIX}.hostname")
                      service = labels.get(f"{LABEL_PREFIX}.service")
                      zone_name = labels.get(f"{LABEL_PREFIX}.zonename")
+                     no_tls_verify = labels.get(f"{LABEL_PREFIX}.no_tls_verify", "false").lower() in ["true", "1", "t", "yes"]
 
                      if enabled and hostname and service:
                          if not is_valid_hostname(hostname): continue
@@ -1010,7 +1025,8 @@ def reconcile_state():
                              "service": service,
                              "container_id": container_id,
                              "container_name": container_name,
-                             "zone_name": zone_name
+                             "zone_name": zone_name,
+                             "no_tls_verify": no_tls_verify
                          }
                  except (NotFound, APIError) as e:
                       logging.warning(f"[Reconcile] Docker error processing container {c.id[:12]}: {e}. Skipping this container.");
@@ -1042,12 +1058,14 @@ def reconcile_state():
                         rule["status"] = "active"; rule["delete_at"] = None
                         rule["service"] = running_details["service"]; rule["container_id"] = running_details["container_id"]
                         rule["zone_id"] = target_zone_id
+                        rule["no_tls_verify"] = running_details["no_tls_verify"]
                         state_changed_locally = True; needs_cf_update = True
                         hostnames_requiring_dns_check.append(hostname)
                         if zone_id_changed: logging.info(f"[Reconcile] Zone ID for reactivated rule {hostname} updated to {target_zone_id}.")
                     elif rule.get("status") == "active":
                         container_changed = rule.get("container_id") != running_details["container_id"]
                         service_changed = rule.get("service") != running_details["service"]
+                        no_tls_verify_changed = rule.get("no_tls_verify", False) != running_details["no_tls_verify"]
                         if container_changed:
                              logging.info(f"[Reconcile] Updating container ID for active rule {hostname}.");
                              rule["container_id"] = running_details["container_id"]; state_changed_locally = True
@@ -1059,11 +1077,15 @@ def reconcile_state():
                              rule["zone_id"] = target_zone_id; state_changed_locally = True;
                              hostnames_requiring_dns_check.append(hostname)
                              needs_cf_update = True
+                        if no_tls_verify_changed:
+                             logging.info(f"[Reconcile] Updating no_tls_verify for active rule {hostname}.");
+                             rule["no_tls_verify"] = running_details["no_tls_verify"]; state_changed_locally = True; needs_cf_update = True
                 else:
                     logging.info(f"[Reconcile] Found running container for new hostname {hostname}. Adding rule.")
                     managed_rules[hostname] = {
                         "service": running_details["service"], "container_id": running_details["container_id"],
-                        "status": "active", "delete_at": None, "zone_id": target_zone_id
+                        "status": "active", "delete_at": None, "zone_id": target_zone_id,
+                        "no_tls_verify": running_details["no_tls_verify"]
                     }
                     state_changed_locally = True; needs_cf_update = True
                     hostnames_requiring_dns_check.append(hostname)

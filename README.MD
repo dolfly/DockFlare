@@ -180,10 +180,12 @@ This method involves cloning the repository, which gives you access to the examp
           cloudflare.tunnel.hostname: "my-service.example.com" # Required: Your public hostname
           cloudflare.tunnel.service: "http://my-web-app:80" # Required: Internal service URL (use container name/alias and port)
           # cloudflare.tunnel.zonename: "other-domain.com" # Optional: Use if hostname is on a different zone than CF_ZONE_ID
+          cloudflare.tunnel.no_tls_verify: "true" # Optional: Disables TLS verification for this service
     ```
     *   Replace `"my-service.example.com"` with the desired public hostname (must be within a zone managed by your Cloudflare account).
     *   Replace `"http://my-web-app:80"` with the internal URL of your service (use the service/container name and the port it listens on *within the Docker network*).
     *   `cloudflare.tunnel.zonename`: (Optional) Only needed if the `hostname` belongs to a *different* Cloudflare Zone than the one specified by `CF_ZONE_ID` in your `.env` file. Both zones must be under the same Cloudflare Account (`CF_ACCOUNT_ID`).
+    *   `cloudflare.tunnel.no_tls_verify`: (Optional) Disables TLS verification for this service.
 
 3.  **Restart or Deploy Labeled Containers:**
     After adding the labels, (re)start the labeled containers (e.g., `docker-compose up -d my-web-app`). DockFlare will detect the labels and automatically configure the Cloudflare Tunnel ingress rules.
