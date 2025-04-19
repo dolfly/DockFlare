@@ -542,10 +542,7 @@ def update_cloudflare_config():
                 service = rule_details.get("service")
                 no_tls_verify = rule_details.get("no_tls_verify", False)
                 if service:
-                    rule = {"hostname": hostname, "service": service}
-                    if no_tls_verify:
-                        rule["noTLSVerify"] = True
-                    desired_ingress_rules.append(rule)
+                    desired_ingress_rules.append({"hostname": hostname, "service": service, "noTLSVerify": no_tls_verify})
                 else:
                     logging.warning(f"Rule {hostname} is active but missing 'service' detail. Skipping.")
 
@@ -674,7 +671,6 @@ def process_container_start(container):
         zone_name = labels.get(zone_name_label)
         no_tls_verify = labels.get(no_tls_verify_label, "false").lower() in ["true", "1", "t", "yes"]
 
-        # Add no_tls_verify to the rule if specified
         if not is_enabled:
             logging.debug(f"Ignoring start: {container_name} ({container_id[:12]}): '{enabled_label}' not true.")
             return
@@ -728,6 +724,7 @@ def process_container_start(container):
                 elif existing_rule.get("status") == "active":
                     service_changed = existing_rule.get("service") != service
                     container_changed = existing_rule.get("container_id") != container_id
+                    no_tls_verify_changed = no_tls_verify != existing_rule.get("no_tls_verify", False)
 
                     if container_changed:
                         logging.info(f"Updating container ID for active rule {hostname}: '{existing_rule.get('container_id')[:12]}' -> '{container_id[:12]}'.")
@@ -738,16 +735,16 @@ def process_container_start(container):
                          existing_rule["service"] = service
                          state_changed_locally = True
                          needs_cf_update = True
+                    if no_tls_verify_changed:
+                         logging.info(f"Updating no_tls_verify for active rule {hostname}: '{existing_rule.get('no_tls_verify')}' -> '{no_tls_verify}'.")
+                         existing_rule["no_tls_verify"] = no_tls_verify
+                         state_changed_locally = True
+                         needs_cf_update = True
                     if zone_id_changed:
                          logging.warning(f"Zone ID for active rule {hostname} changed ('{existing_rule.get('zone_id')}' -> '{target_zone_id}'). DNS in old zone may be stale if cleanup failed.")
                          existing_rule["zone_id"] = target_zone_id
                          state_changed_locally = True
                          needs_cf_update = True
-                    if no_tls_verify != existing_rule.get("no_tls_verify", False):
-                        logging.info(f"Updating no_tls_verify for active rule {hostname}: '{existing_rule.get('no_tls_verify')}' -> '{no_tls_verify}'.")
-                        existing_rule["no_tls_verify"] = no_tls_verify
-                        state_changed_locally = True
-                        needs_cf_update = True
             else:
                 logging.info(f"Adding new active rule for hostname: {hostname}")
                 managed_rules[hostname] = {
@@ -1057,8 +1054,7 @@ def reconcile_state():
                         logging.info(f"[Reconcile] Hostname {hostname} is running again, reactivating pending rule.")
                         rule["status"] = "active"; rule["delete_at"] = None
                         rule["service"] = running_details["service"]; rule["container_id"] = running_details["container_id"]
-                        rule["zone_id"] = target_zone_id
-                        rule["no_tls_verify"] = running_details["no_tls_verify"]
+                        rule["zone_id"] = target_zone_id; rule["no_tls_verify"] = running_details["no_tls_verify"]
                         state_changed_locally = True; needs_cf_update = True
                         hostnames_requiring_dns_check.append(hostname)
                         if zone_id_changed: logging.info(f"[Reconcile] Zone ID for reactivated rule {hostname} updated to {target_zone_id}.")
@@ -1072,14 +1068,14 @@ def reconcile_state():
                         if service_changed:
                              logging.info(f"[Reconcile] Updating service for active rule {hostname}.");
                              rule["service"] = running_details["service"]; state_changed_locally = True; needs_cf_update = True
+                        if no_tls_verify_changed:
+                             logging.info(f"[Reconcile] Updating no_tls_verify for active rule {hostname}.");
+                             rule["no_tls_verify"] = running_details["no_tls_verify"]; state_changed_locally = True; needs_cf_update = True
                         if zone_id_changed:
                              logging.warning(f"[Reconcile] Zone ID for active rule {hostname} changed ('{rule.get('zone_id')}' -> '{target_zone_id}'). Updating state.");
                              rule["zone_id"] = target_zone_id; state_changed_locally = True;
                              hostnames_requiring_dns_check.append(hostname)
                              needs_cf_update = True
-                        if no_tls_verify_changed:
-                             logging.info(f"[Reconcile] Updating no_tls_verify for active rule {hostname}.");
-                             rule["no_tls_verify"] = running_details["no_tls_verify"]; state_changed_locally = True; needs_cf_update = True
                 else:
                     logging.info(f"[Reconcile] Found running container for new hostname {hostname}. Adding rule.")
                     managed_rules[hostname] = {
