@@ -51,16 +51,18 @@ STATE_FILE_PATH = os.getenv('STATE_FILE_PATH', '/app/data/state.json')
 MAX_LOG_QUEUE_SIZE = 200
 
 # Validate required configuration
-if not CF_API_TOKEN or not CF_ACCOUNT_ID:
-    logging.error("FATAL: Missing required environment variables (CF_API_TOKEN, CF_ACCOUNT_ID)")
-    sys.exit(1)
+required_vars = ["CF_API_TOKEN", "CF_ACCOUNT_ID"]
+missing_vars = [var for var in required_vars if not globals().get(var)]
 
-if not USE_EXTERNAL_CLOUDFLARED and not TUNNEL_NAME:
-    logging.error("FATAL: TUNNEL_NAME is required when not using external cloudflared")
-    sys.exit(1)
-    
-if USE_EXTERNAL_CLOUDFLARED and not EXTERNAL_TUNNEL_ID:
-    logging.error("FATAL: EXTERNAL_TUNNEL_ID is required when USE_EXTERNAL_CLOUDFLARED is enabled")
+if not USE_EXTERNAL_CLOUDFLARED:
+    if not TUNNEL_NAME:
+        missing_vars.append("TUNNEL_NAME")
+else:
+    if not EXTERNAL_TUNNEL_ID:
+        missing_vars.append("EXTERNAL_TUNNEL_ID")
+
+if missing_vars:
+    logging.error(f"FATAL: Missing required environment variables ({', '.join(missing_vars)})")
     sys.exit(1)
     
 if not CF_ZONE_ID:
