@@ -45,9 +45,11 @@ RUN mkdir -p /app/static
 COPY static/ /app/static/
 COPY tailwind.config.js /app/
 
-# Install Tailwind CSS globally and build the CSS
-RUN npm install -g tailwindcss postcss autoprefixer && \
-    tailwindcss -c tailwind.config.js -i /app/static/main.css -o /app/static/tailwind.css --minify
+# Install Tailwind CSS and build the CSS
+WORKDIR /app
+RUN npm init -y && \
+    npm install tailwindcss postcss autoprefixer && \
+    ./node_modules/.bin/tailwindcss -c tailwind.config.js -i /app/static/main.css -o /app/static/tailwind.css --minify
 
 # Install Python dependencies
 COPY requirements.txt .
