@@ -1472,7 +1472,12 @@ if BASE_URL:
     app.config['PREFERRED_URL_SCHEME'] = parsed_url.scheme
     app.config['APPLICATION_ROOT'] = '/'
     app.config['USE_X_SENDFILE'] = False
-    logging.info(f"Configured SERVER_NAME as {parsed_url.netloc} and PREFERRED_URL_SCHEME as {parsed_url.scheme}.")
+    
+    # Configure static URL path to work with BASE_URL
+    static_url_path = '/static'
+    app.static_url_path = static_url_path
+    app.static_folder = 'static'
+    logging.info(f"Configured SERVER_NAME as {parsed_url.netloc}, PREFERRED_URL_SCHEME as {parsed_url.scheme}, and static_url_path as {static_url_path}")
 else:
     logging.warning("BASE_URL not set. Flask may generate incorrect URLs for static assets.")
 
@@ -1686,7 +1691,12 @@ if __name__ == '__main__':
         flask_thread = threading.Thread(
             target=serve,
             args=(app,),
-            kwargs={'host':'0.0.0.0','port':5000},
+            kwargs={
+                'host': '0.0.0.0',
+                'port': 5000,
+                'threads': 8,  # Limit the number of threads to prevent overload
+                'max_request_body_size': 10 * 1024 * 1024  # Set max request body size to 10MB
+            },
             daemon=True,
             name="FlaskWaitressServer"
         )
@@ -1731,6 +1741,8 @@ if __name__ == '__main__':
         stop_event.set()
         logging.info("Stop event set for background tasks.")
 
+        # Give threads a moment to finish gracefully
+        time.sleep(1)
         logging.info("Exiting Dockflare application.")
         exit_code = 1 if tunnel_state.get("error") or cloudflared_agent_state.get("container_status") == "docker_unavailable" else 0
         sys.exit(exit_code)
