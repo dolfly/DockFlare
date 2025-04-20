@@ -1684,7 +1684,7 @@ def force_delete_rule(hostname):
 
 @app.route('/stream-logs')
 def stream_logs():
-    """Streams log messages using Server-Sent Events with improved connection handling."""
+    """Streams log messages using Server-Sent Events with improved connection handling for reverse proxies."""
     @stream_with_context
     def event_stream():
         client_id = f"client-{random.randint(1000, 9999)}"
@@ -1694,7 +1694,7 @@ def stream_logs():
         # Send an immediate heartbeat to establish the connection
         yield f"data: heartbeat\n\n"
         
-        heartbeat_interval = 15  # More frequent heartbeats (15 seconds)
+        heartbeat_interval = 10  # More frequent heartbeats (10 seconds)
         last_heartbeat = time.time()
         
         try:
@@ -1708,7 +1708,7 @@ def stream_logs():
                     
                 try:
                     # Very short timeout to prevent blocking waitress threads
-                    log_entry = log_queue.get(timeout=1)  
+                    log_entry = log_queue.get(timeout=0.5)  
                     if log_entry:
                         yield f"data: {log_entry}\n\n"
                 except queue.Empty:
@@ -1726,11 +1726,15 @@ def stream_logs():
             logging.debug(f"Log stream {client_id} connection ended")
     
     response = Response(event_stream(), mimetype='text/event-stream')
-    # Enhanced headers for better proxy compatibility - avoid hop-by-hop headers
+    
+    # Enhanced headers for better proxy compatibility
     response.headers.update({
-        'Cache-Control': 'no-cache, no-transform',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         'X-Accel-Buffering': 'no',  # For Nginx
-        'X-Requested-With': 'XMLHttpRequest'
+        'X-Requested-With': 'XMLHttpRequest',
+        'Access-Control-Allow-Origin': '*'  # Allow cross-origin access
     })
     return response
 
