@@ -155,31 +155,6 @@ This method involves cloning the repository, which gives you access to the examp
 
 ---
 
-### Reverse Proxy Support
-
-DockFlare supports running behind a reverse proxy (e.g., Traefik) with HTTPS. Forwarded headers (e.g., `X-Forwarded-Proto`) are handled automatically, so no additional configuration is required.
-
-Ensure your reverse proxy forwards the full URL, including the protocol (e.g., `https://dockflare.example.com`).
-
----
-
-### Configuring the Base URL
-
-DockFlare allows you to configure the full base URL of the application using the `BASE_URL` environment variable. This ensures that Flask generates correct URLs for static assets and redirects, especially when running behind a reverse proxy.
-
-#### Example Configuration
-
-In your `docker-compose.yml`:
-
-```yaml
-environment:
-  - BASE_URL=https://dockflare.example.com
-```
-
-Replace `https://dockflare.example.com` with the full URL of your application, including the protocol (`http` or `https`).
-
----
-
 ### Architecture Support
 
 *   **Currently Supported:** The pre-built Docker image (`alplat/dockflare:stable`) now supports both `x86_64` / `amd64` and `arm64` architectures.

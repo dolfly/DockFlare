@@ -4,13 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dockflare - Status</title>
-    
-    <!-- Use a specific version of Tailwind CSS from CDN to ensure stability -->
-    <script src="https://cdn.tailwindcss.com/3.3.5"></script>
-    
-    <!-- Inter font -->
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-    
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
           darkMode: 'class',
@@ -28,6 +22,7 @@
           }
         }
       </script>
+      <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
       <style type="text/tailwindcss">
         #log-output .log-status { @apply italic text-gray-400 dark:text-gray-500; }
         #log-output .log-status.error { @apply not-italic text-red-500 dark:text-red-400 font-semibold; }
