@@ -17,11 +17,16 @@ services:
     environment:
       - STATE_FILE_PATH=/app/data/state.json
       - TZ=Europe/Zurich # Set the timezone to Zurich
+      
       # External cloudflared Configuration:
-      # Enable this to use an existing cloudflared instance instead of creating one
-      # Only the tunnel ID is needed - you don't need to specify the container name
+      # When using an external cloudflared instance, you need these settings:
       # - USE_EXTERNAL_CLOUDFLARED=true
       # - EXTERNAL_TUNNEL_ID=your-external-tunnel-id
+      #
+      # When using the external mode, these settings become optional:
+      # - TUNNEL_NAME (not used with external mode)
+      # - CLOUDFLARED_NETWORK_NAME (not used with external mode)
+      # - CLOUDFLARED_CONTAINER_NAME (not used with external mode)
 volumes:
   dockflare_data:
 networks:

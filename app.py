@@ -24,7 +24,6 @@ CF_UPDATE_RETRY_DELAY = 2
 CF_UPDATE_BACKOFF_FACTOR = 2
 
 CF_API_TOKEN = os.getenv('CF_API_TOKEN')
-TUNNEL_NAME = os.getenv('TUNNEL_NAME')
 CF_ACCOUNT_ID = os.getenv('CF_ACCOUNT_ID')
 CF_ZONE_ID = os.getenv('CF_ZONE_ID')
 CF_API_BASE_URL = "https://api.cloudflare.com/client/v4"
@@ -33,6 +32,17 @@ CF_HEADERS = {
     "Content-Type": "application/json",
 }
 
+# External cloudflared container configuration
+USE_EXTERNAL_CLOUDFLARED = os.getenv('USE_EXTERNAL_CLOUDFLARED', 'false').lower() in ['true', '1', 't', 'yes']
+EXTERNAL_TUNNEL_ID = os.getenv('EXTERNAL_TUNNEL_ID')
+
+# Settings that are only required when NOT using external cloudflared
+TUNNEL_NAME = os.getenv('TUNNEL_NAME') if not USE_EXTERNAL_CLOUDFLARED else "external-tunnel"
+CLOUDFLARED_NETWORK_NAME = os.getenv('CLOUDFLARED_NETWORK_NAME', 'cloudflare-net') if not USE_EXTERNAL_CLOUDFLARED else None
+CLOUDFLARED_CONTAINER_NAME = os.getenv('CLOUDFLARED_CONTAINER_NAME', f"cloudflared-agent-{TUNNEL_NAME}") if not USE_EXTERNAL_CLOUDFLARED else None
+CLOUDFLARED_IMAGE = "cloudflare/cloudflared:latest"
+
+# Settings used in both modes
 LABEL_PREFIX = os.getenv('LABEL_PREFIX', 'cloudflare.tunnel')
 GRACE_PERIOD_SECONDS = int(os.getenv('GRACE_PERIOD_SECONDS', 28800))
 CLEANUP_INTERVAL_SECONDS = int(os.getenv('CLEANUP_INTERVAL_SECONDS', 300))
@@ -40,21 +50,21 @@ AGENT_STATUS_UPDATE_INTERVAL_SECONDS = int(os.getenv('AGENT_STATUS_UPDATE_INTERV
 STATE_FILE_PATH = os.getenv('STATE_FILE_PATH', '/app/data/state.json')
 MAX_LOG_QUEUE_SIZE = 200
 
-# External cloudflared container configuration
-USE_EXTERNAL_CLOUDFLARED = os.getenv('USE_EXTERNAL_CLOUDFLARED', 'false').lower() in ['true', '1', 't', 'yes']
-EXTERNAL_TUNNEL_ID = os.getenv('EXTERNAL_TUNNEL_ID')
-CLOUDFLARED_CONTAINER_NAME = os.getenv('CLOUDFLARED_CONTAINER_NAME', f"cloudflared-agent-{TUNNEL_NAME}")
-CLOUDFLARED_IMAGE = "cloudflare/cloudflared:latest"
-CLOUDFLARED_NETWORK_NAME = os.getenv('CLOUDFLARED_NETWORK_NAME', 'cloudflare-net')
-
-if not CF_API_TOKEN or not TUNNEL_NAME or not CF_ACCOUNT_ID:
-    logging.error("FATAL: Missing required environment variables (CF_API_TOKEN, TUNNEL_NAME, CF_ACCOUNT_ID)")
+# Validate required configuration
+if not CF_API_TOKEN or not CF_ACCOUNT_ID:
+    logging.error("FATAL: Missing required environment variables (CF_API_TOKEN, CF_ACCOUNT_ID)")
     sys.exit(1)
+
+if not USE_EXTERNAL_CLOUDFLARED and not TUNNEL_NAME:
+    logging.error("FATAL: TUNNEL_NAME is required when not using external cloudflared")
+    sys.exit(1)
+    
+if USE_EXTERNAL_CLOUDFLARED and not EXTERNAL_TUNNEL_ID:
+    logging.error("FATAL: EXTERNAL_TUNNEL_ID is required when USE_EXTERNAL_CLOUDFLARED is enabled")
+    sys.exit(1)
+    
 if not CF_ZONE_ID:
     logging.warning("CF_ZONE_ID not set. DNS management requires 'cloudflare.tunnel.zonename' label on containers.")
-
-if USE_EXTERNAL_CLOUDFLARED and not EXTERNAL_TUNNEL_ID:
-    logging.warning("USE_EXTERNAL_CLOUDFLARED is enabled but EXTERNAL_TUNNEL_ID is not set. This may cause issues with DNS record management.")
 
 log_queue = queue.Queue(maxsize=MAX_LOG_QUEUE_SIZE)
 log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')

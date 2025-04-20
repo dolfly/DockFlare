@@ -185,6 +185,11 @@ USE_EXTERNAL_CLOUDFLARED=true
 EXTERNAL_TUNNEL_ID=your-external-tunnel-id # The UUID of your existing tunnel
 ```
 
+When using external mode, these settings become optional:
+- `TUNNEL_NAME` - Not used in external mode
+- `CLOUDFLARED_NETWORK_NAME` - Not used in external mode
+- `CLOUDFLARED_CONTAINER_NAME` - Not used in external mode
+
 ### How External Mode Works
 
 When external mode is enabled, DockFlare:
