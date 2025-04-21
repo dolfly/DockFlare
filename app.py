@@ -1689,11 +1689,34 @@ def status_page():
 
 @app.route('/ping')
 def ping():
-    """Simple endpoint to check server availability."""
+    """Simple ping endpoint to check server availability."""
     return jsonify({
-        "status": "ok", 
-        "timestamp": int(time.time()),
-        "protocol": "https" if request.headers.get('X-Forwarded-Proto') == 'https' else "http"
+        "status": "ok",
+        "timestamp": int(time.time())
+    })
+
+@app.route('/debug')
+def debug_info():
+    """Return debugging information about the environment."""
+    headers = {k: v for k, v in request.headers.items()}
+    
+    return jsonify({
+        "request": {
+            "scheme": request.scheme,
+            "is_secure": request.is_secure,
+            "host": request.host,
+            "path": request.path,
+            "url": request.url,
+            "headers": headers
+        },
+        "environment": {
+            "wsgi.url_scheme": request.environ.get('wsgi.url_scheme'),
+            "HTTP_X_FORWARDED_PROTO": request.environ.get('HTTP_X_FORWARDED_PROTO'),
+            "HTTP_X_FORWARDED_HOST": request.environ.get('HTTP_X_FORWARDED_HOST'),
+            "SERVER_NAME": request.environ.get('SERVER_NAME'),
+            "SERVER_PORT": request.environ.get('SERVER_PORT')
+        },
+        "timestamp": int(time.time())
     })
 
 @app.route('/start-tunnel', methods=['POST'])
@@ -1782,22 +1805,20 @@ def force_delete_rule(hostname):
 
 @app.route('/stream-logs')
 def stream_logs():
-    """Stream logs with better compatibility across environments and proxies."""
-    # Capture request data within the request context
+    """Stream logs using Server-Sent Events with proper context handling."""
+    # Generate a unique client ID in the request context
     client_id = f"client-{random.randint(1000, 9999)}"
-    proto_info = request.headers.get('X-Forwarded-Proto', 'none')
-    host_info = request.headers.get('X-Forwarded-Host', request.host)
-    is_secure = proto_info == 'https' or request.is_secure
+    logging.info(f"New log stream request from {client_id}")
     
-    # Log connection info while still in the request context
-    logging.info(f"Log stream {client_id} connected. X-Forwarded-Proto: {proto_info}, Host: {host_info}, is_secure: {is_secure}")
-    
-    def event_stream():
-        # Send welcome message and immediate heartbeat
+    def generate():
+        """Generator function that yields log entries without using Flask request object."""
+        logging.info(f"Starting event stream for client {client_id}")
+        
+        # Send welcome message
         yield f"data: --- Log stream connected (client {client_id}) ---\n\n"
         yield f"data: heartbeat\n\n"
         
-        # More frequent heartbeats (3 seconds for better reliability)
+        # Use shorter heartbeat interval for more responsive connection
         heartbeat_interval = 3
         last_heartbeat = time.time()
 
@@ -1805,54 +1826,41 @@ def stream_logs():
             while True:
                 current_time = time.time()
                 
-                # Send frequent heartbeats to keep connections alive through proxies
+                # Send heartbeat
                 if current_time - last_heartbeat > heartbeat_interval:
                     yield f"data: heartbeat\n\n"
                     last_heartbeat = current_time
 
+                # Get log entry with short timeout
                 try:
-                    # Check for logs with shorter timeout
-                    log_entry = log_queue.get(timeout=0.2)  
+                    log_entry = log_queue.get(timeout=0.2)
                     if log_entry:
                         yield f"data: {log_entry}\n\n"
                 except queue.Empty:
-                    # Keep connection alive with frequent comments
-                    yield f": keepalive {int(current_time)}\n\n"
+                    # Keep connection alive with empty comment
+                    yield f": keepalive\n\n"
                 
-                # Shorter sleep to prevent thread blocking
+                # Short sleep to prevent CPU usage
                 time.sleep(0.05)
                 
         except GeneratorExit:
-            logging.info(f"Log stream {client_id} disconnected.")
+            logging.info(f"Client {client_id} disconnected")
         except Exception as e:
-            logging.error(f"Error in log stream {client_id}: {e}", exc_info=True)
+            logging.error(f"Error in log stream for {client_id}: {e}", exc_info=True)
         finally:
-            logging.info(f"Log stream {client_id} connection ended")
+            logging.info(f"Event stream for {client_id} ended")
 
-    # Create response with modified headers for Cloudflare and proxies
-    response = Response(event_stream(), mimetype='text/event-stream')
+    # Create response with correct mimetype
+    response = Response(generate(), mimetype="text/event-stream")
     
-    # Essential headers for SSE through proxies
+    # Set headers needed for streaming
     response.headers.update({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-        'X-Accel-Buffering': 'no',  # Important for Nginx
-        'Content-Type': 'text/event-stream; charset=utf-8',
-        'Connection': 'keep-alive'  # Add explicit Connection: keep-alive header
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+        'Content-Type': 'text/event-stream',
+        'Access-Control-Allow-Origin': '*'
     })
-    
-    # Add CORS headers
-    response.headers.update({
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
-    })
-    
-    # Do not remove Connection header - important for streaming
-    # Only remove Content-Length if it exists
-    if 'Content-Length' in response.headers:
-        del response.headers['Content-Length']
     
     return response
 

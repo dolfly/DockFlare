@@ -38,32 +38,13 @@
         })();
     </script>
     
-    <!-- CHANGE: Remove upgrade-insecure-requests which causes issues in HTTP mode -->
-    <!-- CHANGE: Use protocol-relative URLs for external resources -->
-    <!-- Preconnect to CDN domains -->
-    <link rel="preconnect" href="//cdn.tailwindcss.com" crossorigin>
-    <link rel="preconnect" href="//rsms.me" crossorigin>
+    <!-- Replace in status_page.html -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="https://rsms.me" crossorigin>
     <!-- Tailwind CSS from CDN -->
-    <script src="//cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-          darkMode: 'class',
-          theme: {
-            extend: {
-              colors: {},
-              fontFamily: {
-                sans: ['Inter var', 'system-ui', 'sans-serif'],
-                mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace'],
-              },
-              animation: {
-                'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              }
-            }
-          }
-        }
-      </script>
-      <!-- Inter font CSS with protocol-relative URL -->
-      <link rel="stylesheet" href="//rsms.me/inter/inter.css" crossorigin="anonymous">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font CSS -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" crossorigin="anonymous">
       <style type="text/tailwindcss">
         #log-output .log-status { @apply italic text-gray-400 dark:text-gray-500; }
         #log-output .log-status.error { @apply not-italic text-red-500 dark:text-red-400 font-semibold; }
@@ -324,6 +305,9 @@
                 </a>
             </p>
         </div>
+        <div class="text-center text-xs text-gray-500">
+          <a href="javascript:void(0)" onclick="checkEnvironment()" class="hover:text-indigo-600">Check Environment</a>
+      </div>
     </footer>
 
     <script>
@@ -370,41 +354,94 @@
           });
       });
 
-            function connectEventSource() {
+      function checkEnvironment() {
+          const currentProtocol = window.location.protocol;
+          const currentHost = window.location.host;
+          const debugUrl = `${currentProtocol}//${currentHost}/debug`;
+          
+          fetch(debugUrl)
+              .then(response => response.json())
+              .then(data => {
+                  console.log("Environment debug info:", data);
+                  alert("Environment debug info has been logged to console.");
+              })
+              .catch(error => {
+                  console.error("Failed to fetch environment info:", error);
+              });
+      }
+
+      function connectEventSource() {
           if (!window.EventSource) {
               console.error("EventSource not supported");
+              document.getElementById('log-output').textContent = "Your browser doesn't support Server-Sent Events. Cannot display real-time logs.";
               return;
           }
           
-          // Close existing connection
+          // Close existing connection if any
           if (window.activeLogSource) {
-              window.activeLogSource.close();
+              try {
+                  window.activeLogSource.close();
+              } catch (e) {
+                  console.error("Error closing existing log stream:", e);
+              }
+              window.activeLogSource = null;
           }
           
-          // Use current protocol and host
+          // Always use HTTPS for log streaming when going through reverse proxy
           const currentProtocol = window.location.protocol;
           const currentHost = window.location.host;
-          const streamUrl = `${currentProtocol}//${currentHost}/stream-logs?t=${Date.now()}`;
+          const timestampParam = Date.now(); // Prevent caching
+          const streamUrl = `${currentProtocol}//${currentHost}/stream-logs?t=${timestampParam}`;
           
-          console.log("Connecting to logs:", streamUrl);
+          console.log(`Connecting log stream to: ${streamUrl}`);
           
-          // Create new connection
-          window.activeLogSource = new EventSource(streamUrl);
-          
-          window.activeLogSource.onopen = function() {
-              console.log("Log stream connected");
-          };
-          
-          window.activeLogSource.onmessage = function(event) {
-              if (event.data === "heartbeat") return;
-              addLogLine(event.data);
-          };
-          
-          window.activeLogSource.onerror = function() {
-              console.error("Log stream error - reconnecting in 5s");
-              window.activeLogSource.close();
+          try {
+              // Create new EventSource
+              window.activeLogSource = new EventSource(streamUrl);
+              
+              // Handle connection opened
+              window.activeLogSource.onopen = function() {
+                  console.log("Log stream connection opened");
+                  addLogLine("--- Log stream connected ---", 'connected');
+              };
+              
+              // Handle incoming messages
+              window.activeLogSource.onmessage = function(event) {
+                  if (event.data === "heartbeat") {
+                      console.log("♥ Heartbeat received");
+                      return;
+                  }
+                  
+                  addLogLine(event.data, 'log');
+              };
+              
+              // Handle errors
+              window.activeLogSource.onerror = function(err) {
+                  console.error("Log stream connection error:", err);
+                  addLogLine("--- Log stream connection error. Reconnecting in 5s... ---", 'error');
+                  
+                  // Clean up
+                  if (window.activeLogSource) {
+                      window.activeLogSource.close();
+                      window.activeLogSource = null;
+                  }
+                  
+                  // Reconnect after delay
+                  setTimeout(connectEventSource, 5000);
+              };
+              
+          } catch (e) {
+              console.error("Error creating EventSource:", e);
+              addLogLine("--- Failed to establish log stream connection ---", 'error');
               setTimeout(connectEventSource, 5000);
-          };
+          }
+          
+          // Ensure cleanup on page unload
+          window.addEventListener('beforeunload', function() {
+              if (window.activeLogSource) {
+                  window.activeLogSource.close();
+              }
+          });
       }
 
       const themeToggleButton = document.getElementById('theme-toggle');
