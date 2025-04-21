@@ -1574,36 +1574,41 @@ def update_cloudflare_config():
     return True
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+app.config['PREFERRED_URL_SCHEME'] = 'https'  # Default for url_for, but client-side JS will fix
+
+@app.before_request
+def detect_protocol():
+    """Detect the protocol to use for internal redirects."""
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
+    app.config['PREFERRED_URL_SCHEME'] = 'https' if forwarded_proto == 'https' or request.is_secure else 'http'
 
 @app.after_request
 def add_security_headers(response):
-    """Add comprehensive security headers for better protection and protocol compatibility."""
+    """Add comprehensive security headers that work in both HTTP and HTTPS environments."""
     # Basic security headers
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     
     # Get protocol information from request
-    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
     is_https = forwarded_proto == 'https' or request.is_secure
     
-    # Adjust CSP based on the protocol detection
+    # Set extremely permissive CSP that works in both environments
     csp = (
-        "default-src 'self'; "
-        f"connect-src 'self' {('wss:' if is_https else 'ws:')} http: https:; "  # Allow both protocols
-        "style-src 'self' 'unsafe-inline' https://rsms.me https://cdn.tailwindcss.com http://rsms.me http://cdn.tailwindcss.com; "
-        "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://cdn.tailwindcss.com http://static.cloudflareinsights.com http://cdn.tailwindcss.com; "
-        "img-src 'self' data: http: https:; "
-        "font-src 'self' https://rsms.me http://rsms.me data:; "
-        "frame-ancestors 'self'; "
-        "base-uri 'self'; "
-        "form-action 'self'; "
+        "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; "
+        "script-src * 'unsafe-inline' 'unsafe-eval'; "
+        "style-src * 'unsafe-inline'; "
+        "img-src * data: blob:; "
+        "font-src * data:; "
+        "connect-src *; "
+        "frame-src *; "
     )
     
-    # Only include upgrade-insecure-requests for HTTPS
+    # Only add upgrade-insecure-requests when using HTTPS
     if is_https:
         csp += "upgrade-insecure-requests; "
-        
+    
     response.headers['Content-Security-Policy'] = csp
     
     # Additional headers for reverse proxy and protocol awareness
@@ -1628,23 +1633,25 @@ def get_display_token(token):
 
 @app.context_processor
 def inject_protocol():
-    """Inject protocol info into all templates with improved detection."""
-    # Check for X-Forwarded-Proto header first (set by reverse proxies)
-    forwarded_proto = request.headers.get('X-Forwarded-Proto', '')
+    """Inject protocol info into all templates with more reliable detection."""
+    # First check X-Forwarded-Proto header (set by reverse proxies)
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
     
-    # Determine if we're using HTTPS based on header or request
+    # Then check if request itself is secure
     is_https = forwarded_proto == 'https' or request.is_secure
     
-    # Get base URL with correct protocol for use in templates
-    if is_https:
-        base_url = f"https://{request.host}"
-    else:
-        base_url = f"http://{request.host}"
+    # Build URL prefix for template use
+    base_url = f"{'https' if is_https else 'http'}://{request.host}"
+    
+    # Include the request scheme for debugging
+    request_scheme = request.scheme
     
     return {
         'protocol': 'https' if is_https else 'http',
         'is_https': is_https,
-        'base_url': base_url
+        'base_url': base_url,
+        'host': request.host,
+        'request_scheme': request_scheme
     }
 
 @app.route('/')
@@ -1766,16 +1773,19 @@ def force_delete_rule(hostname):
 
 @app.route('/stream-logs')
 def stream_logs():
-    """Streams log messages using Server-Sent Events with improved connection handling for all environments."""
-    @stream_with_context
+    """Stream logs with better compatibility across environments."""
     def event_stream():
         client_id = f"client-{random.randint(1000, 9999)}"
-        # Log protocol information for debugging
-        proto_info = request.headers.get('X-Forwarded-Proto', 'none') 
-        is_secure = request.is_secure
-        logging.info(f"Log stream {client_id} connected. X-Forwarded-Proto: {proto_info}, is_secure: {is_secure}")
         
-        yield f"data: --- Log stream connected ---\n\n"
+        # Log connection for debugging
+        proto_info = request.headers.get('X-Forwarded-Proto', 'none')
+        is_secure = request.is_secure
+        request_scheme = request.scheme
+        
+        logging.info(f"Log stream {client_id} connected. X-Forwarded-Proto: {proto_info}, is_secure: {is_secure}, scheme: {request_scheme}")
+        
+        # Send initial data
+        yield f"data: --- Log stream connected (client {client_id}) ---\n\n"
         yield f"data: heartbeat\n\n"
         
         heartbeat_interval = 10
@@ -1784,28 +1794,32 @@ def stream_logs():
         try:
             while True:
                 current_time = time.time()
+                
+                # Send heartbeat to keep connection alive
                 if current_time - last_heartbeat > heartbeat_interval:
                     yield f"data: heartbeat\n\n"
                     last_heartbeat = current_time
 
                 try:
+                    # Get log with timeout
                     log_entry = log_queue.get(timeout=0.5)  
                     if log_entry:
                         yield f"data: {log_entry}\n\n"
                 except queue.Empty:
+                    # Keep connection alive
                     yield f": keepalive {int(current_time)}\n\n"
+                
+                # Prevent thread blocking
                 time.sleep(0.01)
-
-        except GeneratorExit:
-            logging.info(f"Log stream {client_id} disconnected.")
         except Exception as e:
-            logging.error(f"Unexpected error in log stream {client_id}: {e}", exc_info=True)
+            logging.error(f"Error in log stream {client_id}: {e}", exc_info=True)
         finally:
-            logging.debug(f"Log stream {client_id} connection ended")
+            logging.info(f"Log stream {client_id} disconnected")
 
+    # Create basic response
     response = Response(event_stream(), mimetype='text/event-stream')
     
-    # Remove all protocol-sensitive headers
+    # Set headers that work in both HTTP and HTTPS
     response.headers.update({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -1815,10 +1829,9 @@ def stream_logs():
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
-        'Access-Control-Expose-Headers': 'Content-Type'
     })
     
-    # Remove headers that could cause issues
+    # Remove problematic headers
     for header in ['Transfer-Encoding', 'Connection']:
         if header in response.headers:
             del response.headers[header]

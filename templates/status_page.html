@@ -5,13 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Dockflare - Status</title>
-    <!-- Force HTTPS for all resources when page is loaded via HTTPS -->
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    
+    <!-- IMPORTANT: Add early-loading protocol fix script -->
+    <script>
+        // Early protocol detection script
+        (function() {
+            const currentProtocol = window.location.protocol;
+            const currentHost = window.location.host;
+            console.log("Page loading with protocol:", currentProtocol);
+            
+            // Override fetch to handle protocol issues
+            const origFetch = window.fetch;
+            window.fetch = function(url, options) {
+                if (url && typeof url === 'string' && url.startsWith('http')) {
+                    try {
+                        const urlObj = new URL(url);
+                        if (urlObj.host === currentHost) {
+                            urlObj.protocol = currentProtocol;
+                            return origFetch.call(this, urlObj.toString(), options);
+                        }
+                    } catch (e) {
+                        console.error('Error processing URL:', e);
+                    }
+                }
+                return origFetch.call(this, url, options);
+            };
+            
+            // Create a base tag to ensure all relative URLs use the current protocol
+            const baseTag = document.createElement('base');
+            baseTag.href = currentProtocol + '//' + currentHost + '/';
+            document.head.appendChild(baseTag);
+        })();
+    </script>
+    
+    <!-- CHANGE: Remove upgrade-insecure-requests which causes issues in HTTP mode -->
+    <!-- CHANGE: Use protocol-relative URLs for external resources -->
     <!-- Preconnect to CDN domains -->
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
-    <link rel="preconnect" href="https://rsms.me" crossorigin>
+    <link rel="preconnect" href="//cdn.tailwindcss.com" crossorigin>
+    <link rel="preconnect" href="//rsms.me" crossorigin>
     <!-- Tailwind CSS from CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="//cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
           darkMode: 'class',
@@ -29,8 +62,8 @@
           }
         }
       </script>
-      <!-- Inter font CSS with integrity attribute -->
-      <link rel="stylesheet" href="https://rsms.me/inter/inter.css" crossorigin="anonymous">
+      <!-- Inter font CSS with protocol-relative URL -->
+      <link rel="stylesheet" href="//rsms.me/inter/inter.css" crossorigin="anonymous">
       <style type="text/tailwindcss">
         #log-output .log-status { @apply italic text-gray-400 dark:text-gray-500; }
         #log-output .log-status.error { @apply not-italic text-red-500 dark:text-red-400 font-semibold; }
@@ -246,7 +279,7 @@
                                             {% endif %}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');">
+                                            <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
                                                 <button type="submit"
                                                         class="px-2 py-1 rounded text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-800 dark:hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-gray-400"
                                                         {{ 'disabled' if not docker_available else '' }}>
@@ -293,119 +326,101 @@
         </div>
     </footer>
 
-
     <script>
-      // Fix protocol mismatches on page load
+      // Enhanced protocol-aware script that runs AFTER DOM loads
       document.addEventListener('DOMContentLoaded', function() {
           // Get the current protocol
           const currentProtocol = window.location.protocol;
-          const baseUrl = currentProtocol + '//' + window.location.host;
+          const currentHost = window.location.host;
+          console.log("DOM loaded with protocol:", currentProtocol);
           
-          // Fix form actions (for delete buttons and other forms)
+          // Fix all form actions to use current protocol
           document.querySelectorAll('form').forEach(form => {
-              if (form.action && form.action.startsWith('http')) {
-                  const url = new URL(form.action);
-                  // Ensure form uses same protocol as current page
-                  url.protocol = currentProtocol;
-                  form.action = url.toString();
+              if (!form.getAttribute('class') || !form.getAttribute('class').includes('protocol-aware-form')) {
+                  form.classList.add('protocol-aware-form');
+              }
+              
+              const originalAction = form.getAttribute('action');
+              if (originalAction && originalAction.startsWith('http')) {
+                  try {
+                      const actionUrl = new URL(originalAction);
+                      actionUrl.protocol = currentProtocol;
+                      console.log(`Fixed form action: ${originalAction} → ${actionUrl.toString()}`);
+                      form.setAttribute('action', actionUrl.toString());
+                  } catch (e) {
+                      console.error('Error fixing form action:', e);
+                  }
               }
           });
           
-          // Fix stream-logs URL if it exists
-          const logSource = document.getElementById('logSource');
-          if (logSource && typeof connectLogStream === 'function') {
-              // Replace any hardcoded protocol in log source URL
-              const logUrl = baseUrl + '/stream-logs';
-              console.log('Setting log stream URL to:', logUrl);
-              // Reconnect with correct URL
-              disconnectLogStream();
-              setTimeout(() => connectLogStream(logUrl), 500);
-          }
-          
-          // Fix stylesheet links
-          document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
-              if (link.href && link.href.startsWith('http')) {
-                  const url = new URL(link.href);
-                  // Only change protocol for same-origin stylesheets
-                  if (url.host === window.location.host) {
-                      url.protocol = currentProtocol;
-                      link.href = url.toString();
+          // Fix link hrefs that point to our own domain
+          document.querySelectorAll('a[href]').forEach(link => {
+              const href = link.getAttribute('href');
+              if (href && href.startsWith('http')) {
+                  try {
+                      const url = new URL(href);
+                      if (url.host === currentHost) {
+                          url.protocol = currentProtocol;
+                          link.setAttribute('href', url.toString());
+                      }
+                  } catch (e) {
+                      console.error('Error fixing link:', e);
                   }
               }
           });
       });
 
-      // Intercept all fetch/XMLHttpRequest calls to ensure they use the right protocol
-      (function() {
-          const originalFetch = window.fetch;
-          window.fetch = function(url, options) {
-              if (url && typeof url === 'string' && url.startsWith('http')) {
-                  const urlObj = new URL(url);
-                  // Only modify same-origin requests
-                  if (urlObj.host === window.location.host) {
-                      urlObj.protocol = window.location.protocol;
-                      url = urlObj.toString();
-                  }
+      // Protocol-aware event source connection
+      function connectEventSource() {
+          if (!!window.EventSource) {
+              // Close any existing connection first
+              if (window.activeLogSource) {
+                  window.activeLogSource.close();
               }
-              return originalFetch.call(this, url, options);
-          };
-      })();
+              
+              // Use current protocol + host for connection
+              const currentProtocol = window.location.protocol;
+              const currentHost = window.location.host;
+              const logStreamUrl = `${currentProtocol}//${currentHost}/stream-logs`;
+              
+              console.log("Connecting log stream to:", logStreamUrl);
+              
+              // Create new EventSource with correct protocol
+              window.activeLogSource = new EventSource(logStreamUrl);
 
-      // Protocol-aware log streaming
-      function connectLogStream(streamUrl) {
-          // If no URL provided, build one with the correct protocol
-          if (!streamUrl) {
-              const protocol = window.location.protocol;
-              const host = window.location.host;
-              streamUrl = `${protocol}//${host}/stream-logs`;
-          }
-          console.log(`Connecting log stream to: ${streamUrl}`);
-          
-          // Create EventSource with the correct URL
-          window.logSource = new EventSource(streamUrl);
-          
-          window.logSource.onmessage = function(event) {
-              const logList = document.getElementById('logList');
-              if (logList && event.data && event.data !== 'heartbeat') {
-                  const entry = document.createElement('li');
-                  entry.textContent = event.data;
-                  logList.appendChild(entry);
-                  // Keep only the most recent logs
-                  while (logList.childNodes.length > 100) {
-                      logList.removeChild(logList.firstChild);
+              window.activeLogSource.onopen = function() {
+                  console.log("Log stream connection opened successfully.");
+                  addLogLine("--- Log stream connected ---", 'connected');
+              };
+
+              window.activeLogSource.onmessage = function(event) {
+                  if (event.data === "heartbeat") {
+                      console.log("Heartbeat received");
+                      return;
                   }
-                  // Auto-scroll to bottom
-                  logList.scrollTop = logList.scrollHeight;
-              }
-          };
-          
-          window.logSource.onerror = function() {
-              console.log('Log stream connection error, reconnecting in 5s...');
-              disconnectLogStream();
-              setTimeout(() => connectLogStream(streamUrl), 5000);
-          };
-      }
+                  
+                  console.log("Log received:", event.data.substring(0, 50) + (event.data.length > 50 ? "..." : ""));
+                  addLogLine(event.data, 'log');
+              };
 
-      function disconnectLogStream() {
-          if (window.logSource) {
-              window.logSource.close();
-              console.log('Disconnected log stream');
+              window.activeLogSource.onerror = function(err) {
+                  console.error("EventSource failed:", err);
+                  addLogLine("--- Log stream connection error. Retrying in 5s... ---", 'error');
+                  window.activeLogSource.close();
+                  setTimeout(connectEventSource, 5000);
+              };
+              
+              // Ensure cleanup on page unload
+              window.addEventListener('beforeunload', function() {
+                  if (window.activeLogSource) {
+                      window.activeLogSource.close();
+                  }
+              });
+          } else {
+              logOutput.textContent = "Your browser doesn't support Server-Sent Events, cannot display real-time logs.";
+              logOutput.classList.add('text-orange-500', 'font-semibold');
           }
       }
-
-      // Connect when page loads, with protocol detection
-      document.addEventListener('DOMContentLoaded', function() {
-          // Use the correct protocol for the current page
-          const protocol = window.location.protocol;
-          const host = window.location.host;
-          const streamUrl = `${protocol}//${host}/stream-logs`;
-          
-          // Wait a second to ensure page is fully loaded
-          setTimeout(() => connectLogStream(streamUrl), 1000);
-          
-          // Clean up when leaving the page
-          window.addEventListener('beforeunload', disconnectLogStream);
-      });
 
       const themeToggleButton = document.getElementById('theme-toggle');
       const themeToggleIcon = themeToggleButton.querySelector('span');
@@ -437,35 +452,8 @@
             while (logOutput.childNodes.length > maxLogLines) { logOutput.removeChild(logOutput.firstChild); }
             if (isScrolledToBottom) { logOutput.scrollTop = logOutput.scrollHeight; }
       }
-      function connectEventSource() {
-          if (!!window.EventSource) {
-              // Use absolute URL to ensure it works with all reverse proxy setups
-              const logStreamUrl = new URL('/stream-logs', window.location.href).href;
-              console.log("Connecting log stream to:", logStreamUrl);
-              const logSource = new EventSource(logStreamUrl);
-
-              logSource.onopen = function() {
-                  console.log("Log stream connection opened.");
-                  addLogLine("--- Log stream connected ---", 'connected');
-              };
-
-              logSource.onmessage = function(event) {
-                  console.log("Log received:", event.data.substring(0, 50) + (event.data.length > 50 ? "..." : ""));
-                  // Don't try to parse as JSON - our logs are plain text
-                  addLogLine(event.data, 'log');
-              };
-
-              logSource.onerror = function(err) {
-                  console.error("EventSource failed:", err);
-                  addLogLine("--- Log stream connection error. Retrying in 5s... ---", 'error');
-                  logSource.close();
-                  setTimeout(connectEventSource, 5000);
-              };
-          } else {
-              logOutput.textContent = "Your browser doesn't support Server-Sent Events, cannot display real-time logs.";
-              logOutput.classList.add('text-orange-500', 'font-semibold');
-          }
-      }
+      
+      // Start the event source connection when the page loads
       connectEventSource();
     </script>
 
