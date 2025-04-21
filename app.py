@@ -1687,6 +1687,15 @@ def status_page():
                             external_tunnel_id=external_tunnel_id,
                             rules=rules_for_template)
 
+@app.route('/ping')
+def ping():
+    """Simple endpoint to check server availability."""
+    return jsonify({
+        "status": "ok", 
+        "timestamp": int(time.time()),
+        "protocol": "https" if request.headers.get('X-Forwarded-Proto') == 'https' else "http"
+    })
+
 @app.route('/start-tunnel', methods=['POST'])
 def start_tunnel():
     """Handles request to start the tunnel agent."""
@@ -1773,68 +1782,80 @@ def force_delete_rule(hostname):
 
 @app.route('/stream-logs')
 def stream_logs():
-    """Stream logs with better compatibility across environments."""
+    """Stream logs with better compatibility across environments and proxies."""
     def event_stream():
         client_id = f"client-{random.randint(1000, 9999)}"
         
-        # Log connection for debugging
+        # Log connection info for debugging
         proto_info = request.headers.get('X-Forwarded-Proto', 'none')
-        is_secure = request.is_secure
-        request_scheme = request.scheme
+        host_info = request.headers.get('X-Forwarded-Host', request.host)
+        is_secure = proto_info == 'https' or request.is_secure
         
-        logging.info(f"Log stream {client_id} connected. X-Forwarded-Proto: {proto_info}, is_secure: {is_secure}, scheme: {request_scheme}")
+        logging.info(f"Log stream {client_id} connected. X-Forwarded-Proto: {proto_info}, Host: {host_info}, is_secure: {is_secure}")
         
-        # Send initial data
+        # Send welcome message and immediate heartbeat
         yield f"data: --- Log stream connected (client {client_id}) ---\n\n"
         yield f"data: heartbeat\n\n"
         
-        heartbeat_interval = 10
+        # More frequent heartbeats (5 seconds)
+        heartbeat_interval = 5
         last_heartbeat = time.time()
 
         try:
             while True:
                 current_time = time.time()
                 
-                # Send heartbeat to keep connection alive
+                # More frequent heartbeats to keep connections alive through proxies
                 if current_time - last_heartbeat > heartbeat_interval:
                     yield f"data: heartbeat\n\n"
                     last_heartbeat = current_time
 
                 try:
-                    # Get log with timeout
-                    log_entry = log_queue.get(timeout=0.5)  
+                    # Check for logs with shorter timeout
+                    log_entry = log_queue.get(timeout=0.2)  
                     if log_entry:
                         yield f"data: {log_entry}\n\n"
                 except queue.Empty:
-                    # Keep connection alive
+                    # Keep connection alive with frequent comments
                     yield f": keepalive {int(current_time)}\n\n"
                 
-                # Prevent thread blocking
-                time.sleep(0.01)
+                # Yield more often to prevent thread blocking
+                time.sleep(0.05)
+                
+        except GeneratorExit:
+            logging.info(f"Log stream {client_id} disconnected.")
         except Exception as e:
             logging.error(f"Error in log stream {client_id}: {e}", exc_info=True)
         finally:
-            logging.info(f"Log stream {client_id} disconnected")
+            logging.info(f"Log stream {client_id} connection ended")
 
-    # Create basic response
+    # Create response with modified headers for Cloudflare and proxies
     response = Response(event_stream(), mimetype='text/event-stream')
     
-    # Set headers that work in both HTTP and HTTPS
+    # Essential headers for SSE through proxies
     response.headers.update({
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
-        'X-Accel-Buffering': 'no',
+        'X-Accel-Buffering': 'no',  # Important for Nginx
         'Content-Type': 'text/event-stream; charset=utf-8',
+    })
+    
+    # Add CORS headers
+    response.headers.update({
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, X-Requested-With',
     })
     
-    # Remove problematic headers
+    # Remove problematic headers that cause issues with proxies
     for header in ['Transfer-Encoding', 'Connection']:
         if header in response.headers:
             del response.headers[header]
+    
+    # Do not set content-length for streaming responses
+    if 'Content-Length' in response.headers:
+        del response.headers['Content-Length']
     
     return response
 
