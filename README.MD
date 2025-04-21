@@ -22,7 +22,10 @@ DockFlare automates Cloudflare Tunnel ingress rule management based on Docker co
 - **Multi-Domain Support**: Configure multiple domains for a single container using indexed labels, each with its own service target and zone configuration.
 - **Graceful Deletion**: Configurable grace period before removing ingress rules when a container stops.
 - **State Persistence**: Saves `managed_rules` to `state.json` for restarts.
-- **Reconciliation**: On startup, ensures consistency between Docker containers, saved state, and Cloudflare configuration.
+- **Optimized Reconciliation**: 
+  - On startup, ensures consistency between Docker containers, saved state, and Cloudflare configuration
+  - Processes DNS operations in small batches to prevent API rate limiting
+  - Shows real-time reconciliation progress in the UI
 - **Web UI**: Status dashboard with:
   - Tunnel & agent status.
   - Start/Stop agent controls.
@@ -269,7 +272,7 @@ After the switch, DockFlare will:
 | `CF_API_TOKEN` | Cloudflare API token | (Required) |
 | `CF_ACCOUNT_ID` | Cloudflare account ID | (Required) |
 | `CF_ZONE_ID` | Default Cloudflare zone ID | (Required unless using `zonename` label) |
-| `TUNNEL_NAME` | Name for the Cloudflare tunnel | (Required unless using external tunnel) |
+| `TUNNEL_NAME` | Name for the Cloudflare tunnel | dockflared-tunnel (Required unless using external tunnel) |
 | `GRACE_PERIOD_SECONDS` | Time before removing rules after container stops | 28800 (8 hours) |
 | `CLEANUP_INTERVAL_SECONDS` | Interval for checking expired rules | 300 (5 minutes) |
 | `LABEL_PREFIX` | Prefix for Docker labels | cloudflare.tunnel |
@@ -321,6 +324,26 @@ services:
       cloudflare.tunnel.service: "http://my-service:80"
       cloudflare.tunnel.zonename: "customdomain.com"
 ```
+
+### Performance Tuning
+
+DockFlare includes several features to optimize performance and prevent rate limiting:
+
+1. **Concurrent DNS Operation Limiting**: 
+   - Controls how many simultaneous DNS operations can run
+   - Prevents Cloudflare API rate limiting during large reconciliations
+   - Configurable via `MAX_CONCURRENT_DNS_OPS` (default: 3)
+
+2. **Batched DNS Processing**:
+   - Processes DNS records in small batches during reconciliation
+   - Shows real-time progress feedback in the web UI
+   - Configurable via `RECONCILIATION_BATCH_SIZE` (default: 3)
+
+3. **Asynchronous Initialization**:
+   - Web UI is immediately available while initialization continues
+   - Progress indicators show current status of initialization and reconciliation
+
+These optimizations are particularly helpful when managing tunnels with many domains or when running on systems with limited resources.
 
 ## Troubleshooting
 
