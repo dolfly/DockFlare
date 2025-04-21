@@ -361,7 +361,7 @@ def create_tunnel_via_api(name):
         tunnel_state["error"] = f"Unexpected error creating tunnel: {e}"
         return None, None
 
-ddef initialize_tunnel():
+def initialize_tunnel():
     """Finds or creates the tunnel and gets its token."""
     logging.info("Initializing tunnel...")
     tunnel_state["status_message"] = f"Checking for tunnel '{TUNNEL_NAME}' via API..."
