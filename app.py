@@ -1437,7 +1437,7 @@ def stop_cloudflared_container():
         return success_flag
 
 def update_cloudflare_config():
-    """Updates the Cloudflare tunnel ingress configuration if needed, preserving external rules."""
+    """Updates the Cloudflare tunnel ingress configuration if needed, preserving external rules and existing order."""
     if not tunnel_state.get("id"):
         logging.warning("Cannot update CF config, tunnel ID missing.")
         return False
@@ -1447,9 +1447,41 @@ def update_cloudflare_config():
 
     with state_lock:
         logging.info("Checking for Cloudflare tunnel config updates...")
-        desired_ingress_rules = []
         catch_all_rule = {"service": "http_status:404"}
-
+        wildcard_rules = []  # For storing wildcard (*) rules
+        
+        # Fetch current config first to maintain order
+        logging.debug("Fetching current CF config for comparison...")
+        current_config = get_current_cf_config()
+        if current_config is None:
+            logging.error("Failed to fetch current CF config, aborting update check.")
+            return False
+            
+        current_cf_ingress = current_config.get("ingress", [])
+        current_cf_all_hostnames = {r.get("hostname") for r in current_cf_ingress if r.get("hostname")}
+        current_managed_hostnames = {hostname for hostname in managed_rules}
+        
+        # Identify external rules (rules that aren't managed by this instance)
+        external_rules = [
+            r for r in current_cf_ingress 
+            if r.get("hostname") and r.get("hostname") not in current_managed_hostnames
+            and r.get("service") != catch_all_rule.get("service")
+        ]
+        
+        # Identify wildcard rules (containing '*') and store them separately
+        for rule in external_rules[:]:
+            hostname = rule.get("hostname", "")
+            if hostname and '*' in hostname:
+                wildcard_rules.append(rule)
+                external_rules.remove(rule)
+                logging.debug(f"Identified wildcard rule: {hostname}")
+        
+        # Keep track of the catch-all rule if it exists in the current config
+        existing_catch_all = next((r for r in current_cf_ingress if r.get("service") == catch_all_rule["service"]), None)
+        
+        # Create desired ingress rules from current managed rules
+        desired_ingress_rules = []
+        
         for hostname, rule_details in managed_rules.items():
             if rule_details.get("status") == "active":
                 service = rule_details.get("service")
@@ -1464,31 +1496,8 @@ def update_cloudflare_config():
                     })
                 else:
                     logging.warning(f"Rule {hostname} is active but missing 'service' detail. Skipping.")
-
-        desired_ingress_rules.sort(key=lambda x: x.get("hostname", ""))
-
-        logging.debug("Fetching current CF config for comparison...")
-        current_config = get_current_cf_config()
-        if current_config is None:
-            logging.error("Failed to fetch current CF config, aborting update check.")
-            return False
-
-        # Extract just the rules managed by this instance for comparison purposes
-        current_cf_ingress = current_config.get("ingress", [])
-        current_cf_all_hostnames = {r.get("hostname") for r in current_cf_ingress if r.get("hostname")}
-        current_managed_hostnames = {hostname for hostname in managed_rules}
         
-        # Identify external rules (rules that aren't managed by this instance)
-        external_rules = [
-            r for r in current_cf_ingress 
-            if r.get("hostname") and r.get("hostname") not in current_managed_hostnames
-            and r.get("service") != catch_all_rule.get("service")
-        ]
-        
-        # Keep track of the catch-all rule if it exists in the current config
-        existing_catch_all = next((r for r in current_cf_ingress if r.get("service") == catch_all_rule["service"]), None)
-        
-        # For comparison, only consider rules that we're managing
+        # For comparison purposes
         current_cf_managed_ingress = [
             r for r in current_cf_ingress 
             if r.get("hostname") in current_managed_hostnames
@@ -1505,23 +1514,27 @@ def update_cloudflare_config():
             logging.error(f"Error creating canonical rule sets for comparison: {e}", exc_info=True)
             return False
 
-        if current_cf_set == desired_set and len(external_rules) == 0:
+        # Determine if update is needed
+        if current_cf_set == desired_set and len(external_rules) == 0 and len(wildcard_rules) == 0:
             logging.info("No changes detected in CF tunnel config. Skipping API update.")
             needs_api_update = False
         else:
             logging.info("Change detected. Rules need to be updated.")
+            
+            # Combine in the order: normal host rules first, then wildcard rules, then catch-all
+            # Normal external rules
             if len(external_rules) > 0:
                 logging.info(f"Preserving {len(external_rules)} external rules found in the current configuration")
-                for rule in external_rules:
-                    logging.debug(f"Preserving external rule for hostname: {rule.get('hostname')}")
             
-            # Combine external rules with our desired rules
-            final_ingress_rules = external_rules + desired_ingress_rules
+            # Our standard hostname rules
+            final_ingress_rules = desired_ingress_rules + external_rules
             
-            # Sort by hostname for predictable ordering
-            final_ingress_rules.sort(key=lambda x: x.get("hostname", "") if x.get("hostname") else "zzzz")
+            # Then add wildcard rules before the catch-all rule
+            if len(wildcard_rules) > 0:
+                logging.info(f"Preserving {len(wildcard_rules)} wildcard rules at the end (before catch-all)")
+                final_ingress_rules.extend(wildcard_rules)
             
-            # Always add the catch-all rule at the end
+            # Always add the catch-all rule at the very end
             final_ingress_rules.append(catch_all_rule if existing_catch_all is None else existing_catch_all)
             
             needs_api_update = True
@@ -1572,6 +1585,7 @@ def update_cloudflare_config():
     
     # If we reached here, either there were no changes or the update was successful
     return True
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['PREFERRED_URL_SCHEME'] = 'https'  # Default for url_for, but client-side JS will fix
@@ -1705,56 +1719,7 @@ def debug_info():
         
         return jsonify({
             "request": {
-                "scheme": request.scheme,                // Fix for protocol-aware form submission
-                document.addEventListener('DOMContentLoaded', function() {
-                    // Fix all form actions to ensure they use the right protocol and method
-                    document.querySelectorAll('form').forEach(form => {
-                        // Ensure the form has a proper action URL
-                        if (form.getAttribute('action')) {
-                            const currentProtocol = window.location.protocol;
-                            const currentHost = window.location.host;
-                            
-                            // Get original action URL
-                            let actionUrl = form.getAttribute('action');
-                            
-                            // If it's a relative URL, make it absolute using the current protocol and host
-                            if (actionUrl.startsWith('/')) {
-                                actionUrl = `${currentProtocol}//${currentHost}${actionUrl}`;
-                                form.setAttribute('action', actionUrl);
-                                console.log(`Fixed relative form action to: ${actionUrl}`);
-                            }
-                            // If it has a protocol specified, ensure it matches the current one
-                            else if (actionUrl.startsWith('http')) {
-                                try {
-                                    const parsedUrl = new URL(actionUrl);
-                                    if (parsedUrl.host === currentHost && parsedUrl.protocol !== currentProtocol) {
-                                        parsedUrl.protocol = currentProtocol;
-                                        form.setAttribute('action', parsedUrl.toString());
-                                        console.log(`Fixed protocol in form action: ${actionUrl} → ${parsedUrl.toString()}`);
-                                    }
-                                } catch (e) {
-                                    console.error('Error fixing form action URL:', e);
-                                }
-                            }
-                        }
-                        
-                        // Add event listener for form submission to catch and fix issues
-                        form.addEventListener('submit', function(event) {
-                            // Get form action from the form element
-                            const formAction = this.getAttribute('action');
-                            
-                            if (formAction) {
-                                // Check if the form is using the correct protocol
-                                if (formAction.startsWith('http:') && window.location.protocol === 'https:') {
-                                    event.preventDefault();
-                                    this.setAttribute('action', formAction.replace('http:', 'https:'));
-                                    console.log('Fixed http: to https: in form submission');
-                                    this.submit();
-                                }
-                            }
-                        });
-                    });
-                });
+                "scheme": request.scheme,
                 "is_secure": request.is_secure,
                 "host": request.host,
                 "path": request.path,
