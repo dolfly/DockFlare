@@ -40,9 +40,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
-        darkMode: 'class',
+        darkMode: 'class', 
         theme: {
-          extend: {}
+          extend: {} 
         }
       }
     </script>
@@ -86,26 +86,6 @@
 
     <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex-grow w-full max-w-7xl">
 
-        {% if initialization and initialization.in_progress %}
-        <div class="alert-banner mb-8 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 text-gray-700 dark:text-gray-300 shadow-md">
-            <div class="flex items-center">
-                <div class="flex-shrink-0 mr-3">
-                    <svg class="h-5 w-5 text-blue-500 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 6v6l4 2"></path>
-                    </svg>
-                </div>
-                <div>
-                    <p class="font-medium">Initialization in progress...</p>
-                    <p class="text-sm mt-1">You can view logs below while waiting. The web interface will update automatically when ready.</p>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <div id="reconciliation-status" class="mb-8"></div>
-        <div id="reconciliation-status-message" class="text-secondary mb-1" style="font-size: 0.85rem;"></div>
-
         <section class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden mb-8 sm:mb-12 transition-shadow duration-300 hover:shadow-xl">
             <div class="px-6 py-5 sm:px-8 sm:py-6">
                 <h2 class="text-2xl sm:text-3xl font-semibold mb-6 text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700 pb-3">
@@ -114,7 +94,7 @@
 
                 <div class="mb-6">
                     <h3 class="text-lg font-semibold mb-3 text-gray-600 dark:text-gray-400">Cloudflare API & Tunnel Setup</h3>
-                     {% set status_box_class = 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' %}
+                    {% set status_box_class = 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' %}
                     {% if tunnel_state.get('error') and not external_cloudflared %}
                       {% set status_box_class = 'border-red-500 bg-red-50 dark:bg-red-900/20' %}
                     {% elif (tunnel_state.get('id') and tunnel_state.get('token')) or (external_cloudflared and tunnel_state.get('id')) %}
@@ -133,7 +113,7 @@
 
                 <div class="mb-6">
                     <h4 class="text-md font-semibold mb-3 text-gray-600 dark:text-gray-400">Tunnel Details</h4>
-                     <div class="space-y-2 text-sm">
+                    <div class="space-y-2 text-sm">
                         <p><strong class="inline-block w-36">Desired Name:</strong> <code class="bg-gray-200 dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-mono text-xs">{{ tunnel_state.name }}</code></p>
                         <p><strong class="inline-block w-36">Tunnel ID:</strong> <code class="bg-gray-200 dark:bg-gray-700 text-indigo-700 dark:text-indigo-300 px-1.5 py-0.5 rounded font-mono text-xs">{{ tunnel_state.id if tunnel_state.id else 'N/A' }}</code></p>
                         {% if not external_cloudflared %}
@@ -147,6 +127,7 @@
 
                 <div>
                     <h3 class="text-lg font-semibold mb-3 text-gray-600 dark:text-gray-400">Agent Control</h3>
+
                     {% if agent_state.last_action_status %}
                         {% set action_box_class = 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' %}
                         {% if 'Error:' in agent_state.last_action_status %}
@@ -256,14 +237,13 @@
                                 {% for hostname, details in rules.items()|sort %}
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150 ease-in-out">
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                             <a href="https://{{ hostname }}" target="_blank" rel="noopener noreferrer" title="Open https://{{ hostname }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 hover:underline">
+                                            {% set service_protocol = 'https' %}
+                                            {% if details.service and details.service.startswith('http://') %}
+                                                {% set service_protocol = 'http' %}
+                                            {% endif %}
+                                            <a href="{{ service_protocol }}://{{ hostname }}" target="_blank" rel="noopener noreferrer" title="Open {{ service_protocol }}://{{ hostname }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 hover:underline">
                                                 <code>{{ hostname }}</code>
                                             </a>
-                                            {% if hostname.startswith('*.') %}
-                                            <span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300">
-                                                wildcard
-                                            </span>
-                                            {% endif %}
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap">
                                             <code class="text-sm text-gray-700 dark:text-gray-300 font-mono">{{ details.service }}</code>
@@ -469,72 +449,6 @@
             }, 30000);
         }
 
-        function updateReconciliationStatus() {
-            const currentProtocol = window.location.protocol;
-            const currentHost = window.location.host;
-            const statusUrl = `${currentProtocol}//${currentHost}/reconciliation-status?t=${new Date().getTime()}`;
-
-            fetch(statusUrl)
-                .then(response => response.json())
-                .then(data => {
-                    const statusElement = document.getElementById('reconciliation-status');
-                    const messageElement = document.getElementById('reconciliation-status-message');
-
-                    if (!statusElement || !messageElement) {
-                        console.warn("Reconciliation status elements not found in DOM.");
-                        return;
-                    }
-
-                    if (data.status) {
-                        messageElement.textContent = data.status;
-                        messageElement.style.display = data.in_progress ? 'block' : 'none';
-                    }
-
-                    if (data.in_progress) {
-                        statusElement.innerHTML = `
-                            <div class="alert-banner p-4 rounded-lg bg-amber-50 dark:bg-amber-900/30 border-l-4 border-amber-500 text-gray-700 dark:text-gray-300 shadow-md">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 mr-3">
-                                        <svg class="h-5 w-5 text-amber-500 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <circle cx="12" cy="12" r="10"></circle>
-                                            <path d="M12 6v6l4 2"></path>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium">Reconciliation: ${data.progress}%</p>
-                                        <p class="text-sm mt-1">Processing ${data.processed_items} of ${data.total_items} items...</p>
-                                    </div>
-                                </div>
-                            </div>`;
-                    } else if (statusElement.innerHTML.includes('Reconciliation')) {
-                        statusElement.innerHTML = `
-                            <div class="alert-banner p-4 rounded-lg bg-green-50 dark:bg-green-900/30 border-l-4 border-green-500 text-gray-700 dark:text-gray-300 shadow-md">
-                                <div class="flex items-center">
-                                    <div class="flex-shrink-0 mr-3">
-                                        <svg class="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M20 6L9 17l-5-5"></path>
-                                        </svg>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium">Reconciliation complete</p>
-                                    </div>
-                                </div>
-                            </div>`;
-
-                        setTimeout(() => {
-                            if (statusElement.innerHTML.includes('Reconciliation complete')) {
-                                statusElement.innerHTML = '';
-                                if (messageElement) {
-                                    messageElement.style.display = 'none';
-                                }
-                            }
-                        }, 5000);
-                    }
-                })
-                .catch(err => console.error('Error fetching reconciliation status:', err));
-        }
-
-
         document.addEventListener('DOMContentLoaded', function() {
             console.log("DOM fully loaded and parsed");
 
@@ -557,15 +471,15 @@
                         } catch (e) { console.error('Error fixing form action URL:', e); }
                     }
                 }
+                form.addEventListener('submit', function(event) { /* ... submission fix ... */ });
             });
             document.querySelectorAll('a[href]').forEach(link => {
                 const href = link.getAttribute('href');
-                if (href && (href.startsWith('/') || (href.startsWith('http') && new URL(href, window.location.origin).host === currentHost))) {
+                if (href && href.startsWith('http')) {
                     try {
-                        const url = new URL(href, window.location.origin);
+                        const url = new URL(href);
                         if (url.host === currentHost && url.protocol !== currentProtocol) {
-                            url.protocol = currentProtocol;
-                            link.setAttribute('href', url.toString());
+                            url.protocol = currentProtocol; link.setAttribute('href', url.toString());
                             console.log(`Fixed protocol in link href: ${href} -> ${url.toString()}`);
                         }
                     } catch (e) { console.error('Error fixing link:', e); }
@@ -608,10 +522,7 @@
                 console.error('Theme toggle button (#theme-toggle) not found!');
             }
 
-             updateReconciliationStatus();
-            setInterval(updateReconciliationStatus, 2000);
-
-        }); // End DOMContentLoaded
+        });
 
         startServerPing();
 
