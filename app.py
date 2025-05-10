@@ -2095,8 +2095,7 @@ def get_all_account_cloudflare_tunnels():
 
     endpoint = f"/accounts/{CF_ACCOUNT_ID}/cfd_tunnel"
     params = {
-        "is_deleted": "false",
-        "status": ["healthy", "degraded", "down", "inactive"]
+        "is_deleted": "false"
     }
 
     logging.info(f"Attempting to list all Cloudflare tunnels for account ID {CF_ACCOUNT_ID} with params: {params}")
@@ -2105,9 +2104,16 @@ def get_all_account_cloudflare_tunnels():
         tunnels = response_data.get("result", [])
 
         if isinstance(tunnels, list):
-            logging.info(f"Successfully retrieved {len(tunnels)} Cloudflare tunnels from the account.")
-            tunnels.sort(key=lambda t: t.get("name", "").lower())
-            return tunnels
+            logging.info(f"Successfully retrieved {len(tunnels)} Cloudflare tunnels from the account (any status).")
+            
+            desired_statuses = {"healthy", "degraded", "down", "inactive"}
+            filtered_tunnels = [
+                tunnel for tunnel in tunnels if tunnel.get("status") in desired_statuses
+            ]
+            
+            logging.info(f"Returning {len(filtered_tunnels)} tunnels after client-side status check for relevant statuses.")
+            filtered_tunnels.sort(key=lambda t: t.get("name", "").lower())
+            return filtered_tunnels
         else:
             logging.error(f"Unexpected data format for account tunnels list: {type(tunnels)}. Expected a list. Response: {response_data}")
             return []
