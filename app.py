@@ -2084,41 +2084,40 @@ def update_cloudflare_config():
     
     # If we reached here, either there were no changes or the update was successful
     return True
+
 def get_all_account_cloudflare_tunnels():
-    """Retrieves a list of all Cloudflare Tunnels for the configured account."""
-    if not CF_ACCOUNT_ID: 
+    if not CF_ACCOUNT_ID:
         logging.warning("CF_ACCOUNT_ID is not configured. Cannot list all Cloudflare tunnels from the account.")
         return []
-    if not CF_API_TOKEN: 
+    if not CF_API_TOKEN:
         logging.error("Cloudflare API token not configured. Cannot list all account tunnels.")
         return []
 
     endpoint = f"/accounts/{CF_ACCOUNT_ID}/cfd_tunnel"
-    params = {"is_deleted": "false", "status": "healthy,degraded,down,inactive"}
+    params = {
+        "is_deleted": "false",
+        "status": ["healthy", "degraded", "down", "inactive"]
+    }
 
-    logging.info(f"Attempting to list all Cloudflare tunnels for account ID {CF_ACCOUNT_ID}")
+    logging.info(f"Attempting to list all Cloudflare tunnels for account ID {CF_ACCOUNT_ID} with params: {params}")
     try:
-
         response_data = cf_api_request("GET", endpoint, params=params)
         tunnels = response_data.get("result", [])
 
         if isinstance(tunnels, list):
             logging.info(f"Successfully retrieved {len(tunnels)} Cloudflare tunnels from the account.")
-
             tunnels.sort(key=lambda t: t.get("name", "").lower())
             return tunnels
         else:
             logging.error(f"Unexpected data format for account tunnels list: {type(tunnels)}. Expected a list. Response: {response_data}")
             return []
     except requests.exceptions.RequestException as e:
-
         logging.error(f"API error listing all Cloudflare tunnels for the account: {e}")
-
         if hasattr(e, 'response') and e.response is not None:
             if e.response.status_code == 403:
                 logging.error("Permission denied (403) listing account tunnels. Ensure API token has 'Account:Cloudflare Tunnel:Read' permission for the account.")
-            elif e.response.status_code == 400 and "account_id is invalid" in e.response.text.lower(): # Example check
-                logging.error("Invalid Account ID (400) provided for listing account tunnels. Please check CF_ACCOUNT_ID environment variable.")
+            elif e.response.status_code == 400:
+                logging.error(f"Bad Request (400) listing account tunnels. API Response: {e.response.text}")
         return []
     except Exception as e:
         logging.error(f"Unexpected error listing all Cloudflare tunnels for the account: {e}", exc_info=True)
