@@ -138,7 +138,7 @@
 
     <div style="position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;">
         <div class="fixed top-6 left-[-38px] sm:top-7 sm:left-[-35px] z-50 transform -rotate-45 bg-amber-500 dark:bg-amber-600 text-black dark:text-white text-xs font-semibold uppercase tracking-wider text-center py-1 w-36 shadow-md">
-             Beta Build
+             early build
         </div>
     </div>
 
@@ -318,6 +318,13 @@
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Container</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Delete Scheduled (UTC)</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                    <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-12">+/-</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tunnel Name</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tunnel ID</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created At</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Connections</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -406,6 +413,26 @@
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                     {% for tunnel in all_account_tunnels %}
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150 ease-in-out">
+                                            <td class="px-3 py-4 whitespace-nowrap text-sm text-center">
+                                                <button type="button" class="tunnel-dns-toggle p-1 rounded-full text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-700/50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                        data-tunnel-id="{{ tunnel.id | e }}"
+                                                        aria-expanded="false"
+                                                        aria-controls="dns-records-{{ tunnel.id | e }}"
+                                                        title="Toggle DNS records">
+                                                    <svg class="w-5 h-5 expand-icon transition-transform duration-200 ease-in-out" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                                                    <svg class="w-5 h-5 collapse-icon hidden transition-transform duration-200 ease-in-out" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6"></path></svg>
+                                                </button>
+                                            </td>
+                                            <tr class="dns-records-row hidden bg-gray-100 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+                                                <td colspan="8">
+                                                    <div id="dns-records-{{ tunnel.id | e }}" class="p-4 text-sm space-y-2">
+                                                        <p class="text-gray-500 dark:text-gray-400 italic">Click the '+' button to load DNS records for this tunnel.</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                                                {{ tunnel.name | e }}
+                                            </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                                                 {{ tunnel.name | e }}
                                             </td>
@@ -625,7 +652,85 @@
                     .catch(error => console.error("Server ping failed:", error));
             }, 30000);
         }
+        document.querySelectorAll('.tunnel-dns-toggle').forEach(button => {
+        button.addEventListener('click', async function() {
+        const tunnelId = this.dataset.tunnelId;
+        // The targetRow is the one *after* the button's row, which is for DNS records
+        const tunnelDetailsRow = this.closest('tr');
+        const dnsRecordsDisplayRow = tunnelDetailsRow.nextElementSibling;
+        const targetDivId = this.getAttribute('aria-controls'); // e.g., "dns-records-TUNNEL_ID"
+        const targetDiv = document.getElementById(targetDivId);
+        const isExpanded = this.getAttribute('aria-expanded') === 'true';
 
+        const expandIcon = this.querySelector('.expand-icon');
+        const collapseIcon = this.querySelector('.collapse-icon');
+
+        if (!dnsRecordsDisplayRow || !targetDiv) {
+            console.error("Could not find target row or div for DNS records for tunnel:", tunnelId);
+            return;
+        }
+
+        if (isExpanded) {
+            dnsRecordsDisplayRow.classList.add('hidden');
+            this.setAttribute('aria-expanded', 'false');
+            if (expandIcon) expandIcon.classList.remove('hidden');
+            if (collapseIcon) collapseIcon.classList.add('hidden');
+            if (expandIcon) expandIcon.style.transform = 'rotate(0deg)'; // Reset rotation
+        } else {
+            this.setAttribute('aria-expanded', 'true');
+            if (expandIcon) expandIcon.classList.add('hidden');
+            if (collapseIcon) collapseIcon.classList.remove('hidden');
+            if (expandIcon) expandIcon.style.transform = 'rotate(45deg)'; // Visual cue
+
+            // Only fetch if data hasn't been loaded or if a previous load resulted in an error
+            if (targetDiv.dataset.loaded !== 'true' || targetDiv.dataset.loaded === 'error') {
+                targetDiv.innerHTML = '<p class="text-gray-500 dark:text-gray-400 italic animate-pulse p-2">Loading DNS records...</p>';
+                dnsRecordsDisplayRow.classList.remove('hidden'); // Show before loading
+
+                try {
+                    const currentProtocol = window.location.protocol;
+                    const currentHost = window.location.host;
+                    const fetchUrl = `${currentProtocol}//${currentHost}/tunnel-dns-records/${tunnelId}?t=${Date.now()}`; // Added cache buster
+                    
+                    console.log(`Fetching DNS for tunnel ${tunnelId} from ${fetchUrl}`);
+                    const response = await fetch(fetchUrl);
+                    
+                    if (!response.ok) {
+                        let errorDetail = `HTTP error ${response.status}`;
+                        try {
+                            const errorData = await response.json();
+                            errorDetail = errorData.error || errorData.message || errorDetail;
+                        } catch (e) { /* Failed to parse JSON error */ }
+                        throw new Error(errorDetail);
+                    }
+                    const data = await response.json();
+                    
+                    if (data.dns_records && data.dns_records.length > 0) {
+                        let dnsHtml = '<ul class="list-none pl-4 space-y-1.5">'; // Using list-none for custom styling if needed
+                        data.dns_records.forEach(record => {
+                            const recordUrl = `https://${record.name}`; // Assuming HTTPS
+                            dnsHtml += `<li class="text-gray-700 dark:text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-2 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg><a href="${recordUrl}" target="_blank" rel="noopener noreferrer" class="hover:text-indigo-500 dark:hover:text-indigo-300 hover:underline">${record.name}</a></li>`;
+                        });
+                        dnsHtml += '</ul>';
+                        targetDiv.innerHTML = dnsHtml;
+                        targetDiv.dataset.loaded = 'true';
+                    } else if (data.message) { // For messages like "No zones configured"
+                         targetDiv.innerHTML = `<p class="text-gray-600 dark:text-gray-400 italic p-2">${data.message}</p>`;
+                         targetDiv.dataset.loaded = 'info'; // Or 'true' if you don't want to reload
+                    } else {
+                        targetDiv.innerHTML = '<p class="text-gray-600 dark:text-gray-400 italic p-2">No CNAME DNS records found pointing to this tunnel in the configured zones.</p>';
+                        targetDiv.dataset.loaded = 'true';
+                    }
+                } catch (error) {
+                    console.error('Error fetching DNS records for tunnel ' + tunnelId + ':', error);
+                    targetDiv.innerHTML = `<p class="text-red-500 dark:text-red-400 p-2">Error loading DNS records: ${error.message}</p>`;
+                    targetDiv.dataset.loaded = 'error'; // Allows retry on next click
+                }
+            }
+            dnsRecordsDisplayRow.classList.remove('hidden'); // Ensure it's visible after loading or if already loaded
+        }
+    });
+});
         function updateReconciliationStatus() {
             const currentProtocol = window.location.protocol;
             const currentHost = window.location.host;
