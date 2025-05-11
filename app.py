@@ -1169,7 +1169,7 @@ def process_container_start(container):
                         
                         if not cf_access_policies:
                             if desired_access_policy_type == "bypass":
-                                cf_access_policies = [{"name": "Public Bypass", "decision": "bypass", "include": [{"everyone": True}]}]
+                                cf_access_policies = [{"name": "Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
                             elif desired_access_policy_type == "authenticate":
                                 policy_include_rules = []
                                 if desired_allowed_idps_str:
@@ -1774,7 +1774,7 @@ def _run_reconciliation():
                                     if desired_details["access_allowed_idps_str"]:
                                         ids = [idp.strip() for idp in desired_details["access_allowed_idps_str"].split(',') if idp.strip()]
                                         if ids: auth_include.append({"identity_provider": {"id": ids}})
-                                    if not auth_include: auth_include.append({"everyone": True}) # Default to any authed user via app's IdPs
+                                    if not auth_include: auth_include.append({"everyone": {}}) # Default to any authed user via app's IdPs
                                     cf_access_policies_list = [{"name": "Default Auth", "decision": "allow", "include": auth_include}]
                             
                             app_idps = [idp.strip() for idp in desired_details["access_allowed_idps_str"].split(',') if idp.strip()] if desired_details["access_allowed_idps_str"] else None
