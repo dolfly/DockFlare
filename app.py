@@ -2419,84 +2419,6 @@ def update_cloudflare_config():
     # If we reached here, either there were no changes or the update was successful
     return True
 
-@app.route('/create_default_tld_policy', methods=['POST'])
-def create_default_tld_policy():
-    
-    target_zone_id_for_tld = CF_ZONE_ID
-    target_zone_name_for_tld = None
-
-    if not target_zone_id_for_tld:
-
-        if TUNNEL_NAME and TUNNEL_NAME.count('.') >= 1:
-            parts = TUNNEL_NAME.split('.')
-            potential_zone_name = f"{parts[-2]}.{parts[-1]}"
-            logging.info(f"CF_ZONE_ID not set, attempting to derive zone name from TUNNEL_NAME: {potential_zone_name}")
-            resolved_id = get_zone_id_from_name(potential_zone_name)
-            if resolved_id:
-                target_zone_id_for_tld = resolved_id
-                target_zone_name_for_tld = potential_zone_name
-            else:
-                logging.error("Could not determine a target zone for TLD policy creation from TUNNEL_NAME.")
-
-                cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Could not determine target zone."
-                return redirect(url_for('status_page'))
-        else:
-            logging.error("CF_ZONE_ID not set and TUNNEL_NAME is not in a format to derive zone name.")
-            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - CF_ZONE_ID not set, cannot derive zone."
-            return redirect(url_for('status_page'))
-    
-    if not target_zone_name_for_tld: # If CF_ZONE_ID was used, we need to get its name
-
-        form_zone_name = request.form.get('zone_name')
-        form_target_email = request.form.get('target_email')
-
-        if not form_zone_name or not form_target_email:
-            logging.error("Missing zone_name or target_email in form submission for TLD policy.")
-            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Missing form data."
-            return redirect(url_for('status_page'))
-        
-        target_zone_name_for_tld = form_zone_name
-
-    tld_hostname = f"*.{target_zone_name_for_tld}"
-    
-    logging.info(f"Attempting to create default TLD Access Policy for: {tld_hostname} allowing email {form_target_email}")
-
-    if check_for_tld_access_policy(target_zone_name_for_tld):
-        logging.warning(f"A TLD Access Policy for '{tld_hostname}' already seems to exist. Aborting creation.")
-        cloudflared_agent_state["last_action_status"] = f"Info: TLD Policy for {tld_hostname} already exists."
-        return redirect(url_for('status_page'))
-
-    default_tld_policies = [{
-        "name": f"Default Allow {form_target_email} for *.{target_zone_name_for_tld}",
-        "decision": "allow",
-        "include": [{"email": {"email": form_target_email}}]
-    }, {
-        "name": "Default Deny Fallback for TLD", # Explicit deny for others
-        "decision": "deny",
-        "include": [{"everyone": {}}]
-    }]
-
-    app_name = f"Default TLD Access Policy (*.{target_zone_name_for_tld})"
-    created_app = create_cloudflare_access_application(
-        hostname=tld_hostname, # The domain for the app
-        name=app_name,
-        session_duration="24h",
-        app_launcher_visible=False, # Usually TLD policies are not for app launcher
-        self_hosted_domains=[tld_hostname], # Domains it applies to
-        access_policies=default_tld_policies,
-        allowed_idps=None, # Uses account default IdPs
-        auto_redirect_to_identity=False
-    )
-
-    if created_app and created_app.get("id"):
-        logging.info(f"Successfully created default TLD Access Policy for '{tld_hostname}' with App ID: {created_app.get('id')}")
-        cloudflared_agent_state["last_action_status"] = f"Success: Created TLD Access Policy for {tld_hostname}."
-    else:
-        logging.error(f"Failed to create default TLD Access Policy for '{tld_hostname}'.")
-        cloudflared_agent_state["last_action_status"] = f"Error: Failed to create TLD Access Policy for {tld_hostname}."
-        
-    return redirect(url_for('status_page'))
-
 def get_all_account_cloudflare_tunnels():
     if not CF_ACCOUNT_ID:
         logging.warning("CF_ACCOUNT_ID is not configured. Cannot list all Cloudflare tunnels from the account.")
@@ -2573,6 +2495,10 @@ def get_dns_records_for_tunnel(zone_id, tunnel_id):
         logging.error(f"Unexpected error fetching DNS records for tunnel {tunnel_id} in zone {zone_id}: {e}", exc_info=True)
         return []
 
+#
+# BIG REMINDER Flask start here ! Don't forget you dummy and drink coffee Chris.... 
+#
+#
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['PREFERRED_URL_SCHEME'] = 'https'  # Default for url_for, but client-side JS will fix
@@ -2666,6 +2592,84 @@ def tunnel_dns_records(tunnel_id):
     
     logging.info(f"Found {len(all_found_dns_records)} DNS records for tunnel {tunnel_id} across {len(zone_ids_to_scan)} zones.")
     return jsonify({"dns_records": all_found_dns_records})
+
+@app.route('/create_default_tld_policy', methods=['POST'])
+def create_default_tld_policy():
+    
+    target_zone_id_for_tld = CF_ZONE_ID
+    target_zone_name_for_tld = None
+
+    if not target_zone_id_for_tld:
+
+        if TUNNEL_NAME and TUNNEL_NAME.count('.') >= 1:
+            parts = TUNNEL_NAME.split('.')
+            potential_zone_name = f"{parts[-2]}.{parts[-1]}"
+            logging.info(f"CF_ZONE_ID not set, attempting to derive zone name from TUNNEL_NAME: {potential_zone_name}")
+            resolved_id = get_zone_id_from_name(potential_zone_name)
+            if resolved_id:
+                target_zone_id_for_tld = resolved_id
+                target_zone_name_for_tld = potential_zone_name
+            else:
+                logging.error("Could not determine a target zone for TLD policy creation from TUNNEL_NAME.")
+
+                cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Could not determine target zone."
+                return redirect(url_for('status_page'))
+        else:
+            logging.error("CF_ZONE_ID not set and TUNNEL_NAME is not in a format to derive zone name.")
+            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - CF_ZONE_ID not set, cannot derive zone."
+            return redirect(url_for('status_page'))
+    
+    if not target_zone_name_for_tld: 
+
+        form_zone_name = request.form.get('zone_name')
+        form_target_email = request.form.get('target_email')
+
+        if not form_zone_name or not form_target_email:
+            logging.error("Missing zone_name or target_email in form submission for TLD policy.")
+            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Missing form data."
+            return redirect(url_for('status_page'))
+        
+        target_zone_name_for_tld = form_zone_name
+
+    tld_hostname = f"*.{target_zone_name_for_tld}"
+    
+    logging.info(f"Attempting to create default TLD Access Policy for: {tld_hostname} allowing email {form_target_email}")
+
+    if check_for_tld_access_policy(target_zone_name_for_tld):
+        logging.warning(f"A TLD Access Policy for '{tld_hostname}' already seems to exist. Aborting creation.")
+        cloudflared_agent_state["last_action_status"] = f"Info: TLD Policy for {tld_hostname} already exists."
+        return redirect(url_for('status_page'))
+
+    default_tld_policies = [{
+        "name": f"Default Allow {form_target_email} for *.{target_zone_name_for_tld}",
+        "decision": "allow",
+        "include": [{"email": {"email": form_target_email}}]
+    }, {
+        "name": "Default Deny Fallback for TLD", # Explicit deny for others
+        "decision": "deny",
+        "include": [{"everyone": {}}]
+    }]
+
+    app_name = f"Default TLD Access Policy (*.{target_zone_name_for_tld})"
+    created_app = create_cloudflare_access_application(
+        hostname=tld_hostname, # The domain for the app
+        name=app_name,
+        session_duration="24h",
+        app_launcher_visible=False, # Usually TLD policies are not for app launcher
+        self_hosted_domains=[tld_hostname], # Domains it applies to
+        access_policies=default_tld_policies,
+        allowed_idps=None, # Uses account default IdPs
+        auto_redirect_to_identity=False
+    )
+
+    if created_app and created_app.get("id"):
+        logging.info(f"Successfully created default TLD Access Policy for '{tld_hostname}' with App ID: {created_app.get('id')}")
+        cloudflared_agent_state["last_action_status"] = f"Success: Created TLD Access Policy for {tld_hostname}."
+    else:
+        logging.error(f"Failed to create default TLD Access Policy for '{tld_hostname}'.")
+        cloudflared_agent_state["last_action_status"] = f"Error: Failed to create TLD Access Policy for {tld_hostname}."
+        
+    return redirect(url_for('status_page'))
 
 @app.context_processor
 def inject_protocol():
