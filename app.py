@@ -47,39 +47,31 @@ CF_HEADERS = {
     "Content-Type": "application/json",
 }
 
-# External cloudflared container configuration
 USE_EXTERNAL_CLOUDFLARED = os.getenv('USE_EXTERNAL_CLOUDFLARED', 'false').lower() in ['true', '1', 't', 'yes']
 EXTERNAL_TUNNEL_ID = os.getenv('EXTERNAL_TUNNEL_ID')
-
-# Network scanning configuration
 SCAN_ALL_NETWORKS = os.getenv('SCAN_ALL_NETWORKS', 'false').lower() in ['true', '1', 't', 'yes']
-# Tunnel DNS Scanning to show DNS entrys for other 
-# for function get_dns_records_for_tunnel
 TUNNEL_DNS_SCAN_ZONE_NAMES_STR = os.getenv('TUNNEL_DNS_SCAN_ZONE_NAMES', '')
 TUNNEL_DNS_SCAN_ZONE_NAMES = [name.strip() for name in TUNNEL_DNS_SCAN_ZONE_NAMES_STR.split(',') if name.strip()]
-
-# Settings that are only required when NOT using external cloudflared
 TUNNEL_NAME = os.getenv("TUNNEL_NAME", "dockflared-tunnel")
 CLOUDFLARED_NETWORK_NAME = os.getenv('CLOUDFLARED_NETWORK_NAME', 'cloudflare-net') if not USE_EXTERNAL_CLOUDFLARED else None
 CLOUDFLARED_CONTAINER_NAME = os.getenv('CLOUDFLARED_CONTAINER_NAME', f"cloudflared-agent-{TUNNEL_NAME}") if not USE_EXTERNAL_CLOUDFLARED else None
 CLOUDFLARED_IMAGE = "cloudflare/cloudflared:latest"
-
-# Settings used in both modes
 LABEL_PREFIX = os.getenv('LABEL_PREFIX', 'cloudflare.tunnel')
 GRACE_PERIOD_SECONDS = int(os.getenv('GRACE_PERIOD_SECONDS', 28800))
 CLEANUP_INTERVAL_SECONDS = int(os.getenv('CLEANUP_INTERVAL_SECONDS', 300))
 AGENT_STATUS_UPDATE_INTERVAL_SECONDS = int(os.getenv('AGENT_STATUS_UPDATE_INTERVAL_SECONDS', 10))
 STATE_FILE_PATH = os.getenv('STATE_FILE_PATH', '/app/data/state.json')
 MAX_LOG_QUEUE_SIZE = 200
-
-# Performance settings
 MAX_CONCURRENT_DNS_OPS = int(os.getenv('MAX_CONCURRENT_DNS_OPS', 3))
 RECONCILIATION_BATCH_SIZE = int(os.getenv('RECONCILIATION_BATCH_SIZE', 3))
 dns_semaphore = threading.Semaphore(MAX_CONCURRENT_DNS_OPS)
 
-# Validate required configuration
 required_vars = ["CF_API_TOKEN", "CF_ACCOUNT_ID"]
 missing_vars = [var for var in required_vars if not globals().get(var)]
+
+_cached_account_email = None
+_cached_account_email_timestamp = 0
+_ACCOUNT_EMAIL_CACHE_TTL = 3600 
 
 if not USE_EXTERNAL_CLOUDFLARED:
     if not TUNNEL_NAME:
@@ -423,6 +415,58 @@ def _build_access_app_payload(hostname, name, session_duration, app_launcher_vis
         del payload["allowed_idps"]
     return payload
 
+def check_for_tld_access_policy(zone_name):
+    if not zone_name:
+        logging.warning("check_for_tld_access_policy called with no zone_name.")
+        return False
+    
+    tld_hostname = f"*.{zone_name}"
+    logging.info(f"Checking for existing Access Policy for wildcard TLD: {tld_hostname}")
+    
+    try:
+
+        existing_app = find_cloudflare_access_application_by_hostname(tld_hostname)
+        if existing_app and existing_app.get("id"):
+            logging.info(f"Found existing Access Application ID '{existing_app.get('id')}' for TLD '{tld_hostname}'.")
+            return True
+        else:
+            logging.info(f"No specific Access Application found for TLD '{tld_hostname}'.")
+            return False
+    except Exception as e:
+        logging.error(f"Error while checking for TLD access policy for '{tld_hostname}': {e}", exc_info=True)
+        return False
+
+def get_cloudflare_account_email():
+    global _cached_account_email, _cached_account_email_timestamp
+    
+    current_time = time.time()
+    if _cached_account_email and (current_time - _cached_account_email_timestamp < _ACCOUNT_EMAIL_CACHE_TTL):
+        logging.debug(f"Returning cached Cloudflare account email: {_cached_account_email}")
+        return _cached_account_email
+
+    logging.info("Fetching Cloudflare account email from API.")
+    try:
+        response_data = cf_api_request("GET", "/user") 
+        if response_data and response_data.get("success"):
+            email = response_data.get("result", {}).get("email")
+            if email:
+                logging.info(f"Successfully fetched Cloudflare account email: {email}")
+                _cached_account_email = email
+                _cached_account_email_timestamp = current_time
+                return email
+            else:
+                logging.warning("Cloudflare account email not found in API response.")
+                return None
+        else:
+            logging.warning(f"Failed to fetch Cloudflare account email, API call unsuccessful or no success flag. Response: {response_data}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logging.error(f"API error fetching Cloudflare account email: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error fetching Cloudflare account email: {e}", exc_info=True)
+        return None
+        
 def find_cloudflare_access_application_by_hostname(hostname):
     logging.info(f"Finding Cloudflare Access Application for hostname '{hostname}'")
     endpoint = f"/accounts/{CF_ACCOUNT_ID}/access/apps"
@@ -2375,6 +2419,84 @@ def update_cloudflare_config():
     # If we reached here, either there were no changes or the update was successful
     return True
 
+@app.route('/create_default_tld_policy', methods=['POST'])
+def create_default_tld_policy():
+    
+    target_zone_id_for_tld = CF_ZONE_ID
+    target_zone_name_for_tld = None
+
+    if not target_zone_id_for_tld:
+
+        if TUNNEL_NAME and TUNNEL_NAME.count('.') >= 1:
+            parts = TUNNEL_NAME.split('.')
+            potential_zone_name = f"{parts[-2]}.{parts[-1]}"
+            logging.info(f"CF_ZONE_ID not set, attempting to derive zone name from TUNNEL_NAME: {potential_zone_name}")
+            resolved_id = get_zone_id_from_name(potential_zone_name)
+            if resolved_id:
+                target_zone_id_for_tld = resolved_id
+                target_zone_name_for_tld = potential_zone_name
+            else:
+                logging.error("Could not determine a target zone for TLD policy creation from TUNNEL_NAME.")
+
+                cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Could not determine target zone."
+                return redirect(url_for('status_page'))
+        else:
+            logging.error("CF_ZONE_ID not set and TUNNEL_NAME is not in a format to derive zone name.")
+            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - CF_ZONE_ID not set, cannot derive zone."
+            return redirect(url_for('status_page'))
+    
+    if not target_zone_name_for_tld: # If CF_ZONE_ID was used, we need to get its name
+
+        form_zone_name = request.form.get('zone_name')
+        form_target_email = request.form.get('target_email')
+
+        if not form_zone_name or not form_target_email:
+            logging.error("Missing zone_name or target_email in form submission for TLD policy.")
+            cloudflared_agent_state["last_action_status"] = "Error: TLD Policy - Missing form data."
+            return redirect(url_for('status_page'))
+        
+        target_zone_name_for_tld = form_zone_name
+
+    tld_hostname = f"*.{target_zone_name_for_tld}"
+    
+    logging.info(f"Attempting to create default TLD Access Policy for: {tld_hostname} allowing email {form_target_email}")
+
+    if check_for_tld_access_policy(target_zone_name_for_tld):
+        logging.warning(f"A TLD Access Policy for '{tld_hostname}' already seems to exist. Aborting creation.")
+        cloudflared_agent_state["last_action_status"] = f"Info: TLD Policy for {tld_hostname} already exists."
+        return redirect(url_for('status_page'))
+
+    default_tld_policies = [{
+        "name": f"Default Allow {form_target_email} for *.{target_zone_name_for_tld}",
+        "decision": "allow",
+        "include": [{"email": {"email": form_target_email}}]
+    }, {
+        "name": "Default Deny Fallback for TLD", # Explicit deny for others
+        "decision": "deny",
+        "include": [{"everyone": {}}]
+    }]
+
+    app_name = f"Default TLD Access Policy (*.{target_zone_name_for_tld})"
+    created_app = create_cloudflare_access_application(
+        hostname=tld_hostname, # The domain for the app
+        name=app_name,
+        session_duration="24h",
+        app_launcher_visible=False, # Usually TLD policies are not for app launcher
+        self_hosted_domains=[tld_hostname], # Domains it applies to
+        access_policies=default_tld_policies,
+        allowed_idps=None, # Uses account default IdPs
+        auto_redirect_to_identity=False
+    )
+
+    if created_app and created_app.get("id"):
+        logging.info(f"Successfully created default TLD Access Policy for '{tld_hostname}' with App ID: {created_app.get('id')}")
+        cloudflared_agent_state["last_action_status"] = f"Success: Created TLD Access Policy for {tld_hostname}."
+    else:
+        logging.error(f"Failed to create default TLD Access Policy for '{tld_hostname}'.")
+        cloudflared_agent_state["last_action_status"] = f"Error: Failed to create TLD Access Policy for {tld_hostname}."
+        
+    return redirect(url_for('status_page'))
+
 def get_all_account_cloudflare_tunnels():
     if not CF_ACCOUNT_ID:
         logging.warning("CF_ACCOUNT_ID is not configured. Cannot list all Cloudflare tunnels from the account.")
@@ -2571,8 +2693,17 @@ def inject_protocol():
 @app.route('/')
 def status_page():
     """Renders the main status dashboard page."""
-    with state_lock:
-        rules_for_template = {}
+    # Initialize all variables that will be passed to the template outside the lock first
+    rules_for_template = {}
+    template_tunnel_state = {}
+    template_agent_state = {}
+    initialization_status = {} # Ensure this is always defined
+    
+    tld_policy_exists = False
+    account_email_for_tld = None
+    relevant_zone_name_for_tld_policy = None
+
+    with state_lock: # Lock for accessing shared mutable state
         for hostname, rule in managed_rules.items():
             rule_copy = copy.deepcopy(rule)
             if rule_copy.get("delete_at") and isinstance(rule_copy["delete_at"], datetime):
@@ -2586,17 +2717,67 @@ def status_page():
         template_tunnel_state = tunnel_state.copy()
         template_agent_state = cloudflared_agent_state.copy()
         
-        # Add initialization state for UI display
+        # Initialization status should be based on the current tunnel_state
         initialization_status = {
-            "complete": tunnel_state.get("id") is not None,
-            "in_progress": template_tunnel_state.get("status_message") == "Initializing (in progress)..."
+            "complete": template_tunnel_state.get("id") is not None, # Use the copied state
+            "in_progress": template_tunnel_state.get("status_message", "").startswith("Initializing") # More robust check
         }
 
-    display_token = get_display_token(template_tunnel_state.get("token"))
+        # --- New logic for TLD Policy Assistant - also needs to be careful with shared state like zone_id_cache ---
+        # Perform checks that might involve API calls or shared cache outside the main loop if possible,
+        # or ensure they are quick/non-blocking if inside. 
+        # For zone_id_cache, reading it is fine within the lock. API calls are made by helper functions.
+
+        if CF_ZONE_ID and docker_client: # docker_client check implies API might be usable
+            cached_zone_name = None
+            if zone_id_cache: # zone_id_cache is protected by state_lock indirectly if modified only with lock
+                for name, data in zone_id_cache.items():
+                    if isinstance(data, tuple) and data[0] == CF_ZONE_ID:
+                        cached_zone_name = name
+                        break
+            
+            if cached_zone_name:
+                relevant_zone_name_for_tld_policy = cached_zone_name
+                logging.debug(f"Using cached zone name '{relevant_zone_name_for_tld_policy}' for CF_ZONE_ID '{CF_ZONE_ID}' for TLD check.")
+            elif TUNNEL_NAME and TUNNEL_NAME.count('.') >= 1:
+                parts = TUNNEL_NAME.split('.')
+                potential_zone_name = f"{parts[-2]}.{parts[-1]}"
+                # get_zone_id_from_name makes an API call, ideally its cache is effective
+                resolved_id_for_tunnel_zone = get_zone_id_from_name(potential_zone_name) 
+                if CF_ZONE_ID == resolved_id_for_tunnel_zone:
+                     relevant_zone_name_for_tld_policy = potential_zone_name
+                     logging.debug(f"Derived zone name '{relevant_zone_name_for_tld_policy}' from TUNNEL_NAME and it matches CF_ZONE_ID.")
+                # Don't log warning here if it doesn't match, relevant_zone_name_for_tld_policy will remain None
+            
+            # If still no relevant_zone_name_for_tld_policy, and CF_ZONE_ID is set, it means we couldn't map ID to name easily.
+            # The get_zone_id_from_name function has its own caching for zone name lookups.
+            # We could add a get_zone_name_from_id function that also caches.
+            # For now, the warning about displaying accurate TLD policy will be handled if relevant_zone_name_for_tld_policy remains None.
+
+            if relevant_zone_name_for_tld_policy:
+                # check_for_tld_access_policy and get_cloudflare_account_email make API calls.
+                # These are fine to call here; they have their own logging.
+                tld_policy_exists = check_for_tld_access_policy(relevant_zone_name_for_tld_policy)
+                if not tld_policy_exists: 
+                    account_email_for_tld = get_cloudflare_account_email()
+            else:
+                logging.info("Relevant zone name for TLD policy check could not be determined (CF_ZONE_ID might be set, but its name is not cached or derivable). Skipping TLD policy UI elements.")
+        else:
+            if not CF_ZONE_ID:
+                logging.debug("CF_ZONE_ID not set, TLD policy assistant feature will not be active.")
+            if not docker_client:
+                logging.debug("Docker client not available, TLD policy assistant API calls cannot be made.")
+        # --- End of TLD Policy Logic ---
+
+    # Variables that don't depend on the state_lock can be prepared outside
+    display_token = get_display_token(template_tunnel_state.get("token")) # Uses copied state
     docker_available = docker_client is not None
     external_cloudflared = USE_EXTERNAL_CLOUDFLARED
     external_tunnel_id = EXTERNAL_TUNNEL_ID
-    all_account_tunnels_list = get_all_account_cloudflare_tunnels()
+    
+    # get_all_account_cloudflare_tunnels makes API calls, fine to be outside lock
+    all_account_tunnels_list = get_all_account_cloudflare_tunnels() 
+
     return render_template('status_page.html',
                         tunnel_state=template_tunnel_state,
                         agent_state=template_agent_state,
@@ -2608,8 +2789,13 @@ def status_page():
                         external_tunnel_id=external_tunnel_id,
                         rules=rules_for_template,
                         all_account_tunnels=all_account_tunnels_list,
-                        CF_ACCOUNT_ID_CONFIGURED=bool(CF_ACCOUNT_ID), # Pass boolean flag
-                        ACCOUNT_ID_FOR_DISPLAY=CF_ACCOUNT_ID if CF_ACCOUNT_ID else "Not Configured" # Pass actual ID or placeholder
+                        CF_ACCOUNT_ID_CONFIGURED=bool(CF_ACCOUNT_ID), 
+                        ACCOUNT_ID_FOR_DISPLAY=CF_ACCOUNT_ID if CF_ACCOUNT_ID else "Not Configured",
+                        # New variables for the template
+                        relevant_zone_name_for_tld_policy=relevant_zone_name_for_tld_policy,
+                        tld_policy_exists=tld_policy_exists,
+                        account_email_for_tld=account_email_for_tld,
+                        CF_ZONE_ID_CONFIGURED=bool(CF_ZONE_ID) # Pass this to template for conditional display of TLD section
                         )
 
 @app.route('/ping')
