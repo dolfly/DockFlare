@@ -1619,7 +1619,6 @@ def _run_reconciliation():
     watchdog.start()
     
     try:
-        
         running_labeled_hostnames_details = {} 
         try:
             app.reconciliation_info["status"] = "Scanning containers for services and access policies..."
@@ -1649,13 +1648,12 @@ def _run_reconciliation():
                     container_scan_item_start_time = time.time()
                     try:
                         labels = c.labels
-                        container_id = c.id
-                        container_name = c.name
+                        container_id_val = c.id 
+                        container_name_val = c.name 
                         enabled = labels.get(f"{LABEL_PREFIX}.enable", "false").lower() in ["true", "1", "t", "yes"]
                         
                         if not enabled:
                             continue
-                        
                         
                         default_access_policy_type = labels.get(f"{LABEL_PREFIX}.access.policy")
                         default_access_app_name = labels.get(f"{LABEL_PREFIX}.access.name")
@@ -1682,7 +1680,6 @@ def _run_reconciliation():
                                 "access_auto_redirect": default_auto_redirect,
                                 "access_custom_rules_str": default_custom_rules_str
                             })
-
                         
                         idx = 0
                         while time.time() - container_scan_item_start_time < 5 : 
@@ -1714,11 +1711,11 @@ def _run_reconciliation():
                             idx += 1
                         
                         for config in hostname_configs_for_container:
-                            hostname = config["hostname"]
-                            if hostname in running_labeled_hostnames_details:
-                                logging.warning(f"[Reconcile] Duplicate hostname '{hostname}' found from labels. Using latest encountered: {container_name}.")
-                            running_labeled_hostnames_details[hostname] = {
-                                "service": config["service"], "container_id": container_id, "container_name": container_name,
+                            hostname_val = config["hostname"] 
+                            if hostname_val in running_labeled_hostnames_details:
+                                logging.warning(f"[Reconcile] Duplicate hostname '{hostname_val}' found from labels. Using latest encountered: {container_name_val}.")
+                            running_labeled_hostnames_details[hostname_val] = {
+                                "service": config["service"], "container_id": container_id_val, "container_name": container_name_val,
                                 "zone_name": config["zone_name"], "no_tls_verify": config["no_tls_verify"],
                                 "access_policy_type": config["access_policy_type"],
                                 "access_app_name": config["access_app_name"],
@@ -1737,7 +1734,6 @@ def _run_reconciliation():
         except Exception as e_phase1:
             logging.error(f"[Reconcile] Error in container scanning phase: {e_phase1}", exc_info=True)
             app.reconciliation_info["status"] = f"Container scan error: {str(e_phase1)}"
-
         
         app.reconciliation_info["status"] = "Comparing state and reconciling cloud resources..."
         app.reconciliation_info["total_items"] = len(running_labeled_hostnames_details) + len(managed_rules) 
@@ -1781,7 +1777,8 @@ def _run_reconciliation():
                             "service": desired_details["service"], "container_id": desired_details["container_id"],
                             "status": "active", "delete_at": None, "zone_id": target_zone_id,
                             "no_tls_verify": desired_details["no_tls_verify"],
-                            "access_app_id": None, "access_policy_type": None, "access_app_config_hash": None
+                            "access_app_id": None, "access_policy_type": None, "access_app_config_hash": None,
+                            "access_policy_ui_override": False
                         }
                         managed_rules[hostname] = current_rule
                         state_changed_locally = True
@@ -1793,94 +1790,30 @@ def _run_reconciliation():
                             current_rule["status"] = "active"; current_rule["delete_at"] = None
                             state_changed_locally = True 
                         
-                        if current_rule.get("service") != desired_details["service"] or \
-                           current_rule.get("no_tls_verify") != desired_details["no_tls_verify"] or \
-                           current_rule.get("zone_id") != target_zone_id:
+                        service_changed_in_reconcile = current_rule.get("service") != desired_details["service"]
+                        no_tls_verify_changed_in_reconcile = current_rule.get("no_tls_verify") != desired_details["no_tls_verify"]
+                        zone_id_changed_in_reconcile = current_rule.get("zone_id") != target_zone_id
+                        container_id_changed_in_reconcile = current_rule.get("container_id") != desired_details["container_id"]
+
+                        if service_changed_in_reconcile or no_tls_verify_changed_in_reconcile or zone_id_changed_in_reconcile:
                             needs_tunnel_config_update = True 
                         
                         current_rule["service"] = desired_details["service"]
                         current_rule["container_id"] = desired_details["container_id"] 
                         current_rule["zone_id"] = target_zone_id
                         current_rule["no_tls_verify"] = desired_details["no_tls_verify"]
-                        state_changed_locally = True
+                        
+                        if service_changed_in_reconcile or no_tls_verify_changed_in_reconcile or zone_id_changed_in_reconcile or container_id_changed_in_reconcile:
+                            state_changed_locally = True
                         
                         hostnames_requiring_dns_setup.append((hostname, target_zone_id))
-
-
                     
-                    desired_access_policy_type = desired_details["access_policy_type"]
-                    desired_access_app_name = desired_details["access_app_name"] if desired_details["access_app_name"] else f"DockFlare-{hostname}"
-                    
-                    if desired_access_policy_type:
-                        desired_acc_hash = generate_access_app_config_hash(
-                            desired_access_policy_type, desired_details["access_session_duration"],
-                            desired_details["access_app_launcher_visible"], desired_details["access_allowed_idps_str"],
-                            desired_details["access_auto_redirect"], desired_details["access_custom_rules_str"]
-                        )
-
-                        current_app_id = current_rule.get("access_app_id")
-                        needs_access_app_action = False
-
-                        if desired_access_policy_type == "default_tld":
-                            if current_app_id:
-                                logging.info(f"[Reconcile] {hostname} wants 'default_tld', deleting managed Access App {current_app_id}.")
-                                if delete_cloudflare_access_application(current_app_id): 
-                                    current_rule["access_app_id"] = None
-                                    current_rule["access_policy_type"] = "default_tld"
-                                    current_rule["access_app_config_hash"] = None
-                                    state_changed_locally = True
-                        elif desired_access_policy_type in ["bypass", "authenticate"]:
-                            cf_access_policies_list = []
-                            if desired_details["access_custom_rules_str"]:
-                                try: cf_access_policies_list = json.loads(desired_details["access_custom_rules_str"])
-                                except: logging.error(f"[Reconcile] Invalid custom_rules JSON for {hostname}")
-                            if not cf_access_policies_list:
-                                if desired_access_policy_type == "bypass":
-                                    cf_access_policies_list = [{"name": "Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
-                                elif desired_access_policy_type == "authenticate":
-                                    auth_include = []
-                                    if desired_details["access_allowed_idps_str"]:
-                                        ids = [idp.strip() for idp in desired_details["access_allowed_idps_str"].split(',') if idp.strip()]
-                                        if ids: auth_include.append({"identity_provider": {"id": ids}})
-                                    if not auth_include: auth_include.append({"everyone": {}}) 
-                                    cf_access_policies_list = [{"name": "Default Auth", "decision": "allow", "include": auth_include}]
-                            
-                            app_idps = [idp.strip() for idp in desired_details["access_allowed_idps_str"].split(',') if idp.strip()] if desired_details["access_allowed_idps_str"] else None
-
-                            if current_app_id: 
-                                if current_rule.get("access_policy_type") != desired_access_policy_type or \
-                                   current_rule.get("access_app_config_hash") != desired_acc_hash:
-                                    logging.info(f"[Reconcile] Updating Access App for {hostname} (ID: {current_app_id}).")
-                                    updated_app = update_cloudflare_access_application(
-                                        current_app_id, hostname, desired_access_app_name,
-                                        desired_details["access_session_duration"], desired_details["access_app_launcher_visible"],
-                                        [hostname], cf_access_policies_list, app_idps, desired_details["access_auto_redirect"]
-                                    )
-                                    if updated_app:
-                                        current_rule["access_policy_type"] = desired_access_policy_type
-                                        current_rule["access_app_config_hash"] = desired_acc_hash
-                                        state_changed_locally = True
-                            else: 
-                                logging.info(f"[Reconcile] Creating Access App for {hostname}.")
-                                created_app = create_cloudflare_access_application(
-                                    hostname, desired_access_app_name,
-                                    desired_details["access_session_duration"], desired_details["access_app_launcher_visible"],
-                                    [hostname], cf_access_policies_list, app_idps, desired_details["access_auto_redirect"]
-                                )
-                                if created_app and created_app.get("id"):
-                                    current_rule["access_app_id"] = created_app.get("id")
-                                    current_rule["access_policy_type"] = desired_access_policy_type
-                                    current_rule["access_app_config_hash"] = desired_acc_hash
-                                    state_changed_locally = True
-                    else: 
-                        if current_rule.get("access_app_id"):
-                            logging.info(f"[Reconcile] No access policy for {hostname}, deleting managed Access App {current_rule['access_app_id']}.")
-                            if delete_cloudflare_access_application(current_rule["access_app_id"]):
-                                current_rule["access_app_id"] = None
-                                current_rule["access_policy_type"] = None
-                                current_rule["access_app_config_hash"] = None
-                                state_changed_locally = True
-                
+                    if current_rule.get("access_policy_ui_override", False):
+                        logging.info(f"[Reconcile] Access policy for {hostname} (current type: {current_rule.get('access_policy_type')}) is UI-managed. Skipping label-based Access Policy processing during reconciliation.")
+                    else:
+                        logging.debug(f"[Reconcile] Processing Access Policy from labels for {hostname} (not UI-managed) during reconciliation.")
+                        if _handle_access_policy_from_labels(desired_details, current_rule):
+                            state_changed_locally = True
                 
                 hostnames_in_state_but_not_running = list(current_managed_hostnames_in_state - set(running_labeled_hostnames_details.keys()))
                 
@@ -1901,7 +1834,6 @@ def _run_reconciliation():
                         rule["delete_at"] = now_utc + timedelta(seconds=GRACE_PERIOD_SECONDS)
                         state_changed_locally = True
                         
-
                 if state_changed_locally:
                     logging.info("[Reconcile] Saving state changes after reconciliation phase.")
                     app.reconciliation_info["status"] = "Saving reconciled state..."
@@ -1914,7 +1846,6 @@ def _run_reconciliation():
             if state_lock_acquired:
                 state_lock.release()
                 logging.debug("[Reconcile] Released state lock after reconciliation.")
-
         
         if time.time() - reconciliation_start > max_total_time - 15: 
              logging.warning("[Reconcile] Timeout reached before Tunnel/DNS operations.")
@@ -1934,7 +1865,6 @@ def _run_reconciliation():
                 logging.info("[Reconcile] External mode: Skipping DockFlare-managed tunnel config update.")
         else:
             logging.info("[Reconcile] No changes to tunnel ingress rules needed.")
-
         
         if hostnames_requiring_dns_setup:
             app.reconciliation_info["status"] = f"Setting up DNS for {len(hostnames_requiring_dns_setup)} hostnames..."
