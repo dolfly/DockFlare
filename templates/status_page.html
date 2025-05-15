@@ -81,8 +81,8 @@
 
 <body class="min-h-screen flex flex-col font-sans transition-colors duration-300">
     <div style="position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;">
-        <div class="fixed top-6 left-[-38px] sm:top-7 sm:left-[-35px] z-50 transform -rotate-45 bg-indigo-600 text-indigo-50 text-xs font-semibold uppercase tracking-wider text-center py-1 w-36 shadow-md">
-             stable 1.6
+        <div class="fixed top-6 left-[-38px] sm:top-7 sm:left-[-35px] z-50 transform -rotate-45 bg-indigo-600 text-white text-xs font-semibold uppercase tracking-wider text-center py-1 w-36 shadow-md">
+         stable 1.6
         </div>
     </div>
 
@@ -156,12 +156,12 @@
                         <p><strong class="inline-block w-36 opacity-70">Desired Name:</strong> <code class="badge badge-ghost">{{ tunnel_state.name }}</code></p>
                         <p><strong class="inline-block w-36 opacity-70">Tunnel ID:</strong> <code class="badge badge-ghost">{{ tunnel_state.id if tunnel_state.id else 'N/A' }}</code></p>
                         {% if not external_cloudflared %}
-                        <div>
-                            <strong class="inline-block w-36 align-top pt-1 opacity-70">Tunnel Token:</strong>
-                            <div class="mockup-code text-xs inline-block align-top max-w-full mt-1 sm:mt-0 text-neutral-content bg-neutral p-2 rounded-md">
-                                <pre class="px-1"><code>{{ display_token }}</code></pre>
-                            </div>
+                    <div>
+                        <strong class="inline-block w-36 align-top pt-1 opacity-70">Tunnel Token:</strong>
+                        <div class="mockup-code text-xs inline-block align-top max-w-full mt-1 sm:mt-0 bg-neutral p-2 rounded-md">
+                            <pre class="px-1"><code class="text-neutral-content opacity-90">{{ display_token }}</code></pre> 
                         </div>
+                    </div>
                         {% endif %}
                     </div>
                 </div>
