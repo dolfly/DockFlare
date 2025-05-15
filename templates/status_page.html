@@ -65,7 +65,7 @@
             const baseTag = document.createElement('base');
             baseTag.href = currentProtocol + '//' + currentHost + '/';
             document.head.appendChild(baseTag);
-            const preconnectDomains = ['cdn.tailwindcss.com', 'rsms.me'];
+            const preconnectDomains = ['rsms.me']; 
             preconnectDomains.forEach(domain => {
                 const existingPreconnect = Array.from(document.querySelectorAll('link[rel="preconnect"]'))
                     .find(link => link.href.includes(domain));
@@ -79,24 +79,15 @@
         })();
     </script>
 
-    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+    
     <link rel="preconnect" href="https://rsms.me" crossorigin>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" crossorigin="anonymous">
+    
     <script>
       tailwind.config = { darkMode: 'class', theme: { extend: {} } }
     </script>
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" crossorigin="anonymous">
-    <style type="text/tailwindcss">
-        #log-output .log-status { @apply italic text-gray-400 dark:text-gray-500; }
-        #log-output .log-status.error { @apply not-italic text-red-500 dark:text-red-400 font-semibold; }
-        #log-output .log-status.connected { @apply not-italic text-green-500 dark:text-green-400; }
-        #log-output::-webkit-scrollbar { width: 8px; }
-        #log-output::-webkit-scrollbar-track { background: transparent; }
-        #log-output::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
-        #log-output::-webkit-scrollbar-thumb:hover { background-color: rgba(156, 163, 175, 0.7); }
-        html.dark #log-output::-webkit-scrollbar-thumb { background-color: rgba(107, 114, 128, 0.5); }
-        html.dark #log-output::-webkit-scrollbar-thumb:hover { background-color: rgba(107, 114, 128, 0.7); }
-    </style>
+    
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; }
         .dark { color-scheme: dark; }
@@ -106,8 +97,16 @@
         html.dark .connection-badge { background-color: #818cf8; }
         .warning-text { color: #ef4444; font-weight: bold; }
         html.dark .warning-text { color: #f87171; }
+
+        #log-output::-webkit-scrollbar { width: 8px; }
+        #log-output::-webkit-scrollbar-track { background: transparent; }
+        #log-output::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.5); border-radius: 4px; border: 2px solid transparent; background-clip: content-box; }
+        #log-output::-webkit-scrollbar-thumb:hover { background-color: rgba(156, 163, 175, 0.7); }
+        html.dark #log-output::-webkit-scrollbar-thumb { background-color: rgba(107, 114, 128, 0.5); }
+        html.dark #log-output::-webkit-scrollbar-thumb:hover { background-color: rgba(107, 114, 128, 0.7); }
     </style>
 </head>
+
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col font-sans transition-colors duration-300">
 
     <div style="position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;">
