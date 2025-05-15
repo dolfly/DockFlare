@@ -223,7 +223,7 @@
                     Managed Ingress Rules
                 </h2>
                 {% if rules %}
-                    <div class="overflow-x-auto -mx-6 sm:-mx-8">
+                    <div class="overflow-x-auto -mx-6 sm:-mx-8 pb-24">
                         <table class="table table-zebra table-sm w-full">
                             <thead>
                                 <tr>
@@ -240,12 +240,12 @@
                             <tbody>
                                 {% for hostname, details in rules.items()|sort %}
                                     <tr class="hover">
-                                        {/* 1. Status */}
+                                        
                                         <td class="p-3 whitespace-nowrap">
                                             {% set status_badge_color = 'badge-warning' if 'pending' in details.status else 'badge-success' %}
                                             <span class="badge {{ status_badge_color }} badge-sm badge-outline">{{ details.status.replace('_',' ') }}</span>
                                         </td>
-                                        {/* 2. Hostname */}
+                                        
                                         <td class="p-3 whitespace-nowrap">
                                             <a href="https://{{ hostname }}" target="_blank" rel="noopener noreferrer" title="Open https://{{ hostname }}" class="link link-hover link-primary text-sm">
                                                {{ hostname }}
@@ -254,11 +254,11 @@
                                            <span class="badge badge-info badge-outline badge-xs ml-2">wildcard</span>
                                            {% endif %}
                                        </td>
-                                        {/* 3. Service Target */}
+                                        
                                         <td class="p-3 whitespace-nowrap"><code class="text-xs opacity-80">{{ details.service }}</code></td>
-                                        {/* 4. Container */}
+                                        
                                         <td class="p-3 whitespace-nowrap"><code class="text-xs opacity-80" title="{{ details.container_id if details.container_id else 'N/A' }}">{{ details.container_id[:12] if details.container_id else 'N/A' }}</code></td>
-                                        {/* 5. Access Policy */}
+                                        
                                         <td class="p-3 whitespace-nowrap text-sm opacity-80" id="access-policy-display-{{ hostname | replace('.', '-') }}">
                                             {% if details.access_policy_type %}
                                                 <span class="capitalize">
@@ -282,7 +282,7 @@
                                                 N/A
                                             {% endif %}
                                         </td>
-                                        {/* 6. Manage Policy */}
+                                        
                                         <td class="p-3 whitespace-nowrap text-sm policy-actions-cell" id="policy-actions-{{ hostname | replace('.', '-') }}" style="min-width: 180px;">
                                             <div class="flex items-center space-x-1 sm:space-x-2">
                                                 <div class="dropdown dropdown-end dropdown-hover"> 
@@ -317,7 +317,7 @@
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        {/* 7. Expires At (UTC) */}
+                                        
                                         <td class="p-3 whitespace-nowrap text-sm opacity-70">
                                             {% if details.status=='pending_deletion' and details.delete_at %}
                                             <div data-delete-at="{{ details.delete_at.isoformat() }}">
@@ -326,7 +326,7 @@
                                             </div>
                                             {% else %} N/A {% endif %}
                                         </td>
-                                        {/* 8. Actions */}
+                                        
                                         <td class="p-3 whitespace-nowrap text-sm" style="min-width: 80px;">
                                             <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
                                                 <button type="submit" class="btn btn-xs btn-error btn-outline" {{ 'disabled' if not docker_available else '' }}>Delete</button>
