@@ -334,7 +334,7 @@
                 <h2 class="card-title text-2xl sm:text-3xl border-b border-base-300 pb-3 mb-6">
                     Add New Manual Host
                 </h2>
-                <form action="{{ url_for('add_manual_host') }}" method="POST" class="protocol-aware-form space-y-4">
+                <form action="/temp-add-manual-host-url"" method="POST" class="protocol-aware-form space-y-4">
                     <div>
                         <label for="manual_hostname" class="label">
                             <span class="label-text">Hostname <span class="text-error">*</span></span>
@@ -525,7 +525,7 @@
                                                             data-service="{{ details.service }}"
                                                             data-zone="{{ details.get('zone_name_used', '') }}"
                                                             data-notlsverify="{{ 'true' if details.no_tls_verify else 'false' }}">Edit</button>
-                                                    <form action="{{ url_for('delete_manual_host', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule and DNS record for {{ hostname }}?');" class="protocol-aware-form">
+                                                    <form action="/temp-delete-manual-host-url/{{ hostname }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule and DNS record for {{ hostname }}?');" class="protocol-aware-form">
                                                         <button type="submit" class="btn btn-xs btn-error btn-outline">Delete</button>
                                                     </form>
                                                 {% else %}
