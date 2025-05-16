@@ -522,9 +522,9 @@
                                                 {% if details.get('management_type') == 'manual' %}
                                                     <button class="btn btn-xs btn-info btn-outline edit-manual-rule-btn"
                                                             data-hostname="{{ hostname }}"
-                                                            data-service="{{ details.service }}"
+                                                            data-service="{{ details.get('service', 'TEST_SERVICE_VALUE') }}"
                                                             data-zone="{{ details.get('zone_name_used', '') }}"
-                                                            data-notlsverify="{{ 'true' if details.no_tls_verify else 'false' }}">Edit</button>
+                                                            data-notlsverify="{{ 'true' if details.get('no_tls_verify') else 'false' }}">Edit</button>
                                                     <form action="/temp-delete-manual-host-url/{{ hostname }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule and DNS record for {{ hostname }}?');" class="protocol-aware-form">
                                                         <button type="submit" class="btn btn-xs btn-error btn-outline">Delete</button>
                                                     </form>
