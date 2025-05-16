@@ -519,7 +519,6 @@
                         </div>
                     </div>
 
-                    <!-- ADDED THIS BLOCK (Test M.3) -->
                     <div>
                         <label for="manual_access_policy_type" class="label">
                             <span class="label-text">Access Policy</span>
@@ -531,7 +530,15 @@
                             <option value="default_tld">Use Default *.tld Policy (if one exists)</option>
                         </select>
                     </div>
-                    <!-- END ADDED BLOCK (Test M.3) -->
+
+                    <!-- ADDED THIS BLOCK (Test M.4) -->
+                    <div class="manual-auth-email-field hidden mt-2" id="manual_auth_email_field_form">
+                        <label for="manual_auth_email_form" class="label">
+                            <span class="label-text">Allowed Email for Authentication:</span>
+                        </label>
+                        <input type="email" name="manual_auth_email" id="manual_auth_email_form" placeholder="user@example.com" class="input input-bordered w-full">
+                    </div>
+                    <!-- END ADDED BLOCK (Test M.4) -->
 
                     <div class="card-actions justify-end mt-6">
                         <button type="submit" class="btn btn-primary">Add Manual Host</button>
