@@ -333,16 +333,21 @@
              <div class="card-body">
                 <h2 class="card-title text-2xl sm:text-3xl border-b border-base-300 pb-3 mb-6">
                     Managed Ingress Rules
+                    <button class="btn btn-sm btn-primary ml-auto" onclick="document.getElementById('add_manual_rule_modal').showModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        Add Manual Rule
+                    </button>
                 </h2>
-                {% if rules %}
+
+                {% if rules and rules.items() %}
                     <div class="overflow-x-auto -mx-6 sm:-mx-8 pb-24">
                         <table class="table table-zebra table-sm w-full">
                             <thead>
                                 <tr>
-                                    <th class="p-3 w-1/12">Status</th>
+                                    <th class="p-3 w-1/12">Type/Status</th>
                                     <th class="p-3 w-1/4">Hostname</th> 
                                     <th class="p-3 w-1/5">Service Target</th>
-                                    <th class="p-3 w-1/6">Container</th>
+                                    <th class="p-3 w-1/6">Identifier</th>
                                     <th class="p-3 w-1/5">Access Policy</th>
                                     <th class="p-3 w-1/4">Manage Policy</th>
                                     <th class="p-3 w-1/6">Expires At (UTC)</th>
@@ -352,12 +357,14 @@
                             <tbody>
                                 {% for hostname, details in rules.items()|sort %}
                                     <tr class="hover">
-                                        
                                         <td class="p-3 whitespace-nowrap">
-                                            {% set status_badge_color = 'badge-warning' if 'pending' in details.status else 'badge-success' %}
-                                            <span class="badge {{ status_badge_color }} badge-sm badge-outline">{{ details.status.replace('_',' ') }}</span>
+                                            {% if details.source == 'manual' %}
+                                                <span class="badge badge-info badge-sm badge-outline">Manual</span>
+                                            {% else %}
+                                                {% set status_badge_color = 'badge-warning' if 'pending' in details.status else 'badge-success' %}
+                                                <span class="badge {{ status_badge_color }} badge-sm badge-outline">{{ details.status.replace('_',' ') }}</span>
+                                            {% endif %}
                                         </td>
-                                        
                                         <td class="p-3 whitespace-nowrap">
                                             <a href="https://{{ hostname }}" target="_blank" rel="noopener noreferrer" title="Open https://{{ hostname }}" class="link link-hover link-primary text-sm">
                                                {{ hostname }}
@@ -366,12 +373,17 @@
                                            <span class="badge badge-info badge-outline badge-xs ml-2">wildcard</span>
                                            {% endif %}
                                        </td>
-                                        
                                         <td class="p-3 whitespace-nowrap"><code class="text-xs opacity-80">{{ details.service }}</code></td>
-                                        
-                                        <td class="p-3 whitespace-nowrap"><code class="text-xs opacity-80" title="{{ details.container_id if details.container_id else 'N/A' }}">{{ details.container_id[:12] if details.container_id else 'N/A' }}</code></td>
-                                        
-                                        <td class="p-3 whitespace-nowrap text-sm opacity-80" id="access-policy-display-{{ hostname | replace('.', '-') }}">
+                                        <td class="p-3 whitespace-nowrap">
+                                            {% if details.source == 'manual' %}
+                                                <em class="text-xs opacity-70 italic">Manual Rule</em>
+                                            {% elif details.container_id %}
+                                                <code class="text-xs opacity-80" title="{{ details.container_id }}">{{ details.container_id[:12] }}</code>
+                                            {% else %}
+                                                <span class="text-xs opacity-50">N/A</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="p-3 whitespace-nowrap text-sm opacity-80" id="access-policy-display-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}">
                                             {% if details.access_policy_type %}
                                                 <span class="capitalize">
                                                     {{ details.access_policy_type.replace('_', ' ') if details.access_policy_type != 'pending_label_sync' else 'Pending Label Sync...' }}
@@ -386,35 +398,34 @@
                                                     <span class="badge badge-ghost badge-xs ml-1">(Managed)</span>
                                                 {% endif %}
                                                 {% if details.access_policy_ui_override %}
-                                                    <span class="badge badge-accent badge-outline badge-xs ml-2" title="This policy is managed by the UI and overrides container labels.">UI Override</span>
+                                                    <span class="badge badge-accent badge-outline badge-xs ml-2" title="This policy is managed by the UI{% if details.source != 'manual' %} and overrides container labels{% endif %}.">UI Override</span>
                                                 {% endif %}
                                             {% elif details.get('status') == 'active' %} 
                                                 <span class="opacity-60 italic">None (Public)</span>
                                             {% else %}
-                                                N/A
+                                                <span class="text-xs opacity-50">N/A</span>
                                             {% endif %}
                                         </td>
-                                        
-                                        <td class="p-3 whitespace-nowrap text-sm policy-actions-cell" id="policy-actions-{{ hostname | replace('.', '-') }}" style="min-width: 180px;">
+                                        <td class="p-3 whitespace-nowrap text-sm policy-actions-cell" id="policy-actions-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" style="min-width: 180px;">
                                             <div class="flex items-center space-x-1 sm:space-x-2">
                                                 <div class="dropdown dropdown-end dropdown-hover"> 
-                                                    <button tabindex="0" role="button" class="btn btn-xs btn-info btn-outline" data-hostname="{{ hostname }}">Edit</button> 
+                                                    <button tabindex="0" role="button" class="btn btn-xs btn-info btn-outline" data-hostname="{{ hostname }}">Edit Policy</button> 
                                                     <div tabindex="0" class="dropdown-content z-[50] menu p-3 shadow-xl bg-base-100 dark:bg-base-200 rounded-box w-64 sm:w-72"> 
                                                         <form action="{{ url_for('ui_update_access_policy', hostname=hostname) }}" method="POST" class="protocol-aware-form space-y-3">
                                                             <div>
-                                                                <label for="access_policy_type-{{ hostname | replace('.', '-') }}" class="block text-xs font-medium opacity-80 mb-1">Policy Type:</label>
-                                                                <select name="access_policy_type" id="access_policy_type-{{ hostname | replace('.', '-') }}" class="policy-type-select select select-bordered select-xs w-full" data-hostname="{{ hostname }}">
+                                                                <label for="access_policy_type-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" class="block text-xs font-medium opacity-80 mb-1">Policy Type:</label>
+                                                                <select name="access_policy_type" id="access_policy_type-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" class="policy-type-select select select-bordered select-xs w-full" data-hostname="{{ hostname }}">
                                                                     <option value="none" {% if not details.access_policy_type %}selected{% endif %}>None (Public - No App)</option>
                                                                     <option value="bypass" {% if details.access_policy_type == 'bypass' %}selected{% endif %}>Bypass (Public App)</option>
-                                                                    <option value="authenticate_email" {% if details.access_policy_type == 'authenticate_email' or (details.access_policy_type == 'authenticate' and not details.access_custom_rules_str and not details.access_allowed_idps_str) %}selected{% endif %}>Authenticate by Email</option>
+                                                                    <option value="authenticate_email" {% if details.access_policy_type == 'authenticate_email' or (details.source != 'manual' and details.access_policy_type == 'authenticate' and not details.access_custom_rules_str and not details.access_allowed_idps_str) %}selected{% endif %}>Authenticate by Email</option>
                                                                     <option value="default_tld" {% if details.access_policy_type == 'default_tld' %}selected{% endif %}>Use Default *.tld Policy</option>
                                                                 </select>
                                                             </div>
-                                                            <div class="auth-email-field hidden mt-2" id="auth-email-field-{{ hostname | replace('.', '-') }}">
-                                                                <label for="auth_email-{{ hostname | replace('.', '-') }}" class="block text-xs font-medium opacity-80 mb-1">Allowed Email:</label>
-                                                                {% set prefill_email = '' %}
-                                                                {% if details.access_policy_type == 'authenticate_email' or (details.access_policy_type == 'authenticate' and not details.access_custom_rules_str) %}{% endif %}
-                                                                <input type="email" name="auth_email" id="auth_email-{{ hostname | replace('.', '-') }}" placeholder="user@example.com" value="{{ prefill_email }}" class="input input-bordered input-xs w-full">
+                                                            <div class="auth-email-field hidden mt-2" id="auth-email-field-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}">
+                                                                <label for="auth_email-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" class="block text-xs font-medium opacity-80 mb-1">Allowed Email:</label>
+                                                                {% set prefill_email_val = '' %}
+                                                                {# You might need more sophisticated logic here if you store the email differently for manual vs docker rules, or parse it from custom_rules #}
+                                                                <input type="email" name="auth_email" id="auth_email-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" placeholder="user@example.com" value="{{ prefill_email_val }}" class="input input-bordered input-xs w-full">
                                                             </div>
                                                             <div class="flex items-center justify-end space-x-2 mt-3">
                                                                 <button type="submit" class="save-policy-btn btn btn-xs btn-primary">Save</button>
@@ -423,26 +434,36 @@
                                                     </div>
                                                 </div>
                                                 {% if details.access_policy_ui_override %}
-                                                <form action="{{ url_for('revert_access_policy_to_labels', hostname=hostname) }}" method="POST" onsubmit="return confirm('Are you sure you want to revert the Access Policy for {{ hostname }} to be managed by its container labels? The current UI-set policy will be removed.');" class="protocol-aware-form inline-block">
-                                                    <button type="submit" class="btn btn-xs btn-warning btn-outline" title="Revert to label-defined Access Policy">Revert</button>
+                                                <form action="{{ url_for('revert_access_policy_to_labels', hostname=hostname) }}" method="POST" 
+                                                      onsubmit="return confirm('Are you sure you want to revert the Access Policy for {{ hostname }}? {% if details.source == 'manual' %}The current UI-set policy will be removed, and it will become public or use a TLD policy if one exists.{% else %}The current UI-set policy will be removed, and it will be managed by its container labels.{% endif %}');" 
+                                                      class="protocol-aware-form inline-block">
+                                                    <button type="submit" class="btn btn-xs btn-warning btn-outline" title="Revert to Label/Default Policy">Revert</button>
                                                 </form>
                                                 {% endif %}
                                             </div>
                                         </td>
-                                        
                                         <td class="p-3 whitespace-nowrap text-sm opacity-70">
-                                            {% if details.status=='pending_deletion' and details.delete_at %}
-                                            <div data-delete-at="{{ details.delete_at.isoformat() }}">
-                                                <span class="absolute-time">{{ details.delete_at.strftime('%H:%M %d-%b-%Y') }}</span>
-                                                <span class="countdown-timer block text-xs opacity-80">(calculating...)</span>
-                                            </div>
-                                            {% else %} N/A {% endif %}
+                                            {% if details.source == 'manual' or (details.source != 'manual' and details.status == 'active') %}
+                                                N/A
+                                            {% elif details.source != 'manual' and details.status=='pending_deletion' and details.delete_at %}
+                                                <div data-delete-at="{{ details.delete_at.isoformat() }}">
+                                                    <span class="absolute-time">{{ details.delete_at.strftime('%H:%M %d-%b-%Y') }}</span>
+                                                    <span class="countdown-timer block text-xs opacity-80">(calculating...)</span>
+                                                </div>
+                                            {% else %} 
+                                                N/A 
+                                            {% endif %}
                                         </td>
-                                        
                                         <td class="p-3 whitespace-nowrap text-sm" style="min-width: 80px;">
-                                            <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
-                                                <button type="submit" class="btn btn-xs btn-error btn-outline" {{ 'disabled' if not docker_available else '' }}>Delete</button>
-                                            </form>
+                                            {% if details.source == 'manual' %}
+                                                <form action="{{ url_for('ui_delete_manual_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule for {{ hostname }}?');" class="protocol-aware-form">
+                                                    <button type="submit" class="btn btn-xs btn-error btn-outline">Delete</button>
+                                                </form>
+                                            {% else %}
+                                                <form action="{{ url_for('force_delete_rule', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
+                                                    <button type="submit" class="btn btn-xs btn-error btn-outline" {{ 'disabled' if not docker_available else '' }}>Delete</button>
+                                                </form>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                 {% endfor %}
@@ -579,8 +600,17 @@
             toggleAuthEmailField(select.value, select.dataset.hostname);
         });
 
-        function toggleAuthEmailField(policyType, hostname) {
-            const emailFieldDiv = document.getElementById(`auth-email-field-${hostname.replace(/\./g, '-')}`);
+        function toggleAuthEmailField(policyType, hostname, selectElementId) {
+            const parts = selectElementId.split('-');
+            if (parts.length < 3) { return; }
+            
+            const source = parts[1];
+            
+            const hostnameIdentifier = parts.slice(2).join('-'); 
+
+            const emailFieldDivId = `auth-email-field-${source}-${hostnameIdentifier}`;
+            const emailFieldDiv = document.getElementById(emailFieldDivId);
+
             if (emailFieldDiv) {
                 if (policyType === 'authenticate_email') {
                     emailFieldDiv.classList.remove('hidden');
