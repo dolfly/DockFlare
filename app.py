@@ -1,11 +1,16 @@
 import logging
-from flask import Flask, render_template
-import os # <--- ADDED
+from flask import Flask, render_template, request # <--- ADDED request
+import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 app = Flask(__name__)
-app.secret_key = os.urandom(24) # <--- ADDED
-app.config['PREFERRED_URL_SCHEME'] = 'https' # <--- ADDED
+app.secret_key = os.urandom(24)
+app.config['PREFERRED_URL_SCHEME'] = 'https'
+
+@app.before_request # <--- ADDED
+def detect_protocol():
+    forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
+    app.config['PREFERRED_URL_SCHEME'] = 'https' if forwarded_proto == 'https' or request.is_secure else 'http'
 
 @app.route('/')
 def super_minimal_route():
