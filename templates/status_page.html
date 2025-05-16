@@ -569,8 +569,45 @@
             <p class="mt-2 text-xs opacity-60">DockFlare v1.6 (stable)</p>
         </div>
     </footer>
-
-    <script>
+    <dialog id="add_manual_rule_modal" class="modal">
+      <div class="modal-box w-11/12 max-w-lg">
+        <form method="dialog">
+          <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="font-bold text-lg mb-4">Add New Manual Ingress Rule</h3>
+        <form action="{{ url_for('ui_add_manual_rule') }}" method="POST" class="space-y-4 protocol-aware-form">
+            <div>
+                <label class="label" for="manual_hostname"><span class="label-text">Hostname (e.g., router.example.com)</span></label>
+                <input type="text" id="manual_hostname" name="manual_hostname" placeholder="mydevice.yourdomain.com" class="input input-bordered w-full" required />
+            </div>
+            <div>
+                <label class="label" for="manual_service"><span class="label-text">Service URL (e.g., http://192.168.1.1:80)</span></label>
+                <input type="text" id="manual_service" name="manual_service" placeholder="http://internal-ip:port" class="input input-bordered w-full" required />
+            </div>
+            <div>
+                <label class="label" for="manual_zone_name"><span class="label-text">Cloudflare Zone Name (Optional if CF_ZONE_ID is set)</span></label>
+                <input type="text" id="manual_zone_name" name="manual_zone_name" placeholder="yourdomain.com" class="input input-bordered w-full" {% if not CF_ZONE_ID_CONFIGURED %}required{% endif %}/>
+                {% if CF_ZONE_ID_CONFIGURED and CF_ZONE_ID %}
+                <div class="text-xs opacity-60 mt-1">If blank, default Zone ID ({{ CF_ZONE_ID[:12] }}...) will be used.</div>
+                {% elif not CF_ZONE_ID_CONFIGURED %}
+                <div class="text-xs text-warning mt-1">CF_ZONE_ID is not set globally, so Zone Name is required here.</div>
+                {% endif %}
+            </div>
+            <div class="form-control">
+              <label class="label cursor-pointer">
+                <span class="label-text">Disable TLS Verification (No TLS Verify)</span>
+                <input type="checkbox" name="manual_no_tls_verify" id="manual_no_tls_verify" class="checkbox checkbox-sm" />
+              </label>
+              <div class="text-xs opacity-60">Check if the service uses a self-signed certificate or HTTP.</div>
+            </div>
+            <div class="modal-action">
+              <button type="submit" class="btn btn-primary">Add Rule</button>
+            </div>
+        </form>
+      </div>
+       <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+     <script>
         const maxLogLines = 250;let initialConnectMessageCleared = false;let activeLogSource = null;let eventSourceHealthCheck = null;let pingInterval = null;
         function addLogLine(message, type = 'log') {const logOutput = document.getElementById('log-output');if (!logOutput) { console.error("Log output element not found when trying to add line."); return; }if (!initialConnectMessageCleared && logOutput.textContent.includes('Connecting to log stream...')) {logOutput.textContent = ''; initialConnectMessageCleared = true;}const newLogLine = document.createElement('div');newLogLine.textContent = message;if (type === 'status') newLogLine.classList.add('text-neutral-content', 'opacity-70', 'italic');else if (type === 'error') newLogLine.classList.add('text-red-400', 'font-semibold');else if (type === 'connected') newLogLine.classList.add('text-green-400');const isScrolledToBottom = logOutput.scrollHeight - logOutput.clientHeight <= logOutput.scrollTop + 10;logOutput.appendChild(newLogLine);while (logOutput.childNodes.length > maxLogLines) logOutput.removeChild(logOutput.firstChild);if (isScrolledToBottom) logOutput.scrollTop = logOutput.scrollHeight;}
         function connectEventSource() {const logOutput = document.getElementById('log-output');if (!logOutput) { console.error("Log output element not found for EventSource setup."); return; }if (!window.EventSource) {console.error("EventSource not supported");logOutput.textContent = "Browser doesn't support Server-Sent Events."; return;}if (activeLogSource) { try { activeLogSource.close(); } catch (e) { console.error("Error closing existing log stream:", e); } activeLogSource = null; }const currentProtocol = window.location.protocol; const currentHost = window.location.host;const timestampParam = Date.now();const streamUrl = `${currentProtocol}//${currentHost}/stream-logs?t=${timestampParam}`;try {activeLogSource = new EventSource(streamUrl);let connectionTimeout;const resetConnectionTimeout = () => {if (connectionTimeout) clearTimeout(connectionTimeout);connectionTimeout = setTimeout(() => {if (activeLogSource) {activeLogSource.close(); activeLogSource = null;addLogLine("--- Log stream connection timeout. Reconnecting... ---", 'error');setTimeout(connectEventSource, 2000);}}, 10000);};resetConnectionTimeout();activeLogSource.onopen = function() {if (connectionTimeout) clearTimeout(connectionTimeout);addLogLine("--- Log stream connected ---", 'connected');};activeLogSource.onmessage = function(event) {resetConnectionTimeout(); if (event.data === "heartbeat") { return; }addLogLine(event.data, 'log');};let retryAttempt = 0;activeLogSource.onerror = function(err) {if (connectionTimeout) clearTimeout(connectionTimeout);addLogLine("--- Log stream connection error. Retrying... ---", 'error');if (activeLogSource) { activeLogSource.close(); activeLogSource = null; }retryAttempt++; const delay = Math.min(5000 * Math.pow(1.5, retryAttempt - 1), 30000);setTimeout(connectEventSource, delay);};} catch (e) {addLogLine("--- Failed to establish log stream connection ---", 'error'); setTimeout(connectEventSource, 5000);}if (eventSourceHealthCheck) clearInterval(eventSourceHealthCheck);eventSourceHealthCheck = setInterval(() => {if (!activeLogSource || activeLogSource.readyState === 2) {connectEventSource();}}, 30000);window.addEventListener('beforeunload', function() {if (activeLogSource) activeLogSource.close(); if (eventSourceHealthCheck) clearInterval(eventSourceHealthCheck);});}
@@ -592,37 +629,45 @@
             
             updateReconciliationStatus();setInterval(updateReconciliationStatus, 2000);
             
-            document.querySelectorAll('.policy-type-select').forEach(select => {
-                select.addEventListener('change', function() {
-                const hostname = this.dataset.hostname;
-                toggleAuthEmailField(this.value, hostname);
-            });
-            toggleAuthEmailField(select.value, select.dataset.hostname);
-        });
-
-        function toggleAuthEmailField(policyType, hostname, selectElementId) {
-            const parts = selectElementId.split('-');
-            if (parts.length < 3) { return; }
-            
-            const source = parts[1];
-            
-            const hostnameIdentifier = parts.slice(2).join('-'); 
-
-            const emailFieldDivId = `auth-email-field-${source}-${hostnameIdentifier}`;
-            const emailFieldDiv = document.getElementById(emailFieldDivId);
-
-            if (emailFieldDiv) {
-                if (policyType === 'authenticate_email') {
-                    emailFieldDiv.classList.remove('hidden');
-                } else {
-                    emailFieldDiv.classList.add('hidden');
-                    const emailInput = emailFieldDiv.querySelector('input[name="auth_email"]');
-                    if (emailInput) {
-                        emailInput.value = '';
+            function toggleAuthEmailField(policyType, hostname, selectElementId) {
+                if (!selectElementId || typeof selectElementId !== 'string') {
+                    return; 
+                }
+                const parts = selectElementId.split('-');
+                if (parts.length < 3) { 
+                    return; 
+                }
+                const source = parts[1]; 
+                const hostnameIdentifier = parts.slice(2).join('-');
+                const emailFieldDivId = `auth-email-field-${source}-${hostnameIdentifier}`;
+                const emailFieldDiv = document.getElementById(emailFieldDivId);
+                if (emailFieldDiv) {
+                    if (policyType === 'authenticate_email') {
+                        emailFieldDiv.classList.remove('hidden');
+                    } else {
+                        emailFieldDiv.classList.add('hidden');
+                        const emailInput = emailFieldDiv.querySelector('input[name="auth_email"]');
+                        if (emailInput) {
+                            emailInput.value = '';
+                        }
                     }
                 }
             }
-        }
+
+            document.querySelectorAll('.policy-type-select').forEach(select => {
+                if (select.id) {
+                    select.addEventListener('change', function() {
+                        if (this.id) { 
+                            toggleAuthEmailField(this.value, this.dataset.hostname, this.id);
+                        } else {
+                            console.warn("Select element in change event is missing an ID:", this);
+                        }
+                    });
+                    toggleAuthEmailField(select.value, select.dataset.hostname, select.id);
+                } else {
+                    console.warn("Found a .policy-type-select element missing an ID. Cannot attach listener or set initial state for its email field.", select);
+                }
+            });        
             
             document.querySelectorAll('.tunnel-dns-toggle').forEach(button => {
                 button.addEventListener('click', async function() {
