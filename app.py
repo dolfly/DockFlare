@@ -9,7 +9,7 @@ import time
 CF_ACCOUNT_ID_CONFIGURED = True
 ACCOUNT_ID_FOR_DISPLAY = "Test Account ID"
 CF_ZONE_ID_CONFIGURED = True
-docker_client = True
+docker_client = True # Assuming True for now, or proper init
 
 tunnel_state_minimal = {
     "name": "test-tunnel", "id": "test-id", "token": "test-token-value",
@@ -19,20 +19,23 @@ cloudflared_agent_state_minimal = {
     "container_status": "running",
     "last_action_status": None
 }
-managed_rules_minimal = {}
+managed_rules_minimal = {} # For {{ rules }} in template, if any part is active
 initialization_status_minimal = { "complete": True, "in_progress": False }
 
-def get_display_token(token):
+def get_display_token(token): # Dummy function
     if not token: return "N/A"
     return f"{token[:2]}...{token[-2:]}" if len(token) > 4 else token
 
 _all_tunnels_cache = []
 _all_tunnels_cache_time = 0
 _ALL_TUNNELS_CACHE_TTL = 120
+# state_lock = threading.Lock() # Define if actually used by get_all_account_cloudflare_tunnels in this minimal setup
 
-def get_all_account_cloudflare_tunnels():
+def get_all_account_cloudflare_tunnels(): # Cached version
     global _all_tunnels_cache, _all_tunnels_cache_time
+    # global state_lock # Uncomment if state_lock is defined and used
     current_time = time.time()
+    # with state_lock: # Uncomment if state_lock is defined and used
     if _all_tunnels_cache is not None and (current_time - _all_tunnels_cache_time < _ALL_TUNNELS_CACHE_TTL):
         logging.info("Returning all_account_tunnels from cache.")
         return _all_tunnels_cache
@@ -102,7 +105,7 @@ def current_test_route():
     logging.info("Attempting to render ORIGINAL status_page.html (simplified content, more vars + dummy routes)")
     try:
         display_token_val = get_display_token(tunnel_state_minimal.get("token"))
-        docker_available = docker_client is not None
+        docker_available = docker_client is not None # Or just True for this test
         all_account_tunnels_list_val = get_all_account_cloudflare_tunnels()
 
         return render_template('status_page.html',
@@ -124,7 +127,7 @@ def current_test_route():
         logging.error(f"Error rendering status_page.html (more vars + dummy routes): {e}", exc_info=True)
         return f"Error rendering template: {e}", 500
 
-# --- DUMMY ROUTE DEFINITIONS ---
+# --- DUMMY ROUTE DEFINITIONS (MUST BE AT TOP LEVEL) ---
 @app.route('/stop-tunnel', methods=['POST'])
 def stop_tunnel():
     logging.info("Dummy stop_tunnel route called")
@@ -152,10 +155,15 @@ def ping():
     logging.info("Dummy ping route")
     return jsonify({"status": "ok"})
 
-@app.route('/temp-add-manual-host-url', methods=['POST']) # Matching static URL in simplified HTML
-def add_manual_host_dummy():
+@app.route('/temp-add-manual-host-url', methods=['POST'])
+def add_manual_host_dummy(): # Renamed to avoid conflict with any original 'add_manual_host'
     logging.info("Dummy add_manual_host_dummy route reached (via static URL)")
     return "Dummy add_manual_host_dummy reached", 200
+
+# If your status_page.html uses url_for('static', filename='...'),
+# Flask's default static handler should work if you have a 'static' folder
+# in the same directory as app.py, or if static_folder is configured in Flask(__name__, static_folder='path/to/static').
+# No explicit @app.route('/static/...') is usually needed for this.
 
 if __name__ == '__main__':
     logging.info("Starting MODIFIED MINIMAL Flask app for testing status_page.html (more vars + dummy routes).")
