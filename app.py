@@ -170,6 +170,7 @@ def load_state():
              rule.setdefault("access_policy_type", None)
              rule.setdefault("access_app_config_hash", None)
              rule.setdefault("access_policy_ui_override", False)
+             rule.setdefault("source", "docker") 
 
         managed_rules = loaded_data
         logging.info(f"Loaded state for {len(managed_rules)} rules from {STATE_FILE_PATH}")
@@ -192,6 +193,7 @@ def save_state():
         rule_copy.setdefault("access_policy_type", None)
         rule_copy.setdefault("access_app_config_hash", None)
         rule_copy.setdefault("access_policy_ui_override", False)
+        rule_copy.setdefault("source", "docker")
             
         serializable_state[hostname] = rule_copy
     try:
@@ -207,6 +209,7 @@ def save_state():
         logging.debug(f"Saved state for {len(managed_rules)} rules to {STATE_FILE_PATH}")
     except (IOError, OSError) as e:
         logging.error(f"Error saving state to {STATE_FILE_PATH}: {e}", exc_info=True)
+
 def cf_api_request(method, endpoint, json_data=None, params=None):
     url = f"{CF_API_BASE_URL}{endpoint}"
     error_msg = None
@@ -1134,7 +1137,7 @@ def process_container_start(container):
         hostname_label = labels.get(f"{LABEL_PREFIX}.hostname") 
         service_label = labels.get(f"{LABEL_PREFIX}.service") 
         zone_name_label = labels.get(f"{LABEL_PREFIX}.zonename") 
-        no_tls_verify_label = labels.get(f"{LABEL_PREFIX}.no_tls_verify", "false").lower() in ["true", "1", "t", "yes"] # Renamed
+        no_tls_verify_label = labels.get(f"{LABEL_PREFIX}.no_tls_verify", "false").lower() in ["true", "1", "t", "yes"]
         
         if hostname_label and service_label:
             if is_valid_hostname(hostname_label) and is_valid_service(service_label):
@@ -1235,6 +1238,10 @@ def process_container_start(container):
             logging.info(f"Managing {hostname} (from {container_name}) in Zone ID: {target_zone_id}")
             
             with state_lock:
+                if hostname in managed_rules and managed_rules[hostname].get("source") == "manual":
+                    logging.warning(f"Container {container_name} attempting to manage hostname '{hostname}', but it's already a manual entry. Skipping Docker label for this hostname.")
+                    continue
+
                 existing_rule = managed_rules.get(hostname)
 
                 if existing_rule:
@@ -1248,6 +1255,7 @@ def process_container_start(container):
                         existing_rule["container_id"] = container_id
                         existing_rule["zone_id"] = target_zone_id
                         existing_rule["no_tls_verify"] = no_tls_verify_from_item
+                        existing_rule["source"] = "docker"
                         state_changed_locally = True
                         needs_tunnel_config_update = True
                         if zone_id_changed:
@@ -1258,7 +1266,7 @@ def process_container_start(container):
                         no_tls_verify_changed = existing_rule.get("no_tls_verify") != no_tls_verify_from_item
 
                         if container_changed:
-                            logging.info(f"Updating container ID for active rule {hostname}: '{existing_rule.get('container_id')[:12]}' -> '{container_id[:12]}'.")
+                            logging.info(f"Updating container ID for active rule {hostname}: '{existing_rule.get('container_id')[:12] if existing_rule.get('container_id') else 'N/A'}' -> '{container_id[:12]}'.")
                             existing_rule["container_id"] = container_id
                             state_changed_locally = True
                         if service_changed:
@@ -1275,7 +1283,9 @@ def process_container_start(container):
                             logging.warning(f"Zone ID for active rule {hostname} changed ('{existing_rule.get('zone_id')}' -> '{target_zone_id}'). DNS in old zone may be stale.")
                             existing_rule["zone_id"] = target_zone_id
                             state_changed_locally = True
-                            needs_tunnel_config_update = True 
+                            needs_tunnel_config_update = True
+                        
+                        existing_rule["source"] = "docker" # Ensure source is set
                 else:
                     logging.info(f"Adding new active rule for hostname: {hostname}")
                     managed_rules[hostname] = {
@@ -1288,7 +1298,8 @@ def process_container_start(container):
                         "access_app_id": None, 
                         "access_policy_type": None,
                         "access_app_config_hash": None,
-                        "access_policy_ui_override": False 
+                        "access_policy_ui_override": False,
+                        "source": "docker"
                     }
                     existing_rule = managed_rules[hostname] 
                     state_changed_locally = True
@@ -1315,6 +1326,10 @@ def process_container_start(container):
                     if effective_tunnel_id:
                         for config_item_dns in hostnames_to_process: 
                             hostname_dns = config_item_dns["hostname"]
+                            # Check again if this hostname became manual in the meantime (unlikely but safe)
+                            if managed_rules.get(hostname_dns, {}).get("source") == "manual":
+                                continue
+
                             zone_name_dns = config_item_dns["zone_name"]
                             
                             target_zone_id_dns = get_zone_id_from_name(zone_name_dns) if zone_name_dns else CF_ZONE_ID
@@ -1466,7 +1481,7 @@ def cleanup_expired_rules():
 
             with state_lock:
                 for hostname, details in list(managed_rules.items()): 
-                    if details.get("status") == "pending_deletion":
+                    if details.get("status") == "pending_deletion" and details.get("source", "docker") == "docker":
                         delete_at = details.get("delete_at")
                         is_expired = False
                         if isinstance(delete_at, datetime):
@@ -1489,6 +1504,16 @@ def cleanup_expired_rules():
                                 "access_app_id": access_app_id_for_delete
                             }
                             logging.info(f"Rule for {hostname} (Zone: {zone_id_for_delete}, Access App: {access_app_id_for_delete}) expired. Scheduling for full deletion.")
+                    elif details.get("source") == "manual" and details.get("status") == "pending_deletion":
+                        logging.warning(f"Manual rule {hostname} found in 'pending_deletion' state. This should not happen. Resetting to 'active'.")
+                        details["status"] = "active"
+                        details["delete_at"] = None
+                        state_changed_in_cleanup = True
+
+
+            if state_changed_in_cleanup and not rules_to_process_for_deletion: # Only save if only manual rule status was changed
+                save_state()
+                state_changed_in_cleanup = False # Reset for this cycle's main logic
 
             if rules_to_process_for_deletion:
                 logging.info(f"Processing cleanup for hostnames: {list(rules_to_process_for_deletion.keys())}")
@@ -1536,13 +1561,12 @@ def cleanup_expired_rules():
                         with state_lock:
                             deleted_count = 0
                             for hostname in hostnames_fully_cleaned_for_state_removal:
-                                if hostname in managed_rules and managed_rules[hostname].get("status") == "pending_deletion":
-                               
+                                if hostname in managed_rules and managed_rules[hostname].get("status") == "pending_deletion" and managed_rules[hostname].get("source", "docker") == "docker":
                                     del managed_rules[hostname]
                                     deleted_count += 1
                                     state_changed_in_cleanup = True
                                 else:
-                                    logging.warning(f"Rule {hostname} was scheduled for removal but not found or not pending when removing from state.")
+                                    logging.warning(f"Rule {hostname} was scheduled for removal but not found or not pending/docker when removing from state.")
                             logging.info(f"Removed {deleted_count} rules from local state after cleanup.")
                             if state_changed_in_cleanup:
                                 save_state()
@@ -1730,7 +1754,7 @@ def _run_reconciliation():
                                 "access_custom_rules_str": config_item["access_custom_rules_str"]
                             }
                     except Exception as e_cont:
-                        logging.error(f"[Reconcile] Error processing container {c.id[:12]}: {e_cont}")
+                        logging.error(f"[Reconcile] Error processing container {c.id[:12] if c and c.id else 'N/A'}: {e_cont}")
                         continue
                 if USE_EXTERNAL_CLOUDFLARED and i + batch_size < container_count: time.sleep(0.2)
             
@@ -1769,6 +1793,16 @@ def _run_reconciliation():
                         logging.warning("[Reconcile] Timeout reached during active rule reconciliation.")
                         break
 
+                    existing_rule_for_hostname = managed_rules.get(hostname)
+                    if existing_rule_for_hostname and existing_rule_for_hostname.get("source") == "manual":
+                        logging.debug(f"[Reconcile] Hostname {hostname} is manually managed. Skipping update from Docker labels for container {desired_details.get('container_name', 'N/A')}.")
+                        # Still ensure DNS is set up for manual rules if they appear in running_labeled_hostnames_details (which they shouldn't if filtering is correct)
+                        # However, to be safe, if a manual rule exists, we should ensure its DNS is correct if it's active.
+                        # This part might need refinement based on how manual rules are handled regarding DNS.
+                        # For now, if it's manual, reconciliation of *Docker* details stops here.
+                        # We will handle manual rule DNS separately if needed or assume it's done on creation.
+                        continue 
+
                     target_zone_id = get_zone_id_from_name(desired_details["zone_name"]) if desired_details["zone_name"] else CF_ZONE_ID
                     if not target_zone_id:
                         logging.error(f"[Reconcile] No zone ID for {hostname}, skipping its reconciliation.")
@@ -1782,7 +1816,8 @@ def _run_reconciliation():
                             "status": "active", "delete_at": None, "zone_id": target_zone_id,
                             "no_tls_verify": desired_details["no_tls_verify"],
                             "access_app_id": None, "access_policy_type": None, "access_app_config_hash": None,
-                            "access_policy_ui_override": False
+                            "access_policy_ui_override": False,
+                            "source": "docker" 
                         }
                         managed_rules[hostname] = current_rule
                         state_changed_locally = True
@@ -1806,6 +1841,7 @@ def _run_reconciliation():
                         current_rule["container_id"] = desired_details["container_id"] 
                         current_rule["zone_id"] = target_zone_id
                         current_rule["no_tls_verify"] = desired_details["no_tls_verify"]
+                        current_rule["source"] = "docker" 
                         
                         if service_changed_in_reconcile or no_tls_verify_changed_in_reconcile or zone_id_changed_in_reconcile or container_id_changed_in_reconcile:
                             state_changed_locally = True
@@ -1832,11 +1868,18 @@ def _run_reconciliation():
                         break
 
                     rule = managed_rules.get(hostname_to_check)
-                    if rule and rule.get("status") == "active": 
-                        logging.info(f"[Reconcile] Rule for {hostname_to_check} is active but container/labels missing. Marking for deletion.")
+                    if rule and rule.get("status") == "active" and rule.get("source", "docker") == "docker": 
+                        logging.info(f"[Reconcile] Docker-managed rule for {hostname_to_check} is active but container/labels missing. Marking for deletion.")
                         rule["status"] = "pending_deletion"
                         rule["delete_at"] = now_utc + timedelta(seconds=GRACE_PERIOD_SECONDS)
                         state_changed_locally = True
+                    elif rule and rule.get("source") == "manual":
+                        logging.debug(f"[Reconcile] Manual rule {hostname_to_check} found and is active. Preserving.")
+                        # If a manual rule exists, we should ensure its DNS is still set up.
+                        # This logic might be redundant if DNS is only set on creation/update of manual rule.
+                        # However, it's a safeguard.
+                        if rule.get("zone_id"):
+                             hostnames_requiring_dns_setup.append((hostname_to_check, rule.get("zone_id")))
                         
                 if state_changed_locally:
                     logging.info("[Reconcile] Saving state changes after reconciliation phase.")
@@ -1877,9 +1920,19 @@ def _run_reconciliation():
         
             effective_tunnel_id_for_dns = tunnel_state.get("id") if not USE_EXTERNAL_CLOUDFLARED else EXTERNAL_TUNNEL_ID
             if effective_tunnel_id_for_dns:
+                # Deduplicate hostnames requiring DNS setup to avoid redundant calls
+                unique_dns_setups = []
+                seen_host_zone_pairs = set()
                 for hostname_dns, zone_id_dns in hostnames_requiring_dns_setup:
-                    dns_processed +=1
-                    app.reconciliation_info["status"] = f"DNS for {hostname_dns} ({dns_processed}/{dns_total})"
+                    if (hostname_dns, zone_id_dns) not in seen_host_zone_pairs:
+                        unique_dns_setups.append((hostname_dns, zone_id_dns))
+                        seen_host_zone_pairs.add((hostname_dns, zone_id_dns))
+                
+                logging.info(f"[Reconcile] Unique hostnames for DNS setup: {len(unique_dns_setups)}")
+
+                for hostname_dns, zone_id_dns in unique_dns_setups:
+                    dns_processed +=1 # This counter might be slightly off if we have duplicates, but good enough for progress
+                    app.reconciliation_info["status"] = f"DNS for {hostname_dns} ({dns_processed}/{dns_total})" # dns_total is pre-deduplication
                     
                     if time.time() - reconciliation_start > max_total_time - 5:
                         logging.warning("[Reconcile] Timeout reached during DNS setup phase.")
@@ -1904,6 +1957,7 @@ def _run_reconciliation():
         duration = app.reconciliation_info["completed_at"] - app.reconciliation_info["start_time"]
         watchdog.cancel()
         logging.info(f"[Reconcile Thread] Reconciliation complete. Duration: {duration:.2f} seconds. Status: {app.reconciliation_info['status']}")
+
 
 def get_cloudflared_container():
     """Gets the cloudflared agent container object."""
@@ -3067,6 +3121,133 @@ def stream_logs():
     response.headers['Access-Control-Allow-Methods'] = 'GET'
     
     return response
+
+@app.route('/ui/manual-rules/add', methods=['POST'])
+def ui_add_manual_rule():
+    if not docker_client:
+        cloudflared_agent_state["last_action_status"] = "Error: System not ready to add manual rule. Docker client unavailable."
+        return redirect(url_for('status_page'))
+    if not tunnel_state.get("id"):
+        cloudflared_agent_state["last_action_status"] = "Error: System not ready to add manual rule. Tunnel not initialized."
+        return redirect(url_for('status_page'))
+
+
+    hostname = request.form.get('manual_hostname', '').strip()
+    service = request.form.get('manual_service', '').strip()
+    zone_name = request.form.get('manual_zone_name', '').strip() 
+    no_tls_verify = request.form.get('manual_no_tls_verify') == 'on'
+
+    if not hostname or not service:
+        cloudflared_agent_state["last_action_status"] = "Error: Hostname and Service are required for manual rule."
+        return redirect(url_for('status_page'))
+
+    if not is_valid_hostname(hostname):
+        cloudflared_agent_state["last_action_status"] = f"Error: Invalid hostname provided for manual rule: {hostname}"
+        return redirect(url_for('status_page'))
+    if not is_valid_service(service):
+        cloudflared_agent_state["last_action_status"] = f"Error: Invalid service URL provided for manual rule: {service}"
+        return redirect(url_for('status_page'))
+
+    target_zone_id = None
+    if zone_name:
+        target_zone_id = get_zone_id_from_name(zone_name)
+        if not target_zone_id:
+            cloudflared_agent_state["last_action_status"] = f"Error: Could not find Zone ID for '{zone_name}'."
+            return redirect(url_for('status_page'))
+    elif CF_ZONE_ID:
+        target_zone_id = CF_ZONE_ID
+    else:
+        cloudflared_agent_state["last_action_status"] = "Error: Zone Name required for manual rule as CF_ZONE_ID is not set."
+        return redirect(url_for('status_page'))
+
+    with state_lock:
+        existing_rule_details = managed_rules.get(hostname)
+        if existing_rule_details and existing_rule_details.get("source", "docker") == "docker":
+            cloudflared_agent_state["last_action_status"] = f"Error: Hostname {hostname} is already managed by Docker labels. Manual rule not added/updated."
+            return redirect(url_for('status_page'))
+        
+        if existing_rule_details:
+             logging.info(f"Updating existing manual rule for {hostname}")
+        else:
+             logging.info(f"Adding new manual rule for {hostname}")
+
+        managed_rules[hostname] = {
+            "service": service,
+            "container_id": None, 
+            "status": "active",
+            "delete_at": None,
+            "zone_id": target_zone_id,
+            "no_tls_verify": no_tls_verify,
+            "access_app_id": existing_rule_details.get("access_app_id") if existing_rule_details else None,
+            "access_policy_type": existing_rule_details.get("access_policy_type") if existing_rule_details else None,
+            "access_app_config_hash": existing_rule_details.get("access_app_config_hash") if existing_rule_details else None,
+            "access_policy_ui_override": existing_rule_details.get("access_policy_ui_override", False) if existing_rule_details else False,
+            "source": "manual"
+        }
+        save_state()
+
+    effective_tunnel_id = tunnel_state.get("id") if not USE_EXTERNAL_CLOUDFLARED else EXTERNAL_TUNNEL_ID
+    if not effective_tunnel_id:
+        cloudflared_agent_state["last_action_status"] = f"Error: Cannot setup DNS/Tunnel for {hostname}, effective tunnel ID missing."
+        # Note: state is saved, but cloud resources won't be updated. Reconciliation might fix later if tunnel ID appears.
+        return redirect(url_for('status_page'))
+        
+    if update_cloudflare_config():
+        create_cloudflare_dns_record(target_zone_id, hostname, effective_tunnel_id)
+        cloudflared_agent_state["last_action_status"] = f"Success: Manual rule for {hostname} added/updated."
+    else:
+        cloudflared_agent_state["last_action_status"] = f"Error: Failed to update Cloudflare config for manual rule {hostname}. DNS record might also be affected."
+
+    return redirect(url_for('status_page'))
+
+@app.route('/ui/manual-rules/delete/<path:hostname>', methods=['POST'])
+def ui_delete_manual_rule(hostname):
+    if not docker_client:
+        cloudflared_agent_state["last_action_status"] = "Error: System not ready to delete manual rule. Docker client unavailable."
+        return redirect(url_for('status_page'))
+    if not tunnel_state.get("id"):
+        cloudflared_agent_state["last_action_status"] = "Error: System not ready to delete manual rule. Tunnel not initialized."
+        return redirect(url_for('status_page'))
+
+    logging.info(f"UI request: Delete manual rule for hostname: {hostname}")
+    
+    zone_id_for_delete = None
+    access_app_id_for_delete = None
+    rule_existed_as_manual = False
+
+    with state_lock:
+        rule_details = managed_rules.get(hostname)
+        if rule_details and rule_details.get("source") == "manual":
+            rule_existed_as_manual = True
+            zone_id_for_delete = rule_details.get("zone_id")
+            access_app_id_for_delete = rule_details.get("access_app_id")
+            del managed_rules[hostname]
+            save_state()
+        elif rule_details:
+            cloudflared_agent_state["last_action_status"] = f"Error: Rule for {hostname} is not a manual rule. Cannot delete via this action."
+            return redirect(url_for('status_page'))
+        else:
+            cloudflared_agent_state["last_action_status"] = f"Info: Manual rule for {hostname} not found to delete."
+            return redirect(url_for('status_page'))
+
+    if rule_existed_as_manual:
+        effective_tunnel_id = tunnel_state.get("id") if not USE_EXTERNAL_CLOUDFLARED else EXTERNAL_TUNNEL_ID
+        if not effective_tunnel_id:
+            cloudflared_agent_state["last_action_status"] = f"Warning: Rule {hostname} deleted from state, but DNS/Tunnel resources cannot be cleaned (missing tunnel ID)."
+            return redirect(url_for('status_page'))
+
+        if zone_id_for_delete:
+            delete_cloudflare_dns_record(zone_id_for_delete, hostname, effective_tunnel_id)
+        
+        if access_app_id_for_delete:
+            delete_cloudflare_access_application(access_app_id_for_delete)
+
+        if update_cloudflare_config():
+            cloudflared_agent_state["last_action_status"] = f"Success: Manual rule {hostname} and associated resources deleted."
+        else:
+            cloudflared_agent_state["last_action_status"] = f"Warning: Manual rule {hostname} deleted from state & DNS/Access attempted, but Cloudflare tunnel config update failed."
+    
+    return redirect(url_for('status_page'))
 
 @app.route('/cloudflare-ping')
 def cloudflare_ping():
