@@ -2266,135 +2266,121 @@ def stop_cloudflared_container():
         return success_flag
 
 def update_cloudflare_config():
-    """Updates the Cloudflare tunnel ingress configuration if needed, preserving external rules and existing order."""
     if not tunnel_state.get("id"):
         logging.warning("Cannot update CF config, tunnel ID missing.")
         return False
 
-    final_ingress_rules = None
-    needs_api_update = False
-
     with state_lock:
-        logging.info("Checking for Cloudflare tunnel config updates...")
-        catch_all_rule = {"service": "http_status:404"}
-        wildcard_rules = []  
-        
-        logging.debug("Fetching current CF config for comparison...")
-        current_config = get_current_cf_config()
-        if current_config is None:
-            logging.error("Failed to fetch current CF config, aborting update check.")
-            return False
-            
-        current_cf_ingress = current_config.get("ingress", [])
-        current_cf_all_hostnames = {r.get("hostname") for r in current_cf_ingress if r.get("hostname")}
-        current_managed_hostnames = {hostname for hostname in managed_rules}
-        
-        external_rules = [
-            r for r in current_cf_ingress 
-            if r.get("hostname") and r.get("hostname") not in current_managed_hostnames
-            and r.get("service") != catch_all_rule.get("service")
-        ]
-        
-        for rule in external_rules[:]:
-            hostname = rule.get("hostname", "")
-            if hostname and '*' in hostname:
-                wildcard_rules.append(rule)
-                external_rules.remove(rule)
-                logging.debug(f"Identified wildcard rule: {hostname}")
-        
-        existing_catch_all = next((r for r in current_cf_ingress if r.get("service") == catch_all_rule["service"]), None)
-        
-        desired_ingress_rules = []
-        
+        logging.info("Constructing desired Cloudflare tunnel configuration from managed rules...")
+      
+        desired_dockflare_rules = []
         for hostname, rule_details in managed_rules.items():
             if rule_details.get("status") == "active":
                 service = rule_details.get("service")
                 if service:
+
                     no_tls_verify = rule_details.get("no_tls_verify", False)
-                    desired_ingress_rules.append({
+                    rule_config = {
                         "hostname": hostname,
-                        "service": service,
-                        "originRequest": {
-                            "noTLSVerify": no_tls_verify
-                        }
-                    })
+                        "service": service
+                    }
+                    if no_tls_verify: 
+                        rule_config["originRequest"] = {"noTLSVerify": True}
+                    desired_dockflare_rules.append(rule_config)
                 else:
                     logging.warning(f"Rule {hostname} is active but missing 'service' detail. Skipping.")
-        
-        current_cf_managed_ingress = [
-            r for r in current_cf_ingress 
-            if r.get("hostname") in current_managed_hostnames
-        ]
 
-        def rule_to_canonical(rule):
-            items = sorted([(k, v) for k, v in rule.items() if k in ["hostname", "service"]])
-            return tuple(items)
-
-        try:
-            current_cf_set = {rule_to_canonical(r) for r in current_cf_managed_ingress if r.get("hostname") and r.get("service")}
-            desired_set = {rule_to_canonical(r) for r in desired_ingress_rules if r.get("hostname") and r.get("service")}
-        except Exception as e:
-            logging.error(f"Error creating canonical rule sets for comparison: {e}", exc_info=True)
+        current_api_config = get_current_cf_config()
+        if current_api_config is None:
+            logging.error("Failed to fetch current CF config; cannot reliably update.")
             return False
+        
+        current_api_ingress_rules = current_api_config.get("ingress", [])
 
-        if current_cf_set == desired_set and len(external_rules) == 0 and len(wildcard_rules) == 0:
-            logging.info("No changes detected in CF tunnel config. Skipping API update.")
-            needs_api_update = False
-        else:
-            logging.info("Change detected. Rules need to be updated.")
-            
-            if len(external_rules) > 0:
-                logging.info(f"Preserving {len(external_rules)} external rules found in the current configuration")
-            
-            final_ingress_rules = desired_ingress_rules + external_rules
-            
-            if len(wildcard_rules) > 0:
-                logging.info(f"Preserving {len(wildcard_rules)} wildcard rules at the end (before catch-all)")
-                final_ingress_rules.extend(wildcard_rules)
-            
-            final_ingress_rules.append(catch_all_rule if existing_catch_all is None else existing_catch_all)
-            
+        preserved_api_rules = []
+        catch_all_rule_template = {"service": "http_status:404"} 
+
+        for api_rule in current_api_ingress_rules:
+            api_hostname = api_rule.get("hostname")
+            api_service = api_rule.get("service")
+
+            if api_service == catch_all_rule_template["service"] and not api_hostname: 
+                preserved_api_rules.append(api_rule)
+                continue
+
+            if api_hostname and '*' in api_hostname:
+                is_managed_wildcard = False
+                for managed_host in managed_rules:
+                    if managed_host == api_hostname:
+                        is_managed_wildcard = True
+                        break
+                if not is_managed_wildcard:
+                    preserved_api_rules.append(api_rule)
+
+        final_ingress_rules_to_put = list(desired_dockflare_rules)
+        for p_rule in preserved_api_rules:
+            is_duplicate = False
+            p_hostname = p_rule.get("hostname")
+            p_service = p_rule.get("service")
+            for f_rule in final_ingress_rules_to_put:
+                if f_rule.get("hostname") == p_hostname and f_rule.get("service") == p_service:
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                final_ingress_rules_to_put.append(p_rule)
+
+        has_catch_all = any(r.get("service") == catch_all_rule_template["service"] and not r.get("hostname") for r in final_ingress_rules_to_put)
+        if not has_catch_all:
+            final_ingress_rules_to_put.append(catch_all_rule_template)
+            logging.info("Adding default catch-all rule as none was found/preserved.")
+
+        def rule_to_comparable_dict(rule):          
+            comp_dict = {}
+            if rule.get("hostname"):
+                comp_dict["hostname"] = rule.get("hostname")
+            if rule.get("service"):
+                comp_dict["service"] = rule.get("service")
+            if rule.get("originRequest", {}).get("noTLSVerify"):
+                comp_dict["noTLSVerify"] = True # Only include if true
+            return comp_dict
+
+        current_api_comparable_set = {json.dumps(rule_to_comparable_dict(r), sort_keys=True) for r in current_api_ingress_rules}
+        final_put_comparable_set = {json.dumps(rule_to_comparable_dict(r), sort_keys=True) for r in final_ingress_rules_to_put}
+
+        needs_api_update = False
+        if current_api_comparable_set != final_put_comparable_set:
+            logging.info("Ingress rule configuration differs from Cloudflare. Update required.")
             needs_api_update = True
+        else:
+            current_api_hostnames = [r.get("hostname") for r in current_api_ingress_rules if r.get("hostname")]
+            final_put_hostnames = [r.get("hostname") for r in final_ingress_rules_to_put if r.get("hostname")]
+            if current_api_hostnames != final_put_hostnames and len(current_api_hostnames) == len(final_put_hostnames) : 
+                 logging.info("Ingress rule order differs. Update required to enforce Dockflare's order.")
+                 needs_api_update = True 
 
-    if needs_api_update and final_ingress_rules is not None:
-        logging.info(f"Updating Cloudflare tunnel config with {len(final_ingress_rules) - 1} rules (+1 catch-all)")
-        logging.debug(f"Rules to update: {[r.get('hostname') for r in final_ingress_rules if r.get('hostname')]}")
-        
+        if not needs_api_update:
+            logging.info("Cloudflare configuration matches desired state. No API update needed.")
+            return True 
+
+        logging.info(f"Updating Cloudflare tunnel config. Rules to PUT ({len(final_ingress_rules_to_put)} total):")
+        for r_idx, r_val in enumerate(final_ingress_rules_to_put):
+            logging.debug(f"  Rule {r_idx+1}: {json.dumps(r_val)}")
+    
+    if needs_api_update:
         endpoint = f"/accounts/{CF_ACCOUNT_ID}/cfd_tunnel/{tunnel_state['id']}/configurations"
-        
-        config = {
-            "config": {
-                "ingress": final_ingress_rules,
-                "originRequest": {"connectTimeout": 30, "noTLSVerify": False},
-                "warp-routing": {"enabled": False}
-            }
-        }
+        config_payload = {"config": {"ingress": final_ingress_rules_to_put}}
         
         try:
-            for attempt in range(MAX_CF_UPDATE_RETRIES):
-                try:
-                    cf_api_request("PUT", endpoint, json_data=config)
-                    logging.info(f"Successfully updated Cloudflare tunnel configuration (attempt {attempt + 1})")
-                    if tunnel_state.get("error") and "config" in tunnel_state.get("error", "").lower():
-                        tunnel_state["error"] = None  
-                    return True
-                except requests.exceptions.RequestException as e:
-                    if attempt < MAX_CF_UPDATE_RETRIES - 1:
-                        retry_delay = CF_UPDATE_RETRY_DELAY * (CF_UPDATE_BACKOFF_FACTOR ** attempt)
-                        logging.warning(f"CF config update failed (attempt {attempt + 1}/{MAX_CF_UPDATE_RETRIES}), retrying in {retry_delay}s: {e}")
-                        time.sleep(retry_delay)
-                    else:
-                        raise
+            
+            cf_api_request("PUT", endpoint, json_data=config_payload) 
+            logging.info("Successfully updated Cloudflare tunnel configuration.")
+            return True
+        except Exception as e: 
+            logging.error(f"Failed to update CF tunnel config: {e}", exc_info=True)
+            
             return False
-        except requests.exceptions.RequestException as e:
-            logging.error(f"All {MAX_CF_UPDATE_RETRIES} attempts to update CF tunnel config failed: {e}", exc_info=True)
-            tunnel_state["error"] = f"Failed to update tunnel configuration after {MAX_CF_UPDATE_RETRIES} attempts"
-            return False
-        except Exception as e:
-            logging.error(f"Unexpected error updating CF tunnel config: {e}", exc_info=True)
-            tunnel_state["error"] = f"Unexpected error updating tunnel configuration: {e}"
-            return False
-    return True
+            
+    return True 
 
 def get_all_account_cloudflare_tunnels():
     if not CF_ACCOUNT_ID:
