@@ -16,7 +16,7 @@ services:
       - cloudflare-net  # Network for communication with other containers
     environment:
       - STATE_FILE_PATH=/app/data/state.json
-      - TZ=Europe/London  # Set your timezone here
+      - TZ=Europe/Zurich  # Set your timezone here
     #labels: # Optional
     #- cloudflare.tunnel.enable=true
     #- cloudflare.tunnel.hostname=dockflare.yourdomain.tld
