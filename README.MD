@@ -97,11 +97,6 @@ DockFlare listens for Docker container events.
          - cloudflare.tunnel.enable=true
          - cloudflare.tunnel.hostname=dockflare.yourdomain.tld # update your domain 
          - cloudflare.tunnel.service=http://dockflare:5000 
-       logging:
-       driver: "json-file"
-       options:
-         max-size: "10m"
-         max-file: "2"
    volumes:
      dockflare_data:
    networks:
