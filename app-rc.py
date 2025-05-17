@@ -13,22 +13,27 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-import os
-import sys
-import logging
-import re
+#######################################################################
+# reading upon best practices imports by Python's official style guide, PEP 8, in alphabetical order by group of standard lib. imports than thirdparty imports
+# Standard library imports
+import copy
+from datetime import datetime, timedelta, timezone
+import hashlib
 import json
+import logging
+import os
+import queue
+import random
+import re
+import sys
 import threading
 import time
-import queue
-from datetime import datetime, timedelta, timezone
-import random
-import copy 
-import hashlib
+from urllib.parse import urlparse, urlunparse
+# third-party imports
 import docker
 from docker.errors import NotFound, APIError
-from flask import Flask, jsonify, render_template, redirect, url_for, request, Response, stream_with_context
 from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, redirect, url_for, request, Response, stream_with_context
 import requests
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s')
@@ -3113,21 +3118,35 @@ def ui_add_manual_rule():
         cloudflared_agent_state["last_action_status"] = "Error: System not ready to add manual rule. Tunnel not initialized."
         return redirect(url_for('status_page'))
 
-
     hostname = request.form.get('manual_hostname', '').strip()
-    service = request.form.get('manual_service', '').strip()
+    service_input = request.form.get('manual_service', '').strip() 
     zone_name = request.form.get('manual_zone_name', '').strip() 
     no_tls_verify = request.form.get('manual_no_tls_verify') == 'on'
 
-    if not hostname or not service:
+    if not hostname or not service_input:
         cloudflared_agent_state["last_action_status"] = "Error: Hostname and Service are required for manual rule."
         return redirect(url_for('status_page'))
 
     if not is_valid_hostname(hostname):
         cloudflared_agent_state["last_action_status"] = f"Error: Invalid hostname provided for manual rule: {hostname}"
         return redirect(url_for('status_page'))
-    if not is_valid_service(service):
-        cloudflared_agent_state["last_action_status"] = f"Error: Invalid service URL provided for manual rule: {service}"
+
+    processed_service_for_cf = ""
+    try:
+        parsed_url = urlparse(service_input)
+        if not parsed_url.scheme or not parsed_url.netloc:
+
+            raise ValueError("Service URL must include scheme (e.g., http:// or https://) and host/IP.")
+
+        processed_service_for_cf = urlunparse((parsed_url.scheme, parsed_url.netloc, '', '', '', ''))
+        logging.info(f"Manual rule service input '{service_input}' processed to '{processed_service_for_cf}' for Cloudflare config.")
+
+    except ValueError as e:
+        cloudflared_agent_state["last_action_status"] = f"Error: Invalid service URL format '{service_input}': {e}"
+        return redirect(url_for('status_page'))
+
+    if not is_valid_service(processed_service_for_cf):
+        cloudflared_agent_state["last_action_status"] = f"Error: Processed service URL '{processed_service_for_cf}' (from input '{service_input}') is invalid for Cloudflare."
         return redirect(url_for('status_page'))
 
     target_zone_id = None
@@ -3149,12 +3168,13 @@ def ui_add_manual_rule():
             return redirect(url_for('status_page'))
         
         if existing_rule_details:
-             logging.info(f"Updating existing manual rule for {hostname}")
+             logging.info(f"Updating existing manual rule for {hostname} with service {processed_service_for_cf}")
         else:
-             logging.info(f"Adding new manual rule for {hostname}")
+             logging.info(f"Adding new manual rule for {hostname} with service {processed_service_for_cf}")
 
         managed_rules[hostname] = {
-            "service": service,
+            "service": processed_service_for_cf,
+            # "original_service_input": service_input, # Optional: display the user's full input later
             "container_id": None, 
             "status": "active",
             "delete_at": None,
@@ -3171,12 +3191,11 @@ def ui_add_manual_rule():
     effective_tunnel_id = tunnel_state.get("id") if not USE_EXTERNAL_CLOUDFLARED else EXTERNAL_TUNNEL_ID
     if not effective_tunnel_id:
         cloudflared_agent_state["last_action_status"] = f"Error: Cannot setup DNS/Tunnel for {hostname}, effective tunnel ID missing."
-        # Note: state is saved, but cloud resources won't be updated. Reconciliation might fix later if tunnel ID appears.
         return redirect(url_for('status_page'))
-        
+
     if update_cloudflare_config():
         create_cloudflare_dns_record(target_zone_id, hostname, effective_tunnel_id)
-        cloudflared_agent_state["last_action_status"] = f"Success: Manual rule for {hostname} added/updated."
+        cloudflared_agent_state["last_action_status"] = f"Success: Manual rule for {hostname} (service: {processed_service_for_cf}) added/updated."
     else:
         cloudflared_agent_state["last_action_status"] = f"Error: Failed to update Cloudflare config for manual rule {hostname}. DNS record might also be affected."
 

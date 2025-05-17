@@ -424,7 +424,7 @@
                                                             <div class="auth-email-field hidden mt-2" id="auth-email-field-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}">
                                                                 <label for="auth_email-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" class="block text-xs font-medium opacity-80 mb-1">Allowed Email:</label>
                                                                 {% set prefill_email_val = '' %}
-                                                                {# You might need more sophisticated logic here if you store the email differently for manual vs docker rules, or parse it from custom_rules #}
+                                                                {#  #}
                                                                 <input type="email" name="auth_email" id="auth_email-{{ details.source if details.source else 'docker' }}-{{ hostname | replace('.', '-') }}" placeholder="user@example.com" value="{{ prefill_email_val }}" class="input input-bordered input-xs w-full">
                                                             </div>
                                                             <div class="flex items-center justify-end space-x-2 mt-3">
