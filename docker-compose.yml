@@ -43,6 +43,7 @@ services:
       options:
         max-size: "10m"
         max-file: "2"
+        
 volumes:
   dockflare_data:  # Persistent volume for state data
 
