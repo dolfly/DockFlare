@@ -356,14 +356,13 @@
                             </thead>
                             <tbody>
                                 {% for hostname, details in rules.items()|sort %}
-                                    <tr class="hover">
-                                        <td class="p-3 whitespace-nowrap">
+                                    <td class="p-3 whitespace-nowrap">
                                             {% if details.source == 'manual' %}
-                                                <span class="badge badge-info badge-sm">Manual</span>
+                                                <span class="badge badge-info badge-sm">Manual</span>                                               
                                             {% else %}
                                                 {% set status_badge_color = 'badge-warning' if 'pending' in details.status else 'badge-success' %}
-                                                <span class="badge {{ status_badge_color }} badge-sm {% if details.status == 'active' %}animate-pulse{% endif %}"> 
-                                                {{ details.status.replace('_',' ') }}
+                                                <span class="badge {{ status_badge_color }} badge-sm"> 
+                                                    {{ details.status.replace('_',' ') }}
                                                 </span>
                                             {% endif %}
                                         </td>
@@ -400,7 +399,7 @@
                                                     <span class="badge badge-ghost badge-xs ml-1">(Managed)</span>
                                                 {% endif %}
                                                 {% if details.access_policy_ui_override %}
-                                                <span class="badge badge-accent badge-xs ml-2 animate-pulse" title="This policy is managed by the UI{% if details.source != 'manual' %} and overrides container labels{% endif %}.">UI Override</span>
+                                                <span class="badge badge-warning badge-xs ml-2 animate-pulse" title="This policy is managed by the UI{% if details.source != 'manual' %} and overrides container labels{% endif %}.">UI Override</span>
                                                 {% endif %}
                                             {% elif details.get('status') == 'active' %} 
                                                 <span class="opacity-60 italic">None (Public)</span>
