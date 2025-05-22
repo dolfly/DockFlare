@@ -2430,38 +2430,44 @@ def get_all_account_cloudflare_tunnels():
         logging.error(f"Unexpected error listing all Cloudflare tunnels for the account: {e}", exc_info=True)
         return []
 
+# app.py
 def get_dns_records_for_tunnel(zone_id, tunnel_id):
-    """Fetches CNAME records in a specific zone pointing to a specific tunnel."""
     if not zone_id or not tunnel_id:
         logging.warning("get_dns_records_for_tunnel: Missing zone_id or tunnel_id.")
         return []
 
+    zone_details = get_zone_details_by_id(zone_id)
+    zone_name_for_display = zone_details.get("name") if zone_details else zone_id
+
     expected_cname_content = f"{tunnel_id}.cfargotunnel.com"
-    
     endpoint = f"/zones/{zone_id}/dns_records"
-    params = {
-        "type": "CNAME",
-        "content": expected_cname_content,
-        "per_page": 100 
-    }
-    logging.info(f"Fetching DNS records for tunnel {tunnel_id} in zone {zone_id} with content {expected_cname_content}")
+    params = {"type": "CNAME", "content": expected_cname_content, "per_page": 100}
+    logging.info(f"Fetching DNS records for tunnel {tunnel_id} in zone {zone_name_for_display} ({zone_id}) with content {expected_cname_content}")
     
     try:
         response_data = cf_api_request("GET", endpoint, params=params) 
-        dns_records = response_data.get("result", [])
-        if isinstance(dns_records, list):
-
-            return [{"name": record.get("name"), "id": record.get("id"), "zone_id": zone_id} for record in dns_records if record.get("name")]
+        dns_records_from_api = response_data.get("result", [])
+        
+        processed_records = []
+        if isinstance(dns_records_from_api, list):
+            for record in dns_records_from_api:
+                if record.get("name"):
+                    processed_records.append({
+                        "name": record.get("name"), 
+                        "id": record.get("id"), 
+                        "zone_id": zone_id,
+                        "zone_name": zone_name_for_display
+                    })
+            return processed_records
         else:
-            logging.error(f"Unexpected data format for DNS records list in zone {zone_id}: {type(dns_records)}")
+            logging.error(f"Unexpected data format for DNS records list in zone {zone_name_for_display}: {type(dns_records_from_api)}")
             return []
     except requests.exceptions.RequestException as e:
-        logging.error(f"API error fetching DNS records for tunnel {tunnel_id} in zone {zone_id}: {e}")
+        logging.error(f"API error fetching DNS records for tunnel {tunnel_id} in zone {zone_name_for_display}: {e}")
         return []
     except Exception as e:
-        logging.error(f"Unexpected error fetching DNS records for tunnel {tunnel_id} in zone {zone_id}: {e}", exc_info=True)
+        logging.error(f"Unexpected error fetching DNS records for tunnel {tunnel_id} in zone {zone_name_for_display}: {e}", exc_info=True)
         return []
-
 #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # ! BIG REMINDER Flask start here ! Don't forget you dummy and drink coffee Chris..!
