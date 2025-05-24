@@ -1624,7 +1624,7 @@ def _run_reconciliation():
     needs_tunnel_config_update = False 
     state_changed_locally = False
     
-    max_total_time = 240 
+    max_total_time = 480 
     reconciliation_start = time.time()
     
     app.reconciliation_info = {
@@ -1760,7 +1760,7 @@ def _run_reconciliation():
                     except Exception as e_cont:
                         logging.error(f"[Reconcile] Error processing container {c.id[:12] if c and c.id else 'N/A'}: {e_cont}")
                         continue
-                if USE_EXTERNAL_CLOUDFLARED and i + batch_size < container_count: time.sleep(0.2)
+                if USE_EXTERNAL_CLOUDFLARED and i + batch_size < container_count: time.sleep(0.05)
             
             logging.info(f"[Reconcile] Found {len(running_labeled_hostnames_details)} running hostnames with DockFlare labels.")
         except Exception as e_phase1:
