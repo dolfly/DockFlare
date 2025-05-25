@@ -77,6 +77,6 @@ COPY --from=frontend-builder /usr/src/app/app/static/css/output.css /app/static/
 
 # Copy the application code
 COPY ./app /app
-
+ENV PYTHONPATH=/
 EXPOSE 5000
 CMD ["python", "main.py"]
