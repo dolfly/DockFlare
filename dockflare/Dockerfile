@@ -15,56 +15,22 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 # Use an official Python runtime as a parent image
 # Using slim variant for smaller size
-# DockFlare: Automates Cloudflare Tunnel ingress from Docker labels.
-# Copyright (C) 2025 ChrispyBacon-Dev <https://github.com/ChrispyBacon-dev/DockFlare>
-# (License header remains the same)
-# --- Frontend Builder Stage ---
 FROM node:20-alpine as frontend-builder
 LABEL stage=frontend-builder
-WORKDIR /build # Changed WORKDIR to something simple for this stage
-
-# Copy files needed for the build from the 'dockflare' subdirectory of the build context
-COPY ./dockflare/package.json ./package.json
-COPY ./dockflare/package-lock.json* ./
-COPY ./dockflare/tailwind.config.js ./tailwind.config.js
-COPY ./dockflare/postcss.config.js ./postcss.config.js
-
-# Create the expected directory structure for input.css and templates
-# relative to the WORKDIR (/build)
-RUN mkdir -p ./app/templates
-COPY ./dockflare/app/templates/input.css ./app/templates/input.css
-COPY ./dockflare/app/templates ./app/templates 
-
+WORKDIR /usr/src/app
+COPY package.json ./
+COPY package-lock.json* ./ 
 RUN npm install
-
-RUN echo ">>> Current directory before npm run build:css is $(pwd)" && \
-    echo ">>> Listing WORKDIR (/build) contents:" && \
-    ls -la . && \
-    echo ">>> Listing ./app/ contents:" && \
-    ls -la ./app/ && \
-    echo ">>> Listing ./app/templates/ contents:" && \
-    ls -la ./app/templates/ && \
-    echo ">>> Running npm run build:css..." && \
-    npm run build:css
-
-RUN echo ">>> CSS build supposedly complete. Verifying output..." && \
-    echo ">>> Listing /build/app/ :" && \
-    ls -la /build/app/ && \
-    echo ">>> Listing /build/app/static/ :" && \
-    ls -la /build/app/static/ && \
-    echo ">>> Listing /build/app/static/css/ :" && \
-    ls -la /build/app/static/css/ && \
-    echo ">>> Checking for /build/app/static/css/output.css existence:" && \
-    (test -f /build/app/static/css/output.css && echo "output.css FOUND" || echo "output.css NOT FOUND")
-# End of frontend-builder stage
-
-# --- Runtime Stage ---
+COPY tailwind.config.js ./
+COPY postcss.config.js ./
+COPY ./templates/input.css ./templates/input.css 
+COPY ./templates ./templates
+RUN npm run build:css
 FROM python:3.13-slim as runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 ENV CLOUDFLARED_VERSION="2024.1.5"
-# ... (cloudflared install) ...
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
@@ -82,13 +48,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm cloudflared-$CLOUDFLARED_ARCH.deb && \
     cloudflared --version && \
     mkdir -p /root/.cloudflared
-
-COPY ./dockflare/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-COPY --from=frontend-builder /build/app/static/css/output.css /app/static/css/output.css
-
-COPY ./dockflare/app /app
-COPY ./images /app/static/images/
+RUN mkdir -p /app/static/css
+RUN mkdir -p /app/static/images
+COPY --from=frontend-builder /usr/src/app/static/css/output.css /app/static/css/output.css
+COPY app.py .
+COPY templates /app/templates/
+COPY images /app/static/images/
 EXPOSE 5000
-CMD ["python", "main.py"]
+CMD ["python", "app.py"]
