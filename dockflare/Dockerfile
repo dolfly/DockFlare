@@ -56,7 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY ./dockflare/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY --from=frontend-builder /usr/src/frontend_build/app/static/css/output.css /app/static/css/output.css
+COPY --from=frontend-builder /usr/src/frontend_build/app/static/css/output.css /dockflare/app/static/css/output.css
 COPY ./dockflare/app /app
 COPY ./images /app/static/images/
 EXPOSE 5000
