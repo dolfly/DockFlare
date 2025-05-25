@@ -20,7 +20,12 @@ COPY package.json package-lock.json* ./
 RUN npm install
 COPY tailwind.config.js postcss.config.js ./
 COPY ./app ./app
+RUN mkdir -p ./app/static/css
 RUN npm run build:css
+RUN echo "DEBUG: Listing contents of /usr/src/app/app/static after build:"
+RUN ls -R /usr/src/app/app/static
+RUN echo "DEBUG: Checking for /usr/src/app/app/static/css/output.css specifically:"
+RUN ls -l /usr/src/app/app/static/css/output.css
 FROM python:3.13-slim as runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
