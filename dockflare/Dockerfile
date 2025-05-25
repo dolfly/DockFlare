@@ -58,6 +58,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=frontend-builder /usr/src/frontend_build/app/static/css/output.css /app/static/css/output.css
 COPY ./app /app
-COPY ./images /app/static/images/
+COPY ../images /app/static/images/
 EXPOSE 5000
 CMD ["python", "main.py"]
