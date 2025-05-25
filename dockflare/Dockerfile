@@ -20,7 +20,7 @@ COPY postcss.config.js ./postcss.config.js
 #    'app/templates/input.css' is relative to 'dockflare' context root.
 RUN mkdir -p ./app/templates
 COPY app/templates/input.css ./app/templates/input.css
-COPY app/templates ./app/templates # Copies content of context_root/app/templates
+COPY app/templates ./app/templates
 
 # 4. Run the build script. It executes in WORKDIR (/buildstage)
 #    The script in package.json uses relative paths:
