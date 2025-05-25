@@ -53,8 +53,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN mkdir -p /app/static/css
 RUN mkdir -p /app/static/images
 COPY --from=frontend-builder /usr/src/app/static/css/output.css /app/static/css/output.css
-COPY app.py .
-COPY templates /app/templates/
+COPY app/main.py .
+COPY app/templates /app/templates/
 COPY images /app/static/images/
 EXPOSE 5000
-CMD ["python", "app.py"]
+CMD ["python", "main.py"]
