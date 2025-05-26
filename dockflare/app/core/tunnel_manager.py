@@ -289,8 +289,9 @@ def update_cloudflared_container_status():
     if current_status != new_status:
         logging.info(f"Agent container '{config.CLOUDFLARED_CONTAINER_NAME}' status changed: {current_status} -> {new_status}")
         cloudflared_agent_state["container_status"] = new_status
-        if new_status == 'running' and cloudflared_agent_state.get("last_action_status", "").startswith("Error"):
-            cloudflared_agent_state["last_action_status"] = None # Clear error if now running
+        last_action = cloudflared_agent_state.get("last_action_status")
+        if new_status == 'running' and last_action and last_action.startswith("Error"):
+            cloudflared_agent_state["last_action_status"] = None
 
 def ensure_docker_network_exists(network_name):
     if not docker_client:

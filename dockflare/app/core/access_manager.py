@@ -325,24 +325,20 @@ def handle_access_policy_from_labels(hostname_config_item, current_rule_in_state
             else: 
                 needs_api_action = True
                 logging.info(f"No Access App for {hostname}. Needs creation with type: '{desired_access_policy_type_from_label}'.")
-
             if needs_api_action:
-                if current_access_app_id:
-                    logging.info(f"Updating Access App {current_access_app_id} for {hostname} based on labels (type: {desired_access_policy_type_from_label}).")
-                    updated_app = update_cloudflare_access_application(
-                        current_access_app_id, hostname, desired_access_app_name_from_label,
-                        desired_session_duration_from_label, desired_app_launcher_visible_from_label,
-                        [hostname], cf_access_policies, allowed_idps_list_for_app, desired_auto_redirect_from_label
-                    )
-                    if updated_app:
-                        current_rule_in_state["access_policy_type"] = desired_access_policy_type_from_label
-                        current_rule_in_state["access_app_config_hash"] = desired_access_app_config_hash_from_label
-                        local_state_changed_by_access_policy = True
-                    else:
-                        logging.error(f"Failed to update Access App {current_access_app_id} for {hostname} based on labels.")
-                else: 
-                    logging.info(f"Creating new Access App for {hostname} based on labels (type: '{desired_access_policy_type_from_label}').")
-                    created_app = create_cloudflare_access_application(
+                existing_cf_app = None
+                    if not current_access_app_id: # If not known in local state, check CF
+                        logging.info(f"No local Access App ID for {hostname}. Checking Cloudflare API...")
+                        existing_cf_app = find_cloudflare_access_application_by_hostname(hostname)
+                    if existing_cf_app and existing_cf_app.get("id"):
+                        logging.info(f"Found existing Access App ID '{existing_cf_app.get('id')}' on Cloudflare for {hostname}. Will attempt update.")
+                        current_access_app_id = existing_cf_app.get("id") # Use this ID for update
+                        current_rule_in_state["access_app_id"] = current_access_app_id
+                    if current_access_app_id: 
+                        logging.info(f"Updating Access App {current_access_app_id} for {hostname} based on labels (type: {desired_access_policy_type_from_label}).")
+                    else: # Create new app (no local ID and not found on CF)
+                        logging.info(f"Creating new Access App for {hostname} based on labels (type: '{desired_access_policy_type_from_label}').")
+                        created_app = create_cloudflare_access_application(
                         hostname, desired_access_app_name_from_label,
                         desired_session_duration_from_label, desired_app_launcher_visible_from_label,
                         [hostname], cf_access_policies, allowed_idps_list_for_app, desired_auto_redirect_from_label
