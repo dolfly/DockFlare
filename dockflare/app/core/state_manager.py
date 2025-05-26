@@ -15,11 +15,11 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # app/core/state_manager.py
+import copy
 import json
 import logging
 import os
 import threading
-import copy
 from datetime import datetime, timezone
 
 from app import config

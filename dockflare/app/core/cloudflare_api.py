@@ -15,12 +15,12 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # app/core/cloudflare_api.py
+import copy
 import logging
 import requests
 import json
 import time
 import threading
-import copy
 from app import config
 
 zone_id_cache = {}  

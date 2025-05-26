@@ -15,11 +15,10 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # app/web/routes.py
-
+import copy
 import logging
 import time
-import copy 
-import os 
+ import os 
 import random 
 import queue 
 from datetime import datetime, timezone
