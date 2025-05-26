@@ -19,7 +19,7 @@
 import logging
 import time
 import requests
-import copy
+import copy 
 from docker.errors import NotFound, APIError
 
 from app import config, docker_client, cloudflared_agent_state, tunnel_state 
@@ -52,7 +52,6 @@ def is_valid_service(service):
     if not service: return False
     return (re.match(r"^(https?|tcp|unix)://", service) or 
             re.match(r"^[a-zA-Z0-9._-]+:\d+$", service)) is not None
-
 
 def process_container_start(container_obj):
     if not container_obj:
@@ -108,17 +107,14 @@ def process_container_start(container_obj):
             prefix = f"{config.LABEL_PREFIX}.{index}"
             hostname_indexed = labels.get(f"{prefix}.hostname")
             if not hostname_indexed: break
-                
             service_indexed = labels.get(f"{prefix}.service", service_label) 
             if not service_indexed:
                 logging.warning(f"Ignoring indexed hostname {hostname_indexed} for {container_name_val}: Missing service for index {index} and no default service label.")
                 index += 1
                 continue
-            
             zone_name_indexed = labels.get(f"{prefix}.zonename", zone_name_label)
             no_tls_verify_indexed_val = labels.get(f"{prefix}.no_tls_verify", str(no_tls_verify_label).lower())
             no_tls_verify_indexed = no_tls_verify_indexed_val.lower() in ["true", "1", "t", "yes"]
-
             access_policy_type_indexed = labels.get(f"{prefix}.access.policy", default_access_policy_type_label)
             access_app_name_indexed = labels.get(f"{prefix}.access.name", default_access_app_name_label)
             access_session_duration_indexed = labels.get(f"{prefix}.access.session_duration", default_access_session_duration_label)
@@ -128,7 +124,6 @@ def process_container_start(container_obj):
             acc_redirect_val_idx = labels.get(f"{prefix}.access.auto_redirect_to_identity", str(default_access_auto_redirect_label).lower())
             access_auto_redirect_indexed = acc_redirect_val_idx.lower() in ["true", "1", "t", "yes"]
             access_custom_rules_indexed_str = labels.get(f"{prefix}.access.custom_rules", default_access_custom_rules_label_str)
-
             if is_valid_hostname(hostname_indexed) and is_valid_service(service_indexed):
                 hostnames_to_process.append({
                     "hostname": hostname_indexed, "service": service_indexed, "zone_name": zone_name_indexed,
@@ -151,9 +146,9 @@ def process_container_start(container_obj):
             
         logging.info(f"Found {len(hostnames_to_process)} hostname configurations for container {container_name_val}")
         
-        state_changed_locally = False
-        needs_tunnel_config_update_due_to_container = False
-        
+        state_changed_locally_for_this_container = False 
+        needs_tunnel_config_update_for_this_container = False 
+
         for config_item in hostnames_to_process:
             hostname = config_item["hostname"]
             service = config_item["service"]
@@ -172,37 +167,47 @@ def process_container_start(container_obj):
                 logging.error(f"Cannot manage DNS for {hostname}: No Zone ID (label or default). Skipping.")
                 continue
             
+            logging.info(f"DOCKER_HANDLER: Processing hostname {hostname} for container {container_name_val}. Current managed_rules count before this hostname: {len(managed_rules)}")
+
             with state_lock: 
                 existing_rule = managed_rules.get(hostname) 
                 
                 if existing_rule and existing_rule.get("source") == "manual":
-                    logging.warning(f"Container {container_name_val} wants hostname '{hostname}', but it's a manual entry. Skipping for this container.")
+                    logging.info(f"DOCKER_HANDLER: Hostname {hostname} is manual, skipping for container {container_name_val}.")
                     continue
-
-                current_rule_copy = existing_rule.copy() if existing_rule else {}
+                
+                original_existing_rule_for_comparison = copy.deepcopy(existing_rule) if existing_rule else None
                 
                 if existing_rule:
+                    logging.info(f"DOCKER_HANDLER: Updating existing rule for {hostname} from container {container_name_val}.")
+                    
+                    rule_content_changed = False
+                    if existing_rule.get("service") != service:
+                        existing_rule["service"] = service
+                        rule_content_changed = True
+                    if existing_rule.get("no_tls_verify") != no_tls_verify_from_item:
+                        existing_rule["no_tls_verify"] = no_tls_verify_from_item
+                        rule_content_changed = True
+                    if existing_rule.get("zone_id") != target_zone_id: 
+                        existing_rule["zone_id"] = target_zone_id
+                        rule_content_changed = True 
+
+                    existing_rule["container_id"] = container_id_val
+                    existing_rule["source"] = "docker"
+
                     if existing_rule.get("status") == "pending_deletion":
                         existing_rule["status"] = "active"
                         existing_rule["delete_at"] = None
-                        needs_tunnel_config_update_due_to_container = True
+                        rule_content_changed = True 
                     
-                    existing_rule["service"] = service
-                    existing_rule["container_id"] = container_id_val
-                    existing_rule["zone_id"] = target_zone_id
-                    existing_rule["no_tls_verify"] = no_tls_verify_from_item
-                    existing_rule["source"] = "docker"
+                    if rule_content_changed:
+                        needs_tunnel_config_update_for_this_container = True
                     
-                    if (current_rule_copy.get("service") != service or 
-                        current_rule_copy.get("zone_id") != target_zone_id or
-                        current_rule_copy.get("no_tls_verify") != no_tls_verify_from_item or
-                        current_rule_copy.get("status") == "pending_deletion"): 
-                        needs_tunnel_config_update_due_to_container = True
-                    
-                    if current_rule_copy != existing_rule: 
-                         state_changed_locally = True
+                    if original_existing_rule_for_comparison != existing_rule:
+                         state_changed_locally_for_this_container = True
 
-                else: # New rule
+                else: 
+                    logging.info(f"DOCKER_HANDLER: Adding NEW rule for {hostname} from container {container_name_val}.")
                     managed_rules[hostname] = {
                         "service": service, "container_id": container_id_val,
                         "status": "active", "delete_at": None, "zone_id": target_zone_id,
@@ -212,48 +217,53 @@ def process_container_start(container_obj):
                         "source": "docker"
                     }
                     existing_rule = managed_rules[hostname] 
-                    state_changed_locally = True
-                    needs_tunnel_config_update_due_to_container = True
+                    state_changed_locally_for_this_container = True
+                    needs_tunnel_config_update_for_this_container = True
                 
-                if existing_rule.get("access_policy_ui_override", False):
-                    logging.info(f"Access policy for {hostname} is UI-managed. Skipping label-based Access Policy processing.")
-                else:
-                    if handle_access_policy_from_labels(config_item, existing_rule, None): 
-                        state_changed_locally = True 
-                        
-            
-        if state_changed_locally:
-            save_state() 
+                logging.info(f"DOCKER_HANDLER: After add/update for {hostname}, managed_rules count: {len(managed_rules)}. Rule: {existing_rule}")
 
-        if needs_tunnel_config_update_due_to_container:
-            logging.info(f"Triggering Cloudflare tunnel config update due to changes for container {container_name_val}.")
-            if update_cloudflare_config(): # From tunnel_manager
-                logging.info(f"Tunnel config update successful for container {container_name_val}.")
-                
+                if existing_rule: 
+                    if existing_rule.get("access_policy_ui_override", False):
+                        logging.info(f"DOCKER_HANDLER: Access policy for {hostname} is UI-managed. Skipping label-based processing.")
+                    else:
+                        if handle_access_policy_from_labels(config_item, existing_rule, None): 
+                            state_changed_locally_for_this_container = True 
+                            logging.info(f"DOCKER_HANDLER: Access policy change for {hostname} marked state_changed_locally_for_this_container=True.")
+            
+        logging.info(f"DOCKER_HANDLER: Finished processing all hostnames for container {container_name_val}. state_changed_locally_for_this_container={state_changed_locally_for_this_container}. needs_tunnel_config_update_for_this_container={needs_tunnel_config_update_for_this_container}. Final managed_rules count: {len(managed_rules)}")
+            
+        if state_changed_locally_for_this_container:
+            logging.info(f"DOCKER_HANDLER: Calling save_state() for container {container_name_val} modifications.")
+            save_state() 
+        else:
+            logging.info(f"DOCKER_HANDLER: No local state changes detected for container {container_name_val}. Skipping save_state().")
+
+        if needs_tunnel_config_update_for_this_container:
+            logging.info(f"DOCKER_HANDLER: Triggering Cloudflare tunnel config update after processing container {container_name_val}.")
+            if update_cloudflare_config(): 
+                logging.info(f"DOCKER_HANDLER: Tunnel config update successful for container {container_name_val}.")
                 effective_tunnel_id = tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
                 if effective_tunnel_id:
-                    for config_item_dns in hostnames_to_process:
+                    for config_item_dns in hostnames_to_process: 
                         hostname_dns = config_item_dns["hostname"]
-                        
-                        
-                        zone_name_dns = config_item_dns["zone_name"]
-                        target_zone_id_dns_create = get_zone_id_from_name(zone_name_dns) if zone_name_dns else config.CF_ZONE_ID
+                        zone_name_dns_item = config_item_dns["zone_name"]
+                        target_zone_id_for_dns_item = get_zone_id_from_name(zone_name_dns_item) if zone_name_dns_item else config.CF_ZONE_ID
                         
                         if managed_rules.get(hostname_dns, {}).get("source") == "manual": continue 
                         
-                        if target_zone_id_dns_create:
-                            dns_record_id_status = create_cloudflare_dns_record(target_zone_id_dns_create, hostname_dns, effective_tunnel_id)
+                        if target_zone_id_for_dns_item:
+                            dns_record_id_status = create_cloudflare_dns_record(target_zone_id_for_dns_item, hostname_dns, effective_tunnel_id)
                             if dns_record_id_status and dns_record_id_status not in ["semaphore_timeout", "existing_record_unconfirmed"]:
-                                logging.info(f"DNS record management in zone {target_zone_id_dns_create} for {hostname_dns} successful (ID/Status: {dns_record_id_status}).")
-                            elif not dns_record_id_status:
-                                logging.error(f"CRITICAL: Tunnel config for {hostname_dns} may be active but failed to create/verify DNS record in zone {target_zone_id_dns_create}!")
-                                if cloudflared_agent_state: cloudflared_agent_state["last_action_status"] = f"Error: Failed creating DNS for {hostname_dns}."
+                                logging.info(f"DOCKER_HANDLER: DNS for {hostname_dns} in zone {target_zone_id_for_dns_item} OK (ID/Status: {dns_record_id_status}).")
+                            elif not dns_record_id_status: 
+                                logging.error(f"DOCKER_HANDLER: CRITICAL - Failed DNS for {hostname_dns} in zone {target_zone_id_for_dns_item}!")
+                                if cloudflared_agent_state: cloudflared_agent_state["last_action_status"] = f"Error: Failed DNS for {hostname_dns}."
                         else:
-                            logging.error(f"Missing Zone ID for {hostname_dns} - cannot manage DNS record.")
+                            logging.error(f"DOCKER_HANDLER: Missing Zone ID for DNS for {hostname_dns} - cannot manage record.")
                 else:
-                    logging.error(f"Missing effective Tunnel ID - cannot manage DNS records for {container_name_val}.")
+                    logging.error(f"DOCKER_HANDLER: Missing effective Tunnel ID - cannot manage DNS records for {container_name_val}.")
             else:
-                logging.error(f"Failed to update Cloudflare tunnel config for {container_name_val}. DNS records not managed.")
+                logging.error(f"DOCKER_HANDLER: Failed to update Cloudflare tunnel config for {container_name_val}. DNS records not managed.")
 
     except NotFound:
         logging.warning(f"Container {container_name_val} ({container_id_val[:12] if container_id_val else 'UnknownID'}) not found during start processing.")
@@ -261,7 +271,6 @@ def process_container_start(container_obj):
         logging.error(f"Docker API error processing start for {container_name_val}: {e}", exc_info=True)
     except requests.exceptions.ConnectionError as e: 
         logging.error(f"Docker connection error processing start for {container_name_val}: {e}", exc_info=True)
-        
     except Exception as e:
         logging.error(f"Unexpected error processing start for {container_name_val}: {e}", exc_info=True)
 
@@ -270,28 +279,30 @@ def schedule_container_stop(container_id_val):
     if not container_id_val: return
     logging.info(f"Processing stop event for container {container_id_val[:12]}.")
     
-    state_changed = False
+    state_changed_after_stop_processing = False # More specific name
     with state_lock: 
-        hostnames_affected = []
+        hostnames_affected_by_stop = []
         for hn, details in managed_rules.items(): 
-            if details.get("container_id") == container_id_val and details.get("status") == "active" and details.get("source", "docker") == "docker":
-                hostnames_affected.append(hn)
+            if details.get("container_id") == container_id_val and \
+               details.get("status") == "active" and \
+               details.get("source", "docker") == "docker":
+                hostnames_affected_by_stop.append(hn)
         
-        if hostnames_affected:
-            for hostname_to_schedule in hostnames_affected:
+        if hostnames_affected_by_stop:
+            for hostname_to_schedule in hostnames_affected_by_stop:
                 rule = managed_rules[hostname_to_schedule]
-                if rule.get("status") != "pending_deletion":
+                if rule.get("status") != "pending_deletion": 
                     rule["status"] = "pending_deletion"
                     grace_delta = timedelta(seconds=config.GRACE_PERIOD_SECONDS)
                     rule["delete_at"] = datetime.now(timezone.utc) + grace_delta
-                    logging.info(f"Rule for {hostname_to_schedule} (from container {container_id_val[:12]}) scheduled for deletion at {rule['delete_at'].isoformat()}")
-                    state_changed = True
+                    logging.info(f"Rule for {hostname_to_schedule} (from stopped container {container_id_val[:12]}) scheduled for deletion at {rule['delete_at'].isoformat()}")
+                    state_changed_after_stop_processing = True
                 else:
-                    logging.info(f"Rule for {hostname_to_schedule} was already pending deletion.")
+                    logging.info(f"Rule for {hostname_to_schedule} from stopped container {container_id_val[:12]} was already pending deletion.")
         else:
-            logging.info(f"Stop event for {container_id_val[:12]}, but it didn't manage any active Docker-sourced rules.")
+            logging.info(f"Stop event for {container_id_val[:12]}, but it didn't manage any active Docker-sourced rules currently in 'active' state.")
 
-        if state_changed:
+        if state_changed_after_stop_processing:
             save_state() 
 
 def docker_event_listener(stop_event_param): 
@@ -310,10 +321,9 @@ def docker_event_listener(stop_event_param):
     while not stop_event_param.is_set() and error_count < max_errors:
         try:
             logging.info("Connecting to Docker event stream...")
-            
             events = docker_client.events(decode=True, since=int(time.time()))
             logging.info("Successfully connected to Docker event stream.")
-            error_count = 0 # Reset on successful connection
+            error_count = 0 
 
             for event in events:
                 if stop_event_param.is_set():
@@ -333,11 +343,9 @@ def docker_event_listener(stop_event_param):
                         for attempt in range(3): 
                             try:
                                 container_instance = docker_client.containers.get(cont_id)
-                                
                                 if attempt == 0 and not container_instance.labels.get(f"{config.LABEL_PREFIX}.enable"):
                                      time.sleep(0.2) 
                                      container_instance.reload()
-
                                 if container_instance.labels.get(f"{config.LABEL_PREFIX}.hostname") or container_instance.labels.get(f"{config.LABEL_PREFIX}.0.hostname"): 
                                     logging.debug(f"Container {cont_id[:12]} details retrieved on attempt {attempt+1}.")
                                     break 
@@ -370,10 +378,10 @@ def docker_event_listener(stop_event_param):
                         except Exception as e_proc_stop: 
                             logging.error(f"Error processing stop/die/destroy/kill event for {cont_id[:12]}: {e_proc_stop}", exc_info=True)
         
-        except requests.exceptions.ConnectionError as e_conn_stream: # From docker_client.events()
+        except requests.exceptions.ConnectionError as e_conn_stream: 
             error_count += 1
             logging.error(f"Docker listener connection error: {e_conn_stream}. Reconnecting ({error_count}/{max_errors})...")
-            if not stop_event_param.is_set(): stop_event_param.wait(min(30, 2 * error_count)) # Increased base wait
+            if not stop_event_param.is_set(): stop_event_param.wait(min(30, 2 * error_count)) 
         except APIError as e_api_stream:
             error_count += 1
             logging.error(f"Docker listener API error: {e_api_stream}. Reconnecting ({error_count}/{max_errors})...")
