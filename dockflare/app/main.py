@@ -180,8 +180,8 @@ def main_application_entrypoint():
     global main_initialization_thread
 
     logging.info("-" * 52)
-    logging.info("--- DockFlare Starting (Refactored Structure) ---")
-    logging.info(f"--- Version: 1.7.1 ---") 
+    logging.info("--- DockFlare Starting (Refactored Build) ---")
+    logging.info(f"--- Version: 1.8.0 ---") 
     logging.info("-" * 52)
 
     load_state() 
