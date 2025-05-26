@@ -105,7 +105,6 @@ managed_rules = {}
 state_lock = threading.Lock()
 logging.info(f"STATE_MANAGER_INIT: managed_rules object ID at module load: {id(managed_rules)}")
 
-# ... (_deserialize_datetime function) ...
 def _deserialize_datetime(dt_str):
     if not dt_str:
         return None
@@ -119,9 +118,7 @@ def _deserialize_datetime(dt_str):
         logging.warning(f"Could not parse datetime string '{dt_str}': {date_err}. Returning None.")
         return None
 
-# ... (load_state function with its own detailed logging) ...
 def load_state():
-    # Using the version from your previous successful state save (with object ID logging)
     global managed_rules
     logging.info(f"LOAD_STATE: Start. Initial managed_rules ID: {id(managed_rules)}, Current len: {len(managed_rules)}")
     state_dir = os.path.dirname(config.STATE_FILE_PATH)
@@ -175,31 +172,36 @@ def save_state():
 
     with state_lock:
         rules_to_iterate_items = list(managed_rules.items()) 
-
+    
     if not rules_to_iterate_items:
         logging.info(f"SAVE_STATE: THREAD: {current_thread_name}. managed_rules is empty. Nothing to serialize for state file.")
     else:
         logging.info(f"SAVE_STATE: THREAD: {current_thread_name}. Serializing {len(rules_to_iterate_items)} rules.")
 
     for hostname, rule in rules_to_iterate_items: 
+        logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Processing hostname: {hostname}. Rule content before deepcopy: {rule}") # Log the rule
         try:
+            logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Attempting deepcopy for {hostname}.")
             rule_copy_for_serialization = copy.deepcopy(rule) 
+            logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Deepcopy successful for {hostname}.")
+            
             delete_at_val = rule_copy_for_serialization.get("delete_at")
             if isinstance(delete_at_val, datetime):
+                logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Serializing datetime for {hostname} (value: {delete_at_val}).")
                 rule_copy_for_serialization["delete_at"] = delete_at_val.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
+                logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Datetime serialized for {hostname}.")
             
-            if "zone_id" not in rule_copy_for_serialization: 
-                rule_copy_for_serialization["zone_id"] = None
-            
+            if "zone_id" not in rule_copy_for_serialization: rule_copy_for_serialization["zone_id"] = None
             rule_copy_for_serialization.setdefault("access_app_id", None)
             rule_copy_for_serialization.setdefault("access_policy_type", None)
             rule_copy_for_serialization.setdefault("access_app_config_hash", None)
             rule_copy_for_serialization.setdefault("access_policy_ui_override", False)
-            rule_copy_for_serialization.setdefault("source", "docker") 
+            rule_copy_for_serialization.setdefault("source", "docker")
                 
             serializable_state[hostname] = rule_copy_for_serialization
+            logging.info(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Rule for {hostname} added to serializable_state.")
         except Exception as e_serialize_item:
-            logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. Error serializing rule for hostname '{hostname}': {e_serialize_item}", exc_info=True)
+            logging.error(f"SAVE_STATE_LOOP_ERROR: THREAD: {current_thread_name}. Error processing rule for hostname '{hostname}': {e_serialize_item}", exc_info=True)
             continue 
     
     logging.info(f"SAVE_STATE: THREAD: {current_thread_name}. Prepared serializable_state with {len(serializable_state)} items. Sample (first item key): {next(iter(serializable_state), None)}")
@@ -212,7 +214,7 @@ def save_state():
                 logging.info(f"SAVE_STATE: THREAD: {current_thread_name}. Created dir {state_dir}.")
             except OSError as e_mkdir:
                 logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. Could not create dir {state_dir}: {e_mkdir}. Save failed.")
-                return
+                return 
 
         temp_file_path = config.STATE_FILE_PATH + ".tmp"
         logging.info(f"SAVE_STATE: THREAD: {current_thread_name}. Writing to temp file: {temp_file_path}")
@@ -226,8 +228,8 @@ def save_state():
     except (IOError, OSError) as e_io:
         logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. IO/OS Error: {e_io}", exc_info=True)
     except TypeError as e_type: 
-        logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. TypeError during JSON serialization: {e_type}. Data sample (first key if any): {next(iter(serializable_state), None)}", exc_info=True)
+        logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. TypeError during JSON serialization (json.dump): {e_type}. Serializing {len(serializable_state)} items.", exc_info=True)
     except Exception as e_save:
-        logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. Unexpected error: {e_save}", exc_info=True)
+        logging.error(f"SAVE_STATE: THREAD: {current_thread_name}. Unexpected error during file write: {e_save}", exc_info=True)
     
     logging.info(f"SAVE_STATE: End. THREAD: {current_thread_name}.")
