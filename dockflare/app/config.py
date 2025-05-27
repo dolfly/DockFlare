@@ -42,7 +42,6 @@ else:
         "Content-Type": "application/json",
     }
 
-
 USE_EXTERNAL_CLOUDFLARED = os.getenv('USE_EXTERNAL_CLOUDFLARED', 'false').lower() in ['true', '1', 't', 'yes']
 EXTERNAL_TUNNEL_ID = os.getenv('EXTERNAL_TUNNEL_ID')
 SCAN_ALL_NETWORKS = os.getenv('SCAN_ALL_NETWORKS', 'false').lower() in ['true', '1', 't', 'yes']

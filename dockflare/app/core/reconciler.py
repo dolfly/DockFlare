@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 # app/core/reconciler.py
 import copy
 import logging
@@ -38,7 +38,6 @@ from app.core.access_manager import (
 from app.core.tunnel_manager import update_cloudflare_config
 
 def _get_hostname_configs_from_container(container_obj):
-    # ... (no changes in this helper function) ...
     labels = container_obj.labels
     container_id_val = container_obj.id
     container_name_val = container_obj.name
@@ -289,7 +288,6 @@ def _run_reconciliation_logic():
         duration = current_app.reconciliation_info["completed_at"] - current_app.reconciliation_info["start_time"]
         logging.info(f"[Reconcile Thread] Reconciliation complete. Duration: {duration:.2f}s. Status: {current_app.reconciliation_info['status']}")
 
-
 def reconcile_state_threaded(): 
     if not docker_client:
         logging.warning("Docker client unavailable, skipping reconciliation.")
@@ -315,7 +313,6 @@ def reconcile_state_threaded():
     )
     reconcile_thread.start()
     logging.info(f"Started reconciliation in background thread {reconcile_thread.name}")
-
 
 def cleanup_expired_rules(stop_event_param):
     logging.info("Starting cleanup task for expired rules...")

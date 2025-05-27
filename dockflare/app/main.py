@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 # app/main.py
 import copy
 import logging 
@@ -75,7 +74,7 @@ def run_all_background_tasks():
         t.start()
     
     background_threads_list.extend(threads_to_start)
-    if threads_to_start: # Only log if some threads were actually initiated
+    if threads_to_start: 
         logging.info(f"{len(threads_to_start)} background tasks initiated.")
     return threads_to_start
 
@@ -84,7 +83,7 @@ def periodic_agent_status_updater():
     while not stop_event.is_set():
         try:
             logging.debug("Running periodic agent status update check...")
-            update_cloudflared_container_status() # From tunnel_manager
+            update_cloudflared_container_status() 
         except Exception as e_status_update:
             logging.error(f"Error in periodic agent status updater loop: {e_status_update}", exc_info=True)
         
@@ -240,7 +239,6 @@ def main_application_entrypoint():
                     stop_event.set() 
                 else: 
                     time.sleep(5)
-
 
     except ImportError:
         logging.warning("Waitress not found. Using Flask development server (NOT FOR PRODUCTION).")

@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 # app/core/cloudflare_api.py
 import copy
 import logging
@@ -198,7 +198,6 @@ def get_zone_details_by_id(zone_id_to_check):
         logging.error(f"Unexpected error looking up zone ID '{zone_id_to_check}': {e}", exc_info=True)
         return None
 
-
 def find_tunnel_via_api(name):
     logging.info(f"Finding tunnel '{name}' via API on account {config.CF_ACCOUNT_ID}")
     endpoint = f"/accounts/{config.CF_ACCOUNT_ID}/cfd_tunnel"
@@ -372,7 +371,6 @@ def find_dns_record_id(zone_id, hostname, tunnel_id):
         expected_content = f"{tunnel_id}.cfargotunnel.com"
         endpoint = f"/zones/{zone_id}/dns_records"
         
-        # First, try a very specific query
         params_specific = {"type": "CNAME", "name": hostname, "content": expected_content, "match": "all"}
         try:
             logging.info(f"Searching DNS (specific): Zone={zone_id}, Type=CNAME, Name={hostname}, Content={expected_content}")
@@ -434,7 +432,6 @@ def delete_cloudflare_dns_record(zone_id, hostname, tunnel_id):
         if not record_id:
             logging.warning(f"DNS record for {hostname} in zone {zone_id} (for tunnel {tunnel_id}) not found to delete. Assuming success or already deleted.")
             return True
-        
        
         logging.info(f"Attempting to delete DNS record for {hostname} in zone {zone_id} (ID: {record_id})")
         endpoint = f"/zones/{zone_id}/dns_records/{record_id}"
@@ -471,7 +468,7 @@ def get_cloudflare_account_email():
             email = response_data.get("result", {}).get("email")
             if email:
                 logging.info(f"Successfully fetched Cloudflare account email: {email}")
-                with _cache_lock: # Protect cache write
+                with _cache_lock: 
                     _cached_account_email = email
                     _cached_account_email_timestamp = current_time
                 return email

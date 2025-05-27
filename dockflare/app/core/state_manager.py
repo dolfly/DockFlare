@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 # app/core/state_manager.py
 import json
 import logging
@@ -117,7 +117,7 @@ def save_state():
                 "source": rule.get("source", "docker")
             }
             delete_at_val = rule.get("delete_at")
-            if isinstance(delete_at_val, datetime): # Make sure datetime is imported
+            if isinstance(delete_at_val, datetime): 
                 logging.debug(f"SAVE_STATE_LOOP: THREAD: {current_thread_name}. Serializing datetime for {hostname} (value: {delete_at_val}).")
                 data_to_serialize["delete_at"] = delete_at_val.astimezone(timezone.utc).isoformat().replace('+00:00', 'Z')
             serializable_state[hostname] = data_to_serialize

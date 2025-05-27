@@ -1,4 +1,4 @@
-// app/static/js/main.js
+// app/static/js/main.js -> don't forget to review the countdown function
 
 const maxLogLines = 250;
 let initialConnectMessageCleared = false;

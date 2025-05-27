@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 # app/core/docker_handler.py
 
 import logging
@@ -240,7 +240,6 @@ def process_container_start(container_obj):
             else:
                 logging.error(f"DOCKER_HANDLER: Failed to update Cloudflare tunnel config for {container_name_val}. DNS records not managed.")
 
-
     except NotFound:
         logging.warning(f"DOCKER_HANDLER: Container {container_name_val} ({container_id_val[:12] if container_id_val else 'UnknownID'}) not found.")
     except APIError as e:
@@ -255,7 +254,7 @@ def schedule_container_stop(container_id_val):
     if not container_id_val: return
     logging.info(f"Processing stop event for container {container_id_val[:12]}.")
     
-    state_changed_after_stop_processing = False # More specific name
+    state_changed_after_stop_processing = False 
     with state_lock: 
         hostnames_affected_by_stop = []
         for hn, details in managed_rules.items(): 

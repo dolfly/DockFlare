@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
 # app/web/routes.py
 import copy
 import logging
@@ -60,11 +60,9 @@ from app.core.docker_handler import is_valid_hostname, is_valid_service
 
 bp = Blueprint('web', __name__)
 
-
 def get_display_token_ui(token_value): 
     if not token_value: return "Not available"
     return f"{token_value[:5]}...{token_value[-5:]}" if len(token_value) > 10 else "Token (short)"
-
 
 @bp.before_app_request 
 def detect_protocol_bp():
@@ -383,7 +381,6 @@ def revert_access_policy_to_labels(hostname):
     cloudflared_agent_state["last_action_status"] = action_status_message
     return redirect(url_for('web.status_page'))
 
-
 @bp.route('/tunnel-dns-records/<tunnel_id>')
 def tunnel_dns_records(tunnel_id):
     if not tunnel_id: return jsonify({"error": "Tunnel ID is required"}), 400
@@ -504,10 +501,6 @@ def stream_logs_route():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET'
     return response
-
-@bp.route('/ui/manual-rules/add', methods=['POST'])
-# app/web/routes.py
-# ... (other imports and blueprint definition) ...
 
 @bp.route('/ui/manual-rules/add', methods=['POST'])
 def ui_add_manual_rule_route():
