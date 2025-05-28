@@ -228,7 +228,7 @@
                                         <td class="p-3 whitespace-nowrap">
                                         {% set display_hostname = details.hostname_for_dns if details.hostname_for_dns else hostname.split('|')[0] %}
                                         {% set display_path = details.path if details.path else (hostname.split('|')[1] if '|' in hostname else None) %}
-                                        <a href="{{ protocol }}://{{ display_hostname }}{% if display_path %}{{ display_path }}{% endif %}" target="_blank" rel="noopener noreferrer" title="Open {{ protocol }}://{{ display_hostname }}{% if display_path %}{{ display_path }}{% endif %}" class="link link-hover link-primary text-sm">
+                                        <a href="https://{{ display_hostname }}{% if display_path %}{{ display_path }}{% endif %}" target="_blank" rel="noopener noreferrer" title="Open {{ protocol }}://{{ display_hostname }}{% if display_path %}{{ display_path }}{% endif %}" class="link link-hover link-primary text-sm">
                                            {{ display_hostname }}
                                        </a>
                                        {% if display_hostname and display_hostname.startswith('*.') %}
