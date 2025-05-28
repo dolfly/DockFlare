@@ -226,13 +226,14 @@
                                             {% endif %}
                                         </td>
                                         <td class="p-3 whitespace-nowrap">
-                                            <a href="https://{{ hostname }}{{ details.path if details.path else '' }}" target="_blank" rel="noopener noreferrer" title="Open https://{{ hostname }}{{ details.path if details.path else '' }}" class="link link-hover link-primary text-sm">
-                                               {{ hostname }}
+                                            <a href="{{ protocol }}://{{ details.hostname_for_dns }}{{ details.path if details.path else '' }}" target="_blank" rel="noopener noreferrer" title="Open {{ protocol }}://{{ details.hostname_for_dns }}{{ details.path if details.path else '' }}" class="link link-hover link-primary text-sm">
+                                               {{ details.hostname_for_dns }}
                                            </a>
-                                           {% if hostname.startswith('*.') %}
+                                           {% if details.hostname_for_dns and details.hostname_for_dns.startswith('*.') %}
                                            <span class="badge badge-info badge-xs ml-2">wildcard</span>
                                            {% endif %}
                                        </td>
+                                       {# Path Column (already correct) #}
                                        <td class="p-3 whitespace-nowrap">
                                             {% if details.path and details.path.strip() %}
                                                 <code class="text-xs opacity-70">{{ details.path }}</code>
