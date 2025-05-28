@@ -323,11 +323,12 @@
                                         </td>
                                         <td class="p-3 whitespace-nowrap text-sm" style="min-width: 80px;">
                                             {% if details.source == 'manual' %}
-                                                <form action="{{ url_for('web.ui_delete_manual_rule_route', rule_key_from_url=rule_key) }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule for {{ hostname }}?');" class="protocol-aware-form">
+                                                <form action="{{ url_for('web.ui_delete_manual_rule_route', rule_key_from_url=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to delete the manual rule for {{ details.hostname_for_dns }}{{ details.path if details.path else \'\' }}?');" class="protocol-aware-form">
                                                     <button type="submit" class="btn btn-xs btn-error btn-outline">Delete</button>
                                                 </form>
                                             {% else %}
-                                                <form action="{{ url_for('web.force_delete_rule_route', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ hostname }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
+                                                {# Force delete for Docker rules - uses 'hostname' which is the rule_key #}
+                                                <form action="{{ url_for('web.force_delete_rule_route', hostname=hostname) }}" method="post" onsubmit="return confirm('Are you sure you want to force delete the rule and DNS record for {{ details.hostname_for_dns }}{{ details.path if details.path else \'\' }} immediately? This bypasses the grace period.');" class="protocol-aware-form">
                                                     <button type="submit" class="btn btn-xs btn-error btn-outline" {{ 'disabled' if not docker_available else '' }}>Delete</button>
                                                 </form>
                                             {% endif %}
