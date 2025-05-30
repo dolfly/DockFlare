@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request, current_app
 
 from app import config, docker_client, tunnel_state, cloudflared_agent_state, log_queue
-from app.core.state_manager import managed_rules, state_lock, save_state # Removed load_state, not typically API triggered
+from app.core.state_manager import managed_rules, state_lock, save_state
 from app.core.tunnel_manager import (
     start_cloudflared_container,
     stop_cloudflared_container,
