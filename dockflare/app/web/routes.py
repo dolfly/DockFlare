@@ -638,6 +638,8 @@ def ui_delete_manual_rule_route(rule_key_from_url):
         cloudflared_agent_state["last_action_status"] = "Error: System not ready to delete manual rule. Docker client unavailable."
         return redirect(url_for('web.status_page'))
     
+    fqdn_for_dns = rule_key_from_url.split('|')[0]
+    
     effective_tunnel_id = tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
     if not effective_tunnel_id: 
         cloudflared_agent_state["last_action_status"] = "Error: System not ready to delete manual rule. Tunnel not initialized or ID missing."
@@ -648,7 +650,6 @@ def ui_delete_manual_rule_route(rule_key_from_url):
     
     zone_id_for_delete = None
     access_app_id_for_delete = None
-    hostname_for_dns_operations = None 
     rule_existed_as_manual_and_deleted = False 
 
     with state_lock:
@@ -657,7 +658,6 @@ def ui_delete_manual_rule_route(rule_key_from_url):
             logging.info(f"Found manual rule for {rule_key_in_state} to delete. Details: {rule_details}")
             zone_id_for_delete = rule_details.get("zone_id")
             access_app_id_for_delete = rule_details.get("access_app_id")
-            hostname_for_dns_operations = rule_details.get("hostname_for_dns") 
             
             del managed_rules[rule_key_in_state]
             save_state() 
@@ -677,33 +677,33 @@ def ui_delete_manual_rule_route(rule_key_from_url):
         access_app_deleted_successfully = False
         
         should_delete_dns_record = True
-        if hostname_for_dns_operations: 
+        if fqdn_for_dns: 
             with state_lock: 
-                for other_key, other_rule in managed_rules.items():
-                    if other_rule.get("hostname_for_dns") == hostname_for_dns_operations:
+                for other_key in managed_rules.keys():
+                    if other_key.split('|')[0] == fqdn_for_dns:
                         should_delete_dns_record = False 
-                        logging.info(f"DNS for {hostname_for_dns_operations} will NOT be deleted as other rules still use it (e.g., {other_key}).")
+                        logging.info(f"DNS for {fqdn_for_dns} will NOT be deleted as other rules still use it (e.g., {other_key}).")
                         break
         else:
             should_delete_dns_record = False 
-            logging.warning(f"Cannot perform DNS deletion for rule {rule_key_in_state} as 'hostname_for_dns' was not found in rule details.")
+            logging.error(f"Cannot perform DNS deletion as FQDN could not be parsed from rule key {rule_key_in_state}.")
 
-        if should_delete_dns_record and zone_id_for_delete and hostname_for_dns_operations: 
-            logging.info(f"Attempting DNS delete for {hostname_for_dns_operations} (from rule {rule_key_in_state}) in zone {zone_id_for_delete}")
-            if delete_cloudflare_dns_record(zone_id_for_delete, hostname_for_dns_operations, effective_tunnel_id):
+        if should_delete_dns_record and zone_id_for_delete and fqdn_for_dns: 
+            logging.info(f"Attempting DNS delete for {fqdn_for_dns} (from rule {rule_key_in_state}) in zone {zone_id_for_delete}")
+            if delete_cloudflare_dns_record(zone_id_for_delete, fqdn_for_dns, effective_tunnel_id):
                 dns_deleted_successfully = True
-                logging.info(f"DNS record for {hostname_for_dns_operations} deleted successfully.")
+                logging.info(f"DNS record for {fqdn_for_dns} deleted successfully.")
             else:
-                logging.error(f"Failed to delete DNS record for {hostname_for_dns_operations}.")
+                logging.error(f"Failed to delete DNS record for {fqdn_for_dns}.")
         elif not should_delete_dns_record:
             dns_deleted_successfully = True 
-            if hostname_for_dns_operations: 
-                 logging.info(f"DNS deletion for {hostname_for_dns_operations} skipped.")
+            if fqdn_for_dns: 
+                 logging.info(f"DNS deletion for {fqdn_for_dns} skipped because it's still in use.")
 
         if access_app_id_for_delete: 
             logging.info(f"Attempting Access App delete for manual rule {rule_key_in_state}, App ID {access_app_id_for_delete}")
             is_app_id_shared = False
-            with state_lock: # Re-acquire lock
+            with state_lock: 
                 for other_key, other_rule in managed_rules.items():
                     if other_rule.get("access_app_id") == access_app_id_for_delete:
                         is_app_id_shared = True
