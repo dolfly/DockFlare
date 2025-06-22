@@ -18,22 +18,9 @@ services:
       - STATE_FILE_PATH=/app/data/state.json
       - TZ=Europe/Zurich  # Set your timezone here
     #labels: # Optional
-    #- cloudflare.tunnel.enable=true
-    #- cloudflare.tunnel.hostname=dockflare.yourdomain.tld
-    #- cloudflare.tunnel.service=http://dockflare:5000  
-    # cloudflare.tunnel.access.policy: "authenticate"
-    #cloudflare.tunnel.access.app_launcher_visible: "false"
-    #cloudflare.tunnel.access.name: "Custom Rules" # Example for Custom Rule Access authentication via Email and Allow a specifiy IP - You can change everything in UI as well.
-    #cloudflare.tunnel.access.custom_rules: '[{"name": "Allow Specific Email", "decision": "allow", "include": [{"email": {"email": "your@email.com"}}]},{"name": "Allow Your IP", "decision": "allow", "include": [{"ip": {"ip": "YOURIP/32"}}]},{"name": "Deny Everyone Else", "decision": "deny", "include": [{"everyone": {}}]}]'
-    # Container Scanning:
-    # - SCAN_ALL_NETWORKS=true  # Scan containers across all Docker networks
-    # For reverse proxy usage:
-    # - TRUSTED_PROXIES=172.16.0.0/12  # IP range of your proxy servers
-    # For external cloudflared:
-    # - USE_EXTERNAL_CLOUDFLARED=true
-    # - EXTERNAL_TUNNEL_ID=your-external-tunnel-id
-    # SSL verification for origin services:
-    # - DEFAULT_NO_TLS_VERIFY=false  # Set to true to skip SSL verification for all services         
+    #- dockflare.enable=true
+    #- dockflare.hostname=dockflare.yourdomain.tld
+    #- dockflare.service=http://dockflare:5000  
 volumes:
   dockflare_data:
 networks:
