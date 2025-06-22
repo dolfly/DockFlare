@@ -29,7 +29,7 @@ from app.core.state_manager import managed_rules, state_lock, save_state
 from app.core.tunnel_manager import update_cloudflare_config
 from app.core.cloudflare_api import create_cloudflare_dns_record, get_zone_id_from_name
 from app.core.access_manager import handle_access_policy_from_labels
-from app.core.utils import get_rule_key
+from app.core.utils import get_rule_key, get_label
 
 def is_valid_hostname(hostname): 
     if not hostname: return False
@@ -101,29 +101,27 @@ def process_container_start(container_obj):
         container_name_val = container_obj.name
         logging.info(f"DOCKER_HANDLER_PROCESS_START: Processing container {container_name_val} ({container_id_val[:12]})")
         labels = container_obj.labels
-        
-        enabled_label_key = f"{config.LABEL_PREFIX}.enable"
-        is_enabled = labels.get(enabled_label_key, "false").lower() in ["true", "1", "t", "yes"]
+        is_enabled = get_label(labels, "enable", "false").lower() in ["true", "1", "t", "yes"]
         if not is_enabled:
-            logging.debug(f"DOCKER_HANDLER: Ignoring start: {container_name_val} ({container_id_val[:12]}): '{enabled_label_key}' not true.")
+            logging.debug(f"DOCKER_HANDLER: Ignoring start: {container_name_val} ({container_id_val[:12]}): 'enable' label not true.")
             return
 
         hostnames_to_process = []
         
-        default_path_label = labels.get(f"{config.LABEL_PREFIX}.path") 
-        default_originsrvname_label = labels.get(f"{config.LABEL_PREFIX}.originsrvname")
-        default_access_policy_type_label = labels.get(f"{config.LABEL_PREFIX}.access.policy")
-        default_access_app_name_label = labels.get(f"{config.LABEL_PREFIX}.access.name")
-        default_access_session_duration_label = labels.get(f"{config.LABEL_PREFIX}.access.session_duration", "24h")
-        default_access_app_launcher_visible_label = labels.get(f"{config.LABEL_PREFIX}.access.app_launcher_visible", "false").lower() in ["true", "1", "t", "yes"]
-        default_access_allowed_idps_label_str = labels.get(f"{config.LABEL_PREFIX}.access.allowed_idps")
-        default_access_auto_redirect_label = labels.get(f"{config.LABEL_PREFIX}.access.auto_redirect_to_identity", "false").lower() in ["true", "1", "t", "yes"]
-        default_access_custom_rules_label_str = labels.get(f"{config.LABEL_PREFIX}.access.custom_rules")
+        default_path_label = get_label(labels, "path") 
+        default_originsrvname_label = get_label(labels, "originsrvname")
+        default_access_policy_type_label = get_label(labels, "access.policy")
+        default_access_app_name_label = get_label(labels, "access.name")
+        default_access_session_duration_label = get_label(labels, "access.session_duration", "24h")
+        default_access_app_launcher_visible_label = get_label(labels, "access.app_launcher_visible", "false").lower() in ["true", "1", "t", "yes"]
+        default_access_allowed_idps_label_str = get_label(labels, "access.allowed_idps")
+        default_access_auto_redirect_label = get_label(labels, "access.auto_redirect_to_identity", "false").lower() in ["true", "1", "t", "yes"]
+        default_access_custom_rules_label_str = get_label(labels, "access.custom_rules")
 
-        hostname_label = labels.get(f"{config.LABEL_PREFIX}.hostname")
-        service_label = labels.get(f"{config.LABEL_PREFIX}.service")
-        zone_name_label = labels.get(f"{config.LABEL_PREFIX}.zonename")
-        no_tls_verify_label = labels.get(f"{config.LABEL_PREFIX}.no_tls_verify", "false").lower() in ["true", "1", "t", "yes"]
+        hostname_label = get_label(labels, "hostname")
+        service_label = get_label(labels, "service")
+        zone_name_label = get_label(labels, "zonename")
+        no_tls_verify_label = get_label(labels, "no_tls_verify", "false").lower() in ["true", "1", "t", "yes"]
         
         if hostname_label and service_label:
             if is_valid_hostname(hostname_label) and is_valid_service(service_label):
@@ -143,30 +141,29 @@ def process_container_start(container_obj):
         
         index = 0
         while True:
-            prefix = f"{config.LABEL_PREFIX}.{index}"
-            hostname_indexed = labels.get(f"{prefix}.hostname")
+            hostname_indexed = get_label(labels, f"{index}.hostname")
             if not hostname_indexed: break
                 
-            service_indexed = labels.get(f"{prefix}.service", service_label) 
+            service_indexed = get_label(labels, f"{index}.service", service_label) 
             if not service_indexed: 
                 logging.warning(f"DOCKER_HANDLER: Indexed hostname {hostname_indexed} for {container_name_val} missing service, skipping index {index}.")
                 index += 1; continue
             
-            path_indexed = labels.get(f"{prefix}.path", default_path_label) 
-            zone_name_indexed = labels.get(f"{prefix}.zonename", zone_name_label)
-            no_tls_verify_indexed_val = labels.get(f"{prefix}.no_tls_verify", str(no_tls_verify_label).lower())
+            path_indexed = get_label(labels, f"{index}.path", default_path_label) 
+            zone_name_indexed = get_label(labels, f"{index}.zonename", zone_name_label)
+            no_tls_verify_indexed_val = get_label(labels, f"{index}.no_tls_verify", str(no_tls_verify_label).lower())
             no_tls_verify_indexed = no_tls_verify_indexed_val.lower() in ["true", "1", "t", "yes"]
-            originsrvname_indexed_val = labels.get(f"{prefix}.originsrvname", default_originsrvname_label)
+            originsrvname_indexed_val = get_label(labels, f"{index}.originsrvname", default_originsrvname_label)
             
-            access_policy_type_indexed = labels.get(f"{prefix}.access.policy", default_access_policy_type_label)
-            access_app_name_indexed = labels.get(f"{prefix}.access.name", default_access_app_name_label)
-            access_session_duration_indexed = labels.get(f"{prefix}.access.session_duration", default_access_session_duration_label)
-            acc_launcher_val_idx = labels.get(f"{prefix}.access.app_launcher_visible", str(default_access_app_launcher_visible_label).lower())
+            access_policy_type_indexed = get_label(labels, f"{index}.access.policy", default_access_policy_type_label)
+            access_app_name_indexed = get_label(labels, f"{index}.access.name", default_access_app_name_label)
+            access_session_duration_indexed = get_label(labels, f"{index}.access.session_duration", default_access_session_duration_label)
+            acc_launcher_val_idx = get_label(labels, f"{index}.access.app_launcher_visible", str(default_access_app_launcher_visible_label).lower())
             access_app_launcher_visible_indexed = acc_launcher_val_idx.lower() in ["true", "1", "t", "yes"]
-            access_allowed_idps_indexed_str = labels.get(f"{prefix}.access.allowed_idps", default_access_allowed_idps_label_str)
-            acc_redirect_val_idx = labels.get(f"{prefix}.access.auto_redirect_to_identity", str(default_access_auto_redirect_label).lower())
+            access_allowed_idps_indexed_str = get_label(labels, f"{index}.access.allowed_idps", default_access_allowed_idps_label_str)
+            acc_redirect_val_idx = get_label(labels, f"{index}.access.auto_redirect_to_identity", str(default_access_auto_redirect_label).lower())
             access_auto_redirect_indexed = acc_redirect_val_idx.lower() in ["true", "1", "t", "yes"]
-            access_custom_rules_indexed_str = labels.get(f"{prefix}.access.custom_rules", default_access_custom_rules_label_str)
+            access_custom_rules_indexed_str = get_label(labels, f"{index}.access.custom_rules", default_access_custom_rules_label_str)
 
             if is_valid_hostname(hostname_indexed) and is_valid_service(service_indexed):
                 hostnames_to_process.append({
@@ -183,7 +180,6 @@ def process_container_start(container_obj):
                     "access_custom_rules_str": access_custom_rules_indexed_str
                 })
             index += 1
-        
         if not hostnames_to_process:
             logging.warning(f"DOCKER_HANDLER: No valid hostname configs for {container_name_val} ({container_id_val[:12]}).")
             return
@@ -295,16 +291,13 @@ def process_container_start(container_obj):
                 logging.info(f"DOCKER_HANDLER: Tunnel config update successful for container {container_name_val}.")
                 effective_tunnel_id = tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
                 if effective_tunnel_id:
-                    for config_item_dns in hostnames_to_process: 
-                        hostname_dns = config_item_dns["hostname"]
-                        path_dns = config_item_dns.get("path")
-                        rule_key_dns = get_rule_key(hostname_dns, path_dns)
+                    hostnames_for_dns_check = set(item["hostname"] for item in hostnames_to_process)
+                    for hostname_dns in hostnames_for_dns_check:
+                        config_item_dns = next((item for item in hostnames_to_process if item["hostname"] == hostname_dns), None)
+                        if not config_item_dns: continue
                         
                         zone_name_dns_item = config_item_dns["zone_name"]
                         target_zone_id_for_dns_item = get_zone_id_from_name(zone_name_dns_item) if zone_name_dns_item else config.CF_ZONE_ID
-                        
-                        if managed_rules.get(rule_key_dns, {}).get("source") == "manual": continue
-                        
                         if target_zone_id_for_dns_item:
                             dns_record_id_status = create_cloudflare_dns_record(target_zone_id_for_dns_item, hostname_dns, effective_tunnel_id)
                             if dns_record_id_status and dns_record_id_status not in ["semaphore_timeout", "existing_record_unconfirmed"]:
@@ -397,14 +390,13 @@ def docker_event_listener(stop_event_param):
                         for attempt in range(3): 
                             try:
                                 container_instance = docker_client.containers.get(cont_id)
-                                if attempt == 0 and not container_instance.labels.get(f"{config.LABEL_PREFIX}.enable"):
-                                     time.sleep(0.2) 
-                                     container_instance.reload()
-                                if container_instance.labels.get(f"{config.LABEL_PREFIX}.hostname") or container_instance.labels.get(f"{config.LABEL_PREFIX}.0.hostname"): 
+                                container_instance.reload() # Reload to get fresh labels
+                                
+                                if get_label(container_instance.labels, "enable"): 
                                     logging.debug(f"Container {cont_id[:12]} details retrieved on attempt {attempt+1}.")
                                     break 
                                 else:
-                                    logging.debug(f"Container {cont_id[:12]} found but key labels missing, retrying ({attempt+1}/3)...")
+                                    logging.debug(f"Container {cont_id[:12]} found but key 'enable' label missing, retrying ({attempt+1}/3)...")
                             except NotFound:
                                 logging.debug(f"Container {cont_id[:12]} not found on attempt {attempt+1}, retrying...")
                             except APIError as e_get_cont:
@@ -418,7 +410,7 @@ def docker_event_listener(stop_event_param):
                                 break 
                             
                             if attempt < 2: time.sleep(0.2 * (attempt + 1)) 
-                            else: logging.warning(f"Failed to get container {cont_id[:12]} details or key labels after multiple attempts.")
+                            else: logging.warning(f"Failed to get container {cont_id[:12]} details or key 'enable' label after multiple attempts.")
                         
                         if container_instance:
                             try:

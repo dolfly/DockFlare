@@ -16,10 +16,43 @@
 #
 # app/core/utils.py
 
+from app import config
+
 def get_rule_key(hostname, path):
-    """
-    Generates a unique key for a rule based on its hostname and path.
-    A None or empty path is treated as the root.
-    """
+    # ... (this function remains the same)
     path_str = str(path or "").strip()
     return f"{hostname}|{path_str}"
+
+def get_label(labels, key_suffix, default=None):
+    """
+    Gets a label value by checking prefixes in a specific order:
+    1. User-defined custom prefix (from LABEL_PREFIX env var)
+    2. The new 'dockflare.' prefix
+    3. The legacy 'cloudflare.tunnel.' prefix
+    
+    Args:
+        labels (dict): The dictionary of container labels.
+        key_suffix (str): The part of the label after the prefix (e.g., 'enable', '0.hostname').
+        default: The value to return if no label is found.
+
+    Returns:
+        The value of the found label or the default.
+    """
+    # 1. Check for a user-defined custom prefix first.
+    if config.CUSTOM_LABEL_PREFIX:
+        custom_key = f"{config.CUSTOM_LABEL_PREFIX.rstrip('.')}.{key_suffix}"
+        if custom_key in labels:
+            return labels[custom_key]
+
+    # 2. Check for the new, primary prefix.
+    primary_key = f"{config.PRIMARY_LABEL_PREFIX}{key_suffix}"
+    if primary_key in labels:
+        return labels[primary_key]
+
+    # 3. Fall back to the legacy prefix.
+    legacy_key = f"{config.LEGACY_LABEL_PREFIX}{key_suffix}"
+    if legacy_key in labels:
+        return labels[legacy_key]
+
+    # 4. If nothing is found, return the default.
+    return default

@@ -36,7 +36,7 @@ from app.core.access_manager import (
     delete_cloudflare_access_application 
 )
 from app.core.tunnel_manager import update_cloudflare_config
-from app.core.utils import get_rule_key
+from app.core.utils import get_rule_key, get_label
 
 def _get_hostname_configs_from_container(container_obj):
     labels = container_obj.labels
@@ -45,20 +45,20 @@ def _get_hostname_configs_from_container(container_obj):
     
     hostnames_configs = []
 
-    default_path_label = labels.get(f"{config.LABEL_PREFIX}.path") 
-    default_originsrvname_label = labels.get(f"{config.LABEL_PREFIX}.originsrvname")
-    default_access_policy_type = labels.get(f"{config.LABEL_PREFIX}.access.policy")
-    default_access_app_name = labels.get(f"{config.LABEL_PREFIX}.access.name")
-    default_session_duration = labels.get(f"{config.LABEL_PREFIX}.access.session_duration", "24h")
-    default_app_launcher_visible = labels.get(f"{config.LABEL_PREFIX}.access.app_launcher_visible", "false").lower() in ["true", "1", "t", "yes"]
-    default_allowed_idps_str = labels.get(f"{config.LABEL_PREFIX}.access.allowed_idps")
-    default_auto_redirect = labels.get(f"{config.LABEL_PREFIX}.access.auto_redirect_to_identity", "false").lower() in ["true", "1", "t", "yes"]
-    default_custom_rules_str = labels.get(f"{config.LABEL_PREFIX}.access.custom_rules")
+    default_path_label = get_label(labels, "path")
+    default_originsrvname_label = get_label(labels, "originsrvname")
+    default_access_policy_type = get_label(labels, "access.policy")
+    default_access_app_name = get_label(labels, "access.name")
+    default_session_duration = get_label(labels, "access.session_duration", "24h")
+    default_app_launcher_visible = get_label(labels, "access.app_launcher_visible", "false").lower() in ["true", "1", "t", "yes"]
+    default_allowed_idps_str = get_label(labels, "access.allowed_idps")
+    default_auto_redirect = get_label(labels, "access.auto_redirect_to_identity", "false").lower() in ["true", "1", "t", "yes"]
+    default_custom_rules_str = get_label(labels, "access.custom_rules")
 
-    h_main = labels.get(f"{config.LABEL_PREFIX}.hostname")
-    s_main = labels.get(f"{config.LABEL_PREFIX}.service")
-    zn_main = labels.get(f"{config.LABEL_PREFIX}.zonename")
-    ntv_main_str = labels.get(f"{config.LABEL_PREFIX}.no_tls_verify", "false")
+    h_main = get_label(labels, "hostname")
+    s_main = get_label(labels, "service")
+    zn_main = get_label(labels, "zonename")
+    ntv_main_str = get_label(labels, "no_tls_verify", "false")
     ntv_main = ntv_main_str.lower() in ["true", "1", "t", "yes"]
 
     if h_main and s_main: 
@@ -79,29 +79,28 @@ def _get_hostname_configs_from_container(container_obj):
 
     idx = 0
     while True: 
-        pfx = f"{config.LABEL_PREFIX}.{idx}"
-        h_idx = labels.get(f"{pfx}.hostname")
+        h_idx = get_label(labels, f"{idx}.hostname")
         if not h_idx: break
         
-        s_idx = labels.get(f"{pfx}.service", s_main)
+        s_idx = get_label(labels, f"{idx}.service", s_main)
         if not s_idx: 
             idx += 1; continue
             
-        path_idx = labels.get(f"{pfx}.path", default_path_label) 
-        zn_idx = labels.get(f"{pfx}.zonename", zn_main)
-        ntv_idx_str = labels.get(f"{pfx}.no_tls_verify", ntv_main_str) 
+        path_idx = get_label(labels, f"{idx}.path", default_path_label) 
+        zn_idx = get_label(labels, f"{idx}.zonename", zn_main)
+        ntv_idx_str = get_label(labels, f"{idx}.no_tls_verify", ntv_main_str) 
         ntv_idx = ntv_idx_str.lower() in ["true", "1", "t", "yes"]
-        osn_idx_val = labels.get(f"{pfx}.originsrvname", default_originsrvname_label)
+        osn_idx_val = get_label(labels, f"{idx}.originsrvname", default_originsrvname_label)
 
-        acc_pol_idx = labels.get(f"{pfx}.access.policy", default_access_policy_type)
-        acc_name_idx = labels.get(f"{pfx}.access.name", default_access_app_name)
-        acc_sess_idx = labels.get(f"{pfx}.access.session_duration", default_session_duration)
-        acc_vis_idx_str = labels.get(f"{pfx}.access.app_launcher_visible", str(default_app_launcher_visible).lower())
+        acc_pol_idx = get_label(labels, f"{idx}.access.policy", default_access_policy_type)
+        acc_name_idx = get_label(labels, f"{idx}.access.name", default_access_app_name)
+        acc_sess_idx = get_label(labels, f"{idx}.access.session_duration", default_session_duration)
+        acc_vis_idx_str = get_label(labels, f"{idx}.access.app_launcher_visible", str(default_app_launcher_visible).lower())
         acc_vis_idx = acc_vis_idx_str.lower() in ["true", "1", "t", "yes"]
-        acc_idps_idx = labels.get(f"{pfx}.access.allowed_idps", default_allowed_idps_str)
-        acc_redir_idx_str = labels.get(f"{pfx}.access.auto_redirect_to_identity", str(default_auto_redirect).lower())
+        acc_idps_idx = get_label(labels, f"{idx}.access.allowed_idps", default_allowed_idps_str)
+        acc_redir_idx_str = get_label(labels, f"{idx}.access.auto_redirect_to_identity", str(default_auto_redirect).lower())
         acc_redir_idx = acc_redir_idx_str.lower() in ["true", "1", "t", "yes"]
-        acc_custom_idx = labels.get(f"{pfx}.access.custom_rules", default_custom_rules_str)
+        acc_custom_idx = get_label(labels, f"{idx}.access.custom_rules", default_custom_rules_str)
         
         hostnames_configs.append({
             "hostname": h_idx, "service": s_idx, "zone_name": zn_idx, 
@@ -156,7 +155,7 @@ def _run_reconciliation_logic():
                 for c_obj in batch:
                     try:
                         c_obj.reload() 
-                        if c_obj.labels.get(f"{config.LABEL_PREFIX}.enable", "false").lower() in ["true", "1", "t", "yes"]:
+                        if get_label(c_obj.labels, "enable", "false").lower() in ["true", "1", "t", "yes"]:
                             configs = _get_hostname_configs_from_container(c_obj)
                             for conf_item in configs:
                                 rule_key = get_rule_key(conf_item["hostname"], conf_item.get("path"))
