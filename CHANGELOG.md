@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.9.1] - 2025-06-23
+
+### Added
+- **Prometheus Metrics Endpoint:** Added support for enabling the Prometheus metrics endpoint on the managed `cloudflared` agent via the new `CLOUDFLARED_METRICS_PORT` environment variable. The agent container will be automatically reconciled if this setting is added, changed, or removed.
+
 ## [1.9.0] - 2025-06-23
 
 ### Fixed
