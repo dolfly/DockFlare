@@ -342,98 +342,94 @@ def cleanup_expired_rules(stop_event_param):
         next_check_time = time.time() + config.CLEANUP_INTERVAL_SECONDS
         try:
             logging.debug("Running cleanup check for expired rules...")
-            rules_to_process_for_deletion = {}
+            rules_to_delete_keys = []
             now_utc = datetime.now(timezone.utc)
             state_changed_in_cleanup = False
 
             with state_lock:
-                for rule_key, details in list(managed_rules.items()): 
+                for rule_key, details in managed_rules.items():
                     if details.get("status") == "pending_deletion" and details.get("source", "docker") == "docker":
                         delete_at = details.get("delete_at")
-                        is_expired = False
                         if isinstance(delete_at, datetime):
                             delete_at_utc = delete_at.astimezone(timezone.utc) if delete_at.tzinfo else delete_at.replace(tzinfo=timezone.utc)
                             if delete_at_utc <= now_utc:
-                                is_expired = True
-                        else: 
-                            logging.warning(f"Rule {rule_key} pending delete but has invalid/missing delete_at: {delete_at}. Marking for immediate deletion.")
-                            is_expired = True
-                        
-                        if is_expired:
-                            rules_to_process_for_deletion[rule_key] = {
-                                "hostname": details.get("hostname"),
-                                "zone_id": details.get("zone_id", config.CF_ZONE_ID), 
-                                "access_app_id": details.get("access_app_id")
-                            }
-                    elif details.get("source") == "manual" and details.get("status") == "pending_deletion":
+                                rules_to_delete_keys.append(rule_key)
+                        else:
+                            logging.warning(f"Rule {rule_key} pending delete but has invalid/missing delete_at. Marking for immediate deletion.")
+                            rules_to_delete_keys.append(rule_key)
+                
+                for rule_key, details in managed_rules.items():
+                    if details.get("source") == "manual" and details.get("status") == "pending_deletion":
                         logging.warning(f"Manual rule {rule_key} found 'pending_deletion'. Resetting to 'active'.")
-                        details["status"] = "active"; details["delete_at"] = None
+                        details["status"] = "active"
+                        details["delete_at"] = None
                         state_changed_in_cleanup = True
             
-            if state_changed_in_cleanup and not rules_to_process_for_deletion: 
+            if state_changed_in_cleanup and not rules_to_delete_keys:
                 save_state()
 
-            if rules_to_process_for_deletion:
-                rule_keys_fully_cleaned = []
-                effective_tunnel_id_cleanup = tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
-                
-                with state_lock: 
-                    for rule_key, delete_info in rules_to_process_for_deletion.items():
-                        hostname_del = delete_info.get("hostname")
-                        zone_id_del = delete_info["zone_id"]
-                        access_app_id_del = delete_info["access_app_id"]
-                        is_hostname_shared = any(
-                            k not in rules_to_process_for_deletion and r.get("hostname") == hostname_del
-                            for k, r in managed_rules.items()
-                        )
+            if rules_to_delete_keys:
+                logging.info(f"Found {len(rules_to_delete_keys)} expired rules to process: {rules_to_delete_keys}")
+                effective_tunnel_id = tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
 
-                        if not is_hostname_shared:
-                            if zone_id_del and effective_tunnel_id_cleanup and hostname_del:
-                                logging.info(f"Hostname '{hostname_del}' is no longer used by any active rules. Deleting DNS record.")
-                                if not delete_cloudflare_dns_record(zone_id_del, hostname_del, effective_tunnel_id_cleanup):
-                                    logging.error(f"Failed DNS delete for expired rule's hostname {hostname_del} in zone {zone_id_del}.")
-                            else:
-                                logging.warning(f"Skipping DNS delete for {hostname_del or rule_key}: missing required info.")
-                        else:
-                            logging.info(f"Skipping DNS delete for '{hostname_del}'; it is still in use by other rules.")
+                rules_being_deleted = {}
+                with state_lock:
+                    for key in rules_to_delete_keys:
+                        if key in managed_rules:
+                            rules_being_deleted[key] = managed_rules[key]
 
-                        is_app_id_shared = any(
-                            k not in rules_to_process_for_deletion and r.get("access_app_id") == access_app_id_del
-                            for k, r in managed_rules.items()
-                        )
+                for rule_key, delete_info in rules_being_deleted.items():
+                    hostname_del = delete_info.get("hostname")
+                    access_app_id_del = delete_info.get("access_app_id")
 
-                        if access_app_id_del and not is_app_id_shared:
-                            logging.info(f"Access App ID '{access_app_id_del}' is no longer used by any active rules. Deleting application.")
-                            if not delete_cloudflare_access_application(access_app_id_del):
-                                logging.error(f"Failed Access App delete for {hostname_del or rule_key}, App ID: {access_app_id_del}.")
-                        elif access_app_id_del:
-                             logging.info(f"Skipping Access App delete for ID '{access_app_id_del}'; it is still in use by other rules.")
+                    is_hostname_still_used = any(
+                        k not in rules_to_delete_keys and r.get("hostname") == hostname_del
+                        for k, r in managed_rules.items()
+                    )
+                    
+                    if hostname_del and not is_hostname_still_used:
+                        logging.info(f"Hostname '{hostname_del}' is no longer used. Deleting its DNS record.")
+                        delete_cloudflare_dns_record(delete_info.get("zone_id"), hostname_del, effective_tunnel_id)
+                    elif hostname_del:
+                        logging.info(f"Skipping DNS delete for '{hostname_del}' as it is still used by other rules.")
+                    
+                    is_app_id_still_used = any(
+                        k not in rules_to_delete_keys and r.get("access_app_id") == access_app_id_del
+                        for k, r in managed_rules.items()
+                    )
+                    
+                    if access_app_id_del and not is_app_id_still_used:
+                        logging.info(f"Access App ID '{access_app_id_del}' is no longer used. Deleting it.")
+                        delete_cloudflare_access_application(access_app_id_del)
+                    elif access_app_id_del:
+                        logging.info(f"Skipping Access App delete for '{access_app_id_del}' as it is still used by other rules.")
 
-                        rule_keys_fully_cleaned.append(rule_key)
-                if rule_keys_fully_cleaned:
-                    config_updated_after_delete = False
-                    if not config.USE_EXTERNAL_CLOUDFLARED:
-                        if update_cloudflare_config(): 
-                            config_updated_after_delete = True
-                        else:
-                            logging.error("Failed to update Cloudflare tunnel config during rule cleanup. Rules will remain in local state temporarily.")
-                    else: 
-                        config_updated_after_delete = True 
+                config_updated = False
+                if not config.USE_EXTERNAL_CLOUDFLARED:
+                    logging.info("Updating Cloudflare config to remove expired ingress rules...")
+                    if update_cloudflare_config():
+                        config_updated = True
+                    else:
+                        logging.error("Failed to update Cloudflare tunnel config during rule cleanup. Rules will remain in local state temporarily.")
+                else:
+                    config_updated = True
 
-                    if config_updated_after_delete:
-                        with state_lock:
-                            deleted_count = 0
-                            for rule_key_rem in rule_keys_fully_cleaned:
-                                if rule_key_rem in managed_rules and managed_rules[rule_key_rem].get("status") == "pending_deletion":
-                                    del managed_rules[rule_key_rem]
-                                    deleted_count += 1
-                            if deleted_count > 0:
-                                logging.info(f"Removed {deleted_count} rules from local state after cleanup.")
-                                save_state()
+                if config_updated:
+                    with state_lock:
+                        deleted_count = 0
+                        for key in rules_to_delete_keys:
+                            if key in managed_rules:
+                                del managed_rules[key]
+                                deleted_count += 1
+                        if deleted_count > 0:
+                            logging.info(f"Removed {deleted_count} expired rules from local state.")
+                            save_state()
+                            
         except Exception as e_cleanup:
             logging.error(f"Error in cleanup task loop: {e_cleanup}", exc_info=True)
 
         wait_duration = max(0, next_check_time - time.time())
-        if not stop_event_param.is_set(): stop_event_param.wait(wait_duration)
+        if not stop_event_param.is_set():
+            stop_event_param.wait(wait_duration)
 
     logging.info("Cleanup task for expired rules stopped.")
