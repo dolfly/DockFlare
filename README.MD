@@ -2,7 +2,7 @@
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://github.com/ChrispyBacon-dev/DockFlare)
 [![OS](https://img.shields.io/badge/os-linux%20%7C%20windows%20%7C%20macos-brightgreen)]()
 [![CPU Architectures](https://img.shields.io/badge/CPU-x86_64%20%7C%20arm64-brightgreen)](https://en.wikipedia.org/wiki/Central_processing_unit)
-[![Generic badge](https://img.shields.io/badge/Release-1.9.0-blue.svg)](https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v1.8.9)
+[![Generic badge](https://img.shields.io/badge/Release-1.9.1-blue.svg)](https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v1.8.9)
 [![Docker Pulls](https://img.shields.io/docker/pulls/alplat/dockflare)](https://hub.docker.com/r/alplat/dockflare)
 [![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 [![GitHub issues](https://img.shields.io/github/issues/ChrispyBacon-dev/dockflare)](https://github.com/ChrispyBacon-dev/dockflare/issues)
@@ -152,6 +152,129 @@ DockFlare simplifies Cloudflare Tunnel and Zero Trust Access policy management b
     ```
 
 4.  **Access the Web UI**: Open `http://your-server-ip:5000` in your browser.
+
+---
+
+## ✨ Prometheus Metrics & Observability
+
+DockFlare supports exporting the native Prometheus metrics from the managed `cloudflared` agent, allowing you to monitor the health and performance of your tunnel with tools like Prometheus and Grafana.
+
+### Enabling the Metrics Endpoint
+
+To enable the metrics endpoint, simply add the following environment variable to your `.env` file:
+
+```dotenv
+# .env.example
+
+# Enables the Prometheus metrics endpoint on the specified port.
+# This port will be exposed to the Docker host.
+CLOUDFLARED_METRICS_PORT=2000
+```
+
+DockFlare's built-in reconciliation logic will automatically handle everything for you. If you add, remove, or change this variable and restart DockFlare, the `cloudflared-agent` container will be automatically recreated with the correct settings.
+
+### Visualizing with Grafana
+
+Once enabled, you'll need a Prometheus instance to scrape the metrics endpoint.
+
+To help you get started immediately, a pre-built, detailed Grafana dashboard is included in the repository at **`examples/dashboard.json`**. You can import this file directly into your Grafana instance to get instant visibility into:
+-   Request & Error Rates
+-   Request Latency Percentiles (P99, P95, P50)
+-   Active HA Connections
+-   HTTP Status Code Breakdowns
+-   And more...
+
+<br>
+
+<details>
+<summary><b>Quick Start: Prometheus & Grafana Docker Compose Setup</b></summary>
+
+If you don't already have a monitoring stack, here is a minimal setup to add to your `docker-compose.yml` to start scraping and visualizing your tunnel metrics.
+
+#### 1. Directory & File Setup
+Create these files and folders next to your main `docker-compose.yml`:
+
+```
+.
+├── docker-compose.yml
+├── prometheus.yml
+└── grafana-provisioning/
+    └── datasources/
+        └── datasource.yml
+```
+
+#### 2. `docker-compose.yml` Services
+Add the following services to your `docker-compose.yml`:
+```yaml
+services:
+  # ... your existing dockflare service ...
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - your-dockflare-network # <-- IMPORTANT: Use the same network as DockFlare
+    labels:
+      - "dockflare.enable=true"
+      - "dockflare.hostname=prometheus.your-domain.com"
+      - "dockflare.service=http://prometheus:9090"
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - ./grafana_data:/var/lib/grafana
+      - ./grafana-provisioning:/etc/grafana/provisioning
+    networks:
+      - your-dockflare-network # <-- IMPORTANT: Use the same network as DockFlare
+    labels:
+      - "dockflare.enable=true"
+      - "dockflare.hostname=metrics.your-domain.com" # Exposes Grafana
+      - "dockflare.service=http://grafana:3000"
+```
+> **Permissions Tip:** If you encounter a "Permission denied" error on startup, you may need to set the ownership of the host directories. Run `sudo chown -R 472:472 ./grafana_data` for Grafana and `sudo chown -R 65534:65534 ./prometheus_data` for Prometheus.
+
+#### 3. `prometheus.yml` Configuration
+Create the `prometheus.yml` file with the following content:
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'cloudflared'
+    static_configs:
+      - targets: ['your-agent-container-name:2000']
+        # --- IMPORTANT ---
+        # 1. Replace 'your-agent-container-name' with the name of your cloudflared container.
+        # 2. Replace '2000' with your chosen CLOUDFLARED_METRICS_PORT.
+```
+
+#### 4. Grafana `datasource.yml` Configuration
+Create the `grafana-provisioning/datasources/datasource.yml` file:
+```yaml
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+```
+
+#### 5. Launch & Verify
+1.  Run `docker-compose up -d`.
+2.  Navigate to your Prometheus URL and check **Status -> Targets** to ensure the `cloudflared` job is **UP**.
+3.  Navigate to your Grafana URL, log in (default: `admin`/`admin`), and import the `dashboard.json` from the `examples/` directory.
+
+</details>
 
 ---
 
