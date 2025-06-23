@@ -296,7 +296,8 @@ def handle_access_policy_from_labels(hostname_config_item, current_rule_in_state
                     policy_include_rules = []
                     if desired_allowed_idps_str_from_label:
                         idp_ids = [idp.strip() for idp in desired_allowed_idps_str_from_label.split(',') if idp.strip()]
-                        if idp_ids: policy_include_rules.append({"login_method": {"id": idp_ids}})
+                        for an_idp_id in idp_ids:
+                            policy_include_rules.append({"login_method": {"id": an_idp_id}})
                     if not policy_include_rules: policy_include_rules.append({"everyone": {}}) 
                     cf_access_policies = [{"name": "Label Default Authenticated Access", "decision": "allow", "include": policy_include_rules}]
 
