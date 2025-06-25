@@ -56,7 +56,7 @@ def is_valid_service(service_str):
     service_str = service_str.strip()
     # Regex patterns for different service types
 
-    # Hostname/IP part: Allows domain names, IPv4, and bracketed IPv6 // update issue 132 , allow _ character for internal docker services, please not for external DNS _ character is not allowed
+    # Hostname/IP for service targets: Allows domain names (includes '_' for Docker service names, per #132), IPv4, and bracketed IPv6. (Note: '_' is not valid for public DNS hostnames).
     host_ip_pattern = r"([a-zA-Z0-9_](?:[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9_])?(?:\.[a-zA-Z0-9_](?:[a-zA-Z0-9\-_]{0,61}[a-zA-Z0-9_])?)*\.?|[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}|\[[0-9a-fA-F:]+\])"
     port_pattern = r"[0-9]{1,5}" # Ports 0-65535
 
