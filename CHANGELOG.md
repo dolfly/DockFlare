@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.9.3] - 2025-07-19
+## [1.9.4] - 2025-07-19
 
 ### Fixed
 - **Critical UI Fix for Access Policies:** Resolved a critical bug causing an 'Internal Server Error' when creating or editing manual rules, or updating a Docker-managed rule's policy, to use the 'Authenticate by Email' method via the web UI. This was a regression caused by recent updates to the Cloudflare Access API handling in `access_manager.py` which were not reflected in the UI routes. The routes in `app/web/routes.py` have been updated to correctly construct the Access Policy payload, resolving the `TypeError` and API validation errors.
