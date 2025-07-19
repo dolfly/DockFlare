@@ -206,25 +206,29 @@ def ui_update_access_policy(hostname):
 
         elif new_policy_type in ["bypass", "authenticate_email"]:
             cf_access_policies = []
+            allowed_idps_str_for_hash = None
+
             if new_policy_type == "bypass":
                 cf_access_policies = [{"name": "UI Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
             elif new_policy_type == "authenticate_email":
                 if not auth_email:
                     cloudflared_agent_state["last_action_status"] = f"Error: Email address required for 'authenticate_email' policy for {fqdn}."
                     return redirect(url_for('web.status_page'))
+                
+                allowed_idps_str_for_hash = "ea94073b-1175-4089-81a2-3498c8c147b3"
                 cf_access_policies = [
                     {"name": f"UI Allow Email {auth_email}", "decision": "allow", "include": [{"email": {"email": auth_email}}]},
-                    {"name": "UI Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]}
+                    {"name": "UI Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]},
+                    {"name": "Enable Email Auth", "decision": "non_identity", "include": [{"login_method": {"id": allowed_idps_str_for_hash}}]}
                 ]
 
             desired_session_duration = request.form.get("session_duration", current_rule.get("access_session_duration", "24h"))
             desired_app_launcher_visible = request.form.get("app_launcher_visible", str(current_rule.get("access_app_launcher_visible", False))).lower() in ["true", "on", "1", "yes"]
-            desired_allowed_idps_str = request.form.get("allowed_idps", current_rule.get("access_allowed_idps_str"))
             desired_auto_redirect = request.form.get("auto_redirect", str(current_rule.get("access_auto_redirect", False))).lower() in ["true", "on", "1", "yes"]
             
             new_config_hash = generate_access_app_config_hash(
                 new_policy_type, 
-                desired_session_duration, desired_app_launcher_visible, desired_allowed_idps_str, desired_auto_redirect,
+                desired_session_duration, desired_app_launcher_visible, allowed_idps_str_for_hash, desired_auto_redirect,
                 custom_access_rules_str=json.dumps(cf_access_policies)
             )
 
@@ -233,7 +237,6 @@ def ui_update_access_policy(hostname):
                 operation_successful = True
             else:
                 desired_app_name = f"DockFlare-{fqdn}"
-                allowed_idps_list = [idp.strip() for idp in desired_allowed_idps_str.split(',') if idp.strip()] if desired_allowed_idps_str else None
                 
                 effective_app_id_for_operation = current_access_app_id
                 if not effective_app_id_for_operation:
@@ -249,14 +252,14 @@ def ui_update_access_policy(hostname):
                     app_result = update_cloudflare_access_application(
                         effective_app_id_for_operation, fqdn, desired_app_name,
                         desired_session_duration, desired_app_launcher_visible,
-                        [fqdn], cf_access_policies, allowed_idps_list, desired_auto_redirect
+                        [fqdn], cf_access_policies, desired_auto_redirect
                     )
                 else: 
                     logging.info(f"UI: Attempting to create Access App. Target Name: {desired_app_name}, Target Policy: {new_policy_type}")
                     app_result = create_cloudflare_access_application(
                         fqdn, desired_app_name,
                         desired_session_duration, desired_app_launcher_visible,
-                        [fqdn], cf_access_policies, allowed_idps_list, desired_auto_redirect
+                        [fqdn], cf_access_policies, desired_auto_redirect
                     )
 
                 if app_result and app_result.get("id"):
@@ -283,7 +286,7 @@ def ui_update_access_policy(hostname):
 @bp.route('/revert_access_policy_to_labels/<path:hostname>', methods=['POST'])
 def revert_access_policy_to_labels(hostname):
     fqdn = hostname.split('|')[0]
-    if not docker_client: # ...
+    if not docker_client: 
         return redirect(url_for('web.status_page'))
     
     action_status_message = f"Attempting to revert Access Policy for '{fqdn}' to label configuration..."
@@ -292,20 +295,19 @@ def revert_access_policy_to_labels(hostname):
 
     with state_lock:
         current_rule = managed_rules.get(hostname)
-        if not current_rule: # ...
+        if not current_rule:
             return redirect(url_for('web.status_page'))
-        if not current_rule.get("access_policy_ui_override", False): # ...
+        if not current_rule.get("access_policy_ui_override", False):
             return redirect(url_for('web.status_page'))
         
         app_id_to_delete_if_any = current_rule.get("access_app_id")
         current_rule["access_policy_ui_override"] = False
-        # ...
         state_changed_for_revert = True
         if state_changed_for_revert: save_state()
 
     if app_id_to_delete_if_any:
         if delete_cloudflare_access_application(app_id_to_delete_if_any): 
-            pass # ...
+            pass
     
     reconcile_state_threaded() 
     action_status_message += " Reconciliation triggered."
@@ -550,18 +552,15 @@ def ui_add_manual_rule_route():
         cf_access_policies_for_app = [{"name": "UI Manual Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
         custom_rules_for_hash_str = json.dumps(cf_access_policies_for_app)
     elif manual_access_policy_type == "authenticate_email":
+        desired_allowed_idps_str = "ea94073b-1175-4089-81a2-3498c8c147b3"
         cf_access_policies_for_app = [
             {"name": f"UI Manual Allow Email {manual_auth_email}", "decision": "allow", "include": [{"email": {"email": manual_auth_email}}]},
-            {"name": "UI Manual Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]}
+            {"name": "UI Manual Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]},
+            {"name": "Enable Email Auth", "decision": "non_identity", "include": [{"login_method": {"id": desired_allowed_idps_str}}]}
         ]
         custom_rules_for_hash_str = json.dumps(cf_access_policies_for_app)
     
     if manual_access_policy_type in ["bypass", "authenticate_email"]:
-        allowed_idps_list = None
-        if manual_access_policy_type == "authenticate_email":
-            desired_allowed_idps_str = "ea94073b-1175-4089-81a2-3498c8c147b3"
-            allowed_idps_list = [desired_allowed_idps_str]
-        
         existing_cf_app = find_cloudflare_access_application_by_hostname(full_hostname)
         if existing_cf_app and existing_cf_app.get("id"):
             logging.info(f"Manual Add: Found existing Access App {existing_cf_app.get('id')} for {full_hostname}. Will attempt to update it.")
@@ -569,7 +568,7 @@ def ui_add_manual_rule_route():
             updated_app = update_cloudflare_access_application(
                 access_app_created_or_updated_id, full_hostname, desired_app_name,
                 desired_session_duration, desired_app_launcher_visible,
-                [full_hostname], cf_access_policies_for_app, allowed_idps_list, desired_auto_redirect
+                [full_hostname], cf_access_policies_for_app, desired_auto_redirect
             )
             if updated_app:
                 access_app_created_or_updated_id = updated_app.get("id")
@@ -585,7 +584,6 @@ def ui_add_manual_rule_route():
                 full_hostname, desired_app_name,
                 desired_session_duration, desired_app_launcher_visible,
                 [full_hostname], cf_access_policies_for_app, 
-                allowed_idps_list, 
                 desired_auto_redirect
             )
             if created_app and created_app.get("id"):
@@ -819,28 +817,27 @@ def ui_edit_manual_rule_route():
     cf_access_policies_for_app = [] 
     
     if manual_access_policy_type in ["bypass", "authenticate_email"]:
-        allowed_idps_for_update = None
         allowed_idps_str_for_hash = None
         
         if manual_access_policy_type == "bypass":
             cf_access_policies_for_app = [{"name": "UI Manual Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
         else: 
+            allowed_idps_str_for_hash = "ea94073b-1175-4089-81a2-3498c8c147b3"
             cf_access_policies_for_app = [
                 {"name": f"UI Manual Allow Email {manual_auth_email}", "decision": "allow", "include": [{"email": {"email": manual_auth_email}}]},
-                {"name": "UI Manual Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]}
+                {"name": "UI Manual Deny Fallback", "decision": "deny", "include": [{"everyone": {}}]},
+                {"name": "Enable Email Auth", "decision": "non_identity", "include": [{"login_method": {"id": allowed_idps_str_for_hash}}]}
             ]
-            allowed_idps_str_for_hash = "ea94073b-1175-4089-81a2-3498c8c147b3"
-            allowed_idps_for_update = [allowed_idps_str_for_hash]
         
         app_id_to_update = old_access_app_id if old_hostname_for_dns == full_hostname else None
         
         if app_id_to_update:
             logging.info(f"Manual Edit: Updating existing Access App {app_id_to_update} for {full_hostname}")
-            updated_app = update_cloudflare_access_application(app_id_to_update, full_hostname, f"DockFlare-{full_hostname}", "24h", False, [full_hostname], cf_access_policies_for_app, allowed_idps_for_update, False)
+            updated_app = update_cloudflare_access_application(app_id_to_update, full_hostname, f"DockFlare-{full_hostname}", "24h", False, [full_hostname], cf_access_policies_for_app, False)
             if updated_app: access_app_created_or_updated_id = updated_app.get("id")
         else:
             logging.info(f"Manual Edit: Creating new Access App for {full_hostname}")
-            created_app = create_cloudflare_access_application(full_hostname, f"DockFlare-{full_hostname}", "24h", False, [full_hostname], cf_access_policies_for_app, allowed_idps_for_update, False)
+            created_app = create_cloudflare_access_application(full_hostname, f"DockFlare-{full_hostname}", "24h", False, [full_hostname], cf_access_policies_for_app, False)
             if created_app: access_app_created_or_updated_id = created_app.get("id")
             
         if access_app_created_or_updated_id:
