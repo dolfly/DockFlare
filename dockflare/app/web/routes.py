@@ -32,7 +32,7 @@ from flask import (
 )
 
 from app import config, docker_client, tunnel_state, cloudflared_agent_state, log_queue 
-from app.core.state_manager import managed_rules, state_lock, save_state, load_state 
+from app.core.state_manager import managed_rules, access_groups, state_lock, save_state, load_state
 from app.core.tunnel_manager import (
     start_cloudflared_container,
     stop_cloudflared_container,
