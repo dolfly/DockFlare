@@ -1,4 +1,5 @@
 // app/static/js/main.js
+// app/static/js/main.js
 const maxLogLines = 250;
 let initialConnectMessageCleared = false;
 let activeLogSource = null;
@@ -201,7 +202,6 @@ function fixResourcesAndBase() {
 function addLogLine(message, type = 'log') {
     const logOutput = document.getElementById('log-output');
     if (!logOutput) {
-        console.error("Log output element not found.");
         return;
     }
     if (!initialConnectMessageCleared && logOutput.textContent.includes('Connecting to log stream...')) {
@@ -227,7 +227,6 @@ function addLogLine(message, type = 'log') {
 function connectEventSource() {
     const logOutput = document.getElementById('log-output');
     if (!logOutput) {
-        console.error("Log output element not found for EventSource.");
         return;
     }
     if (!window.EventSource) {
@@ -403,79 +402,66 @@ function setupPathInput(displayElement, hiddenElement) {
     });
 }
 
+function openCreateAccessGroupModal() {
+    const modal = document.getElementById('access_group_modal');
+    if (!modal) return;
+    const form = document.getElementById('access_group_form');
+    const title = document.getElementById('access_group_modal_title');
+    const groupIdInput = document.getElementById('group_id');
+
+    form.reset();
+    form.action = `${document.baseURI}ui/access-groups/create`;
+    title.textContent = 'Create New Access Group';
+    groupIdInput.disabled = false;
+    document.getElementById('original_group_id').value = '';
+    
+    modal.showModal();
+}
+
+function openEditAccessGroupModal(groupId, details) {
+    const modal = document.getElementById('access_group_modal');
+    if (!modal) return;
+    const form = document.getElementById('access_group_form');
+    const title = document.getElementById('access_group_modal_title');
+    const groupIdInput = document.getElementById('group_id');
+    
+    form.reset();
+    form.action = `${document.baseURI}ui/access-groups/edit/${encodeURIComponent(groupId)}`;
+    title.textContent = `Edit Access Group: ${details.display_name}`;
+    
+    document.getElementById('original_group_id').value = groupId;
+    groupIdInput.value = groupId;
+    groupIdInput.disabled = true;
+
+    document.getElementById('group_display_name').value = details.display_name || '';
+    document.getElementById('group_session_duration').value = details.session_duration || '24h';
+    document.getElementById('group_app_launcher_visible').checked = details.app_launcher_visible || false;
+    document.getElementById('group_auto_redirect').checked = details.auto_redirect_to_identity || false;
+
+    let emailText = '';
+    if (details.policies) {
+        const emails = [];
+        details.policies.forEach(policy => {
+            if (policy.include) {
+                policy.include.forEach(rule => {
+                    if (rule.email && rule.email.email) {
+                        emails.push(rule.email.email);
+                    }
+                });
+            }
+        });
+        emailText = emails.join(', ');
+    }
+    document.getElementById('group_emails').value = emailText;
+
+    modal.showModal();
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     fixResourcesAndBase();
     themeManager.initialize();
+    
     const manualServiceTypeSelect = document.getElementById('manual_service_type');
-    const noTlsVerifyDiv = document.getElementById('manual_no_tls_verify_div');
-    const originServerNameDiv = document.getElementById('manual_origin_server_name_div');
-
-    const manualServiceAddressInput = document.getElementById('manual_service_address');
-    const manualServiceAddressLabel = document.getElementById('manual_service_address_label');
-    const manualServiceHelpText = document.getElementById('manual_service_help');
-    const manualServicePrefixSpan = document.getElementById('manual_service_prefix_span');
-
-    function updateManualRuleServiceFields() {
-        const selectedType = manualServiceTypeSelect.value.toLowerCase();
-        let showNoTlsVerify = false;
-        let showOriginServerName = false;
-
-        if (manualServicePrefixSpan) manualServicePrefixSpan.classList.add('hidden');
-        if (manualServiceAddressInput) manualServiceAddressInput.placeholder = 'host:port or status code';
-        if (manualServiceAddressLabel) manualServiceAddressLabel.textContent = 'URL (Required for most types)';
-        if (manualServiceHelpText) manualServiceHelpText.textContent = 'e.g., 192.168.1.10:8000 or my-service.local:3000 for HTTP/S/TCP etc.';
-
-
-        if (selectedType === 'http' || selectedType === 'https') {
-            if (manualServicePrefixSpan) {
-                manualServicePrefixSpan.textContent = selectedType + '://';
-                manualServicePrefixSpan.classList.remove('hidden');
-            }
-            if (manualServiceAddressInput) manualServiceAddressInput.placeholder = 'host:port or resolvable hostname';
-            if (manualServiceAddressLabel) manualServiceAddressLabel.textContent = 'Origin URL (Required)';
-            if (manualServiceHelpText) manualServiceHelpText.textContent = 'e.g., 192.168.1.10:8000 or my-service.local:3000';
-            showNoTlsVerify = true;
-            showOriginServerName = true;
-        } else if (selectedType === 'tcp' || selectedType === 'ssh' || selectedType === 'rdp') {
-            if (manualServicePrefixSpan) {
-                manualServicePrefixSpan.textContent = selectedType + '://';
-                manualServicePrefixSpan.classList.remove('hidden');
-            }
-            if (manualServiceAddressInput) manualServiceAddressInput.placeholder = 'host:port';
-            if (manualServiceAddressLabel) manualServiceAddressLabel.textContent = `Origin Address for ${selectedType.toUpperCase()} (host:port)`;
-            if (manualServiceHelpText) manualServiceHelpText.textContent = `e.g., my-internal-server:22`;
-            showNoTlsVerify = false;
-            showOriginServerName = false;
-        } else if (selectedType === 'http_status') {
-            if (manualServiceAddressInput) manualServiceAddressInput.placeholder = 'e.g., 404';
-            if (manualServiceAddressLabel) manualServiceAddressLabel.textContent = 'HTTP Status Code (e.g., 200, 404, 503)';
-            if (manualServiceHelpText) manualServiceHelpText.textContent = 'Enter a valid HTTP status code (100-599).';
-            showNoTlsVerify = false;
-            showOriginServerName = false;
-        }
-
-        if (noTlsVerifyDiv) {
-            if (showNoTlsVerify) {
-                noTlsVerifyDiv.style.display = '';
-            } else {
-                noTlsVerifyDiv.style.display = 'none';
-                const noTlsVerifyCheckbox = document.getElementById('manual_no_tls_verify');
-                if (noTlsVerifyCheckbox) noTlsVerifyCheckbox.checked = false;
-            }
-        }
-
-        if (originServerNameDiv) {
-            if (showOriginServerName) {
-                originServerNameDiv.style.display = '';
-            } else {
-                originServerNameDiv.style.display = 'none';
-                const originServerNameInput = document.getElementById('manual_origin_server_name');
-                if (originServerNameInput) originServerNameInput.value = '';
-            }
-        }
-    }
-
     if (manualServiceTypeSelect) {
         manualServiceTypeSelect.addEventListener('change', updateManualRuleServiceFields);
         updateManualRuleServiceFields();
@@ -486,134 +472,63 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.querySelectorAll('form.protocol-aware-form').forEach(form => {
         if (form.getAttribute('action')) {
-            let actionUrl = form.getAttribute('action');
             try {
-                const fullActionUrl = new URL(actionUrl, document.baseURI);
-                if (fullActionUrl.protocol !== window.location.protocol && fullActionUrl.host === window.location.host) {
-                    fullActionUrl.protocol = window.location.protocol;
-                    form.setAttribute('action', fullActionUrl.toString());
-                } else if (!actionUrl.startsWith('http')) {
-                    form.setAttribute('action', fullActionUrl.toString());
-                }
-            } catch (e) {}
-        }
-    });
-    document.querySelectorAll('a[href]').forEach(link => {
-        const href = link.getAttribute('href');
-        if (href && href !== "#" && !href.startsWith('mailto:') && !href.startsWith('tel:')) {
-            try {
-                const fullLinkUrl = new URL(href, document.baseURI);
-                if (fullLinkUrl.protocol !== window.location.protocol && fullLinkUrl.host === window.location.host) {
-                    fullLinkUrl.protocol = window.location.protocol;
-                    link.setAttribute('href', fullLinkUrl.toString());
-                } else if (!href.startsWith('http')) {
-                    link.setAttribute('href', fullLinkUrl.toString());
-                }
+                const fullActionUrl = new URL(form.getAttribute('action'), document.baseURI);
+                form.setAttribute('action', fullActionUrl.toString());
             } catch (e) {}
         }
     });
 
     updateCountdowns();
     setInterval(updateCountdowns, 30000);
-    connectEventSource();
 
-    updateReconciliationStatus();
-    setInterval(updateReconciliationStatus, 2000);
-
-    function toggleAuthEmailField(policyType, selectElement) {
-        const form = selectElement.closest('form');
-        if (!form) return;
-        const emailFieldDiv = form.querySelector('.auth-email-field');
-        if (emailFieldDiv) {
-            if (policyType === 'authenticate_email') {
-                emailFieldDiv.classList.remove('hidden');
-            } else {
-                emailFieldDiv.classList.add('hidden');
-                const emailInput = emailFieldDiv.querySelector('input[name="auth_email"]');
-                if (emailInput) emailInput.value = '';
-            }
-        }
+    if (document.getElementById('log-output')) {
+        connectEventSource();
     }
+    
+    if (document.getElementById('reconciliation-status')) {
+        updateReconciliationStatus();
+        setInterval(updateReconciliationStatus, 2000);
+    }
+    
     document.querySelectorAll('.policy-type-select').forEach(select => {
         select.addEventListener('change', function() {
-            toggleAuthEmailField(this.value, this);
+            const form = this.closest('form');
+            if (!form) return;
+            const emailFieldDiv = form.querySelector('.auth-email-field');
+            if (emailFieldDiv) {
+                emailFieldDiv.style.display = (this.value === 'authenticate_email') ? '' : 'none';
+            }
         });
-        toggleAuthEmailField(select.value, select);
+        select.dispatchEvent(new Event('change'));
     });
 
     document.querySelectorAll('.tunnel-dns-toggle').forEach(button => {
         button.addEventListener('click', async function() {
             const tunnelId = this.dataset.tunnelId;
-            const tunnelDetailsRow = this.closest('tr');
-            const dnsRecordsDisplayRow = tunnelDetailsRow.nextElementSibling;
-            const targetDivId = this.getAttribute('aria-controls');
-            const targetDiv = document.getElementById(targetDivId);
+            const dnsRecordsDisplayRow = this.closest('tr').nextElementSibling;
+            const targetDiv = document.getElementById(this.getAttribute('aria-controls'));
             const isExpanded = this.getAttribute('aria-expanded') === 'true';
-            const expandIcon = this.querySelector('.expand-icon');
-            const collapseIcon = this.querySelector('.collapse-icon');
-
-            if (!dnsRecordsDisplayRow || !targetDiv) return;
 
             if (isExpanded) {
                 dnsRecordsDisplayRow.classList.add('hidden');
                 this.setAttribute('aria-expanded', 'false');
-                if (expandIcon) expandIcon.classList.remove('hidden');
-                if (collapseIcon) collapseIcon.classList.add('hidden');
             } else {
                 this.setAttribute('aria-expanded', 'true');
-                if (expandIcon) expandIcon.classList.add('hidden');
-                if (collapseIcon) collapseIcon.classList.remove('hidden');
-
-                if (targetDiv.dataset.loaded !== 'true' || targetDiv.dataset.loaded === 'error') {
+                if (targetDiv.dataset.loaded !== 'true') {
                     targetDiv.innerHTML = '<p class="opacity-60 italic animate-pulse p-2">Loading DNS records...</p>';
-                    dnsRecordsDisplayRow.classList.remove('hidden');
-
                     try {
-                        const fetchUrl = `${document.baseURI}tunnel-dns-records/${encodeURIComponent(tunnelId)}?t=${Date.now()}`;
-                        const response = await fetch(fetchUrl);
-                        if (!response.ok) {
-                            let errorDetail = `HTTP error ${response.status}`;
-                            try {
-                                const errorData = await response.json();
-                                errorDetail = errorData.error || errorData.message || errorDetail;
-                            } catch (e) {}
-                            throw new Error(errorDetail);
-                        }
+                        const response = await fetch(`${document.baseURI}tunnel-dns-records/${encodeURIComponent(tunnelId)}?t=${Date.now()}`);
+                        if (!response.ok) throw new Error(`HTTP error ${response.status}`);
                         const data = await response.json();
-
-                        const currentTargetDiv = document.getElementById(`dns-records-${tunnelId}`);
-                        if (!currentTargetDiv) {
-                            return;
-                        }
-
-
                         if (data.dns_records && data.dns_records.length > 0) {
-                            let dnsHtml = '<ul class="list-none pl-4 space-y-1.5">';
-                            data.dns_records.forEach(record => {
-                                const recordUrl = `https://${record.name}`;
-                                const zoneDisplay = record.zone_name ? record.zone_name : record.zone_id;
-                                dnsHtml += `<li class="opacity-90 text-xs">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 inline-block mr-1 text-info" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                                <a href="${recordUrl}" target="_blank" rel="noopener noreferrer" class="link link-hover">${record.name}</a>
-                                <span class="ml-2 opacity-60">(Zone: ${zoneDisplay})</span>
-                                </li>`;
-                            });
-                            dnsHtml += '</ul>';
-                            currentTargetDiv.innerHTML = dnsHtml;
-                            currentTargetDiv.dataset.loaded = 'true';
-                        } else if (data.message) {
-                            currentTargetDiv.innerHTML = `<p class="opacity-60 italic p-2">${data.message}</p>`;
-                            currentTargetDiv.dataset.loaded = 'info';
+                            targetDiv.innerHTML = '<ul class="list-none pl-4 space-y-1.5">' + data.dns_records.map(r => `...`).join('') + '</ul>';
                         } else {
-                            currentTargetDiv.innerHTML = '<p class="opacity-60 italic p-2">No CNAME DNS records found pointing to this tunnel in the configured zones.</p>';
-                            currentTargetDiv.dataset.loaded = 'true';
+                            targetDiv.innerHTML = `<p class="opacity-60 italic p-2">${data.message || 'No CNAME records found.'}</p>`;
                         }
+                        targetDiv.dataset.loaded = 'true';
                     } catch (error) {
-                        const errorTargetDiv = document.getElementById(`dns-records-${tunnelId}`);
-                        if (errorTargetDiv) {
-                            errorTargetDiv.innerHTML = `<p class="text-error p-2">Error loading DNS records: ${error.message}</p>`;
-                            errorTargetDiv.dataset.loaded = 'error';
-                        }
+                        targetDiv.innerHTML = `<p class="text-error p-2">Error loading DNS records: ${error.message}</p>`;
                     }
                 }
                 dnsRecordsDisplayRow.classList.remove('hidden');
@@ -621,8 +536,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    startServerPing();
+    document.querySelectorAll('.edit-access-group-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const groupId = this.dataset.groupId;
+            const details = JSON.parse(this.dataset.groupDetails);
+            openEditAccessGroupModal(groupId, details);
+        });
+    });
 
+    startServerPing();
     initializeEditManualRuleModal();
 
     window.addEventListener('beforeunload', function() {
