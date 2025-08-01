@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# app/web/routes.py
 import copy
 import logging
 import time
@@ -105,7 +104,7 @@ def inject_protocol_bp():
         'base_url': base_url,
         'host': request.host,
         'request_scheme': request.scheme,
-        'app_version': config.APP_VERSION 
+        'app_version': config.APP_VERSION
     }
 
 @bp.route('/')
@@ -149,43 +148,51 @@ def status_page():
                 logging.info("Relevant zone name for TLD policy check (from CF_ZONE_ID) could not be determined.")
 
     display_token_val = get_display_token_ui(template_tunnel_state.get("token"))
-    all_account_tunnels_list = get_all_account_cloudflare_tunnels()
 
     return render_template('status_page.html',
                         tunnel_state=template_tunnel_state,
                         agent_state=template_agent_state,
                         initialization=initialization_status,
-                        display_token=display_token_val,
-                        cloudflared_container_name=config.CLOUDFLARED_CONTAINER_NAME,
-                        docker_available=docker_client is not None,
-                        external_cloudflared=config.USE_EXTERNAL_CLOUDFLARED,
-                        external_tunnel_id=config.EXTERNAL_TUNNEL_ID,
                         rules=rules_for_template,
-                        all_account_tunnels=all_account_tunnels_list,
                         CF_ACCOUNT_ID_CONFIGURED=bool(config.CF_ACCOUNT_ID), 
                         ACCOUNT_ID_FOR_DISPLAY=config.CF_ACCOUNT_ID if config.CF_ACCOUNT_ID else "Not Configured",
-                        relevant_zone_name_for_tld_policy=relevant_zone_name_for_tld_policy_val,
-                        tld_policy_exists=tld_policy_exists_val,
-                        account_email_for_tld=account_email_for_tld_val,
                         access_groups=template_access_groups,
                         CF_ZONE_ID_CONFIGURED=bool(config.CF_ZONE_ID)
                         )
 
-@bp.route('/access-groups')
-def access_groups_page():
+@bp.route('/settings')
+def settings_page():
     groups_for_template = {}
     used_group_ids = set()
+    template_tunnel_state = {}
+    template_agent_state = {}
+
     with state_lock:
         used_group_ids = {
             rule.get('access_group_id') for rule in managed_rules.values()
             if rule.get('source') == 'docker' and rule.get('access_group_id')
         }
         groups_for_template = copy.deepcopy(access_groups)
+        template_tunnel_state = tunnel_state.copy()
+        template_agent_state = cloudflared_agent_state.copy()
+
+    display_token_val = get_display_token_ui(template_tunnel_state.get("token"))
+    all_account_tunnels_list = get_all_account_cloudflare_tunnels()
 
     return render_template(
-        'access_groups.html',
+        'settings.html',
         access_groups=groups_for_template,
-        used_group_ids=used_group_ids
+        used_group_ids=used_group_ids,
+        all_account_tunnels=all_account_tunnels_list,
+        tunnel_state=template_tunnel_state,
+        agent_state=template_agent_state,
+        display_token=display_token_val,
+        cloudflared_container_name=config.CLOUDFLARED_CONTAINER_NAME,
+        docker_available=docker_client is not None,
+        external_cloudflared=config.USE_EXTERNAL_CLOUDFLARED,
+        external_tunnel_id=config.EXTERNAL_TUNNEL_ID,
+        CF_ACCOUNT_ID_CONFIGURED=bool(config.CF_ACCOUNT_ID),
+        ACCOUNT_ID_FOR_DISPLAY=config.CF_ACCOUNT_ID if config.CF_ACCOUNT_ID else "Not Configured"
     )
 
 @bp.route('/ui_update_access_policy/<path:hostname>', methods=['POST'])
@@ -518,7 +525,6 @@ def ui_add_manual_rule_route():
 
     with state_lock:
         if manual_access_group_id and manual_access_group_id in access_groups:
-
             group = access_groups[manual_access_group_id]
             access_group_id = manual_access_group_id
             access_policy_type = "group"
@@ -559,7 +565,6 @@ def ui_add_manual_rule_route():
                 cloudflared_agent_state["last_action_status"] = f"Error: Failed to create/update Access App for group '{access_group_id}'."
 
         elif manual_access_policy_type and manual_access_policy_type != 'none':
-
             cf_access_policies = []
             if manual_access_policy_type == "bypass":
                 cf_access_policies = [{"name": "UI Manual Public Bypass", "decision": "bypass", "include": [{"everyone": {}}]}]
@@ -901,22 +906,15 @@ def _parse_and_build_policy_from_form(email_str):
     if not email_str or not email_str.strip():
         return []
     
-    emails = []
-    domains = []
+    include_rules = []
     
     parts = [part.strip() for part in email_str.split(',') if part.strip()]
     for part in parts:
         if part.startswith('@'):
-            domains.append({"domain": part[1:]})
+            include_rules.append({"email_domain": {"domain": part[1:]}})
         else:
-            emails.append({"email": {"email": part}})
+            include_rules.append({"email": {"email": part}})
             
-    include_rules = []
-    if emails:
-        include_rules.extend(emails)
-    if domains:
-        include_rules.extend(domains)
-    
     if not include_rules:
         return []
 
@@ -934,12 +932,12 @@ def create_access_group():
 
     if not group_id or not display_name:
         cloudflared_agent_state["last_action_status"] = "Error: Group ID and Display Name are required."
-        return redirect(url_for('web.access_groups_page'))
+        return redirect(url_for('web.settings_page'))
 
     with state_lock:
         if group_id in access_groups:
             cloudflared_agent_state["last_action_status"] = f"Error: Access Group with ID '{group_id}' already exists."
-            return redirect(url_for('web.access_groups_page'))
+            return redirect(url_for('web.settings_page'))
         
         new_group = {
             "id": group_id,
@@ -953,7 +951,7 @@ def create_access_group():
         save_state()
 
     cloudflared_agent_state["last_action_status"] = f"Success: Access Group '{display_name}' created."
-    return redirect(url_for('web.access_groups_page'))
+    return redirect(url_for('web.settings_page'))
 
 
 @bp.route('/ui/access-groups/edit/<group_id>', methods=['POST'])
@@ -961,13 +959,13 @@ def edit_access_group(group_id):
     with state_lock:
         if group_id not in access_groups:
             cloudflared_agent_state["last_action_status"] = f"Error: Access Group with ID '{group_id}' not found."
-            return redirect(url_for('web.access_groups_page'))
+            return redirect(url_for('web.settings_page'))
     
     form = request.form
     display_name = form.get('display_name', '').strip()
     if not display_name:
         cloudflared_agent_state["last_action_status"] = "Error: Display Name is required."
-        return redirect(url_for('web.access_groups_page'))
+        return redirect(url_for('web.settings_page'))
     
     with state_lock:
         updated_group = {
@@ -983,7 +981,7 @@ def edit_access_group(group_id):
 
     cloudflared_agent_state["last_action_status"] = f"Success: Access Group '{display_name}' updated. Triggering reconciliation."
     reconcile_state_threaded()
-    return redirect(url_for('web.access_groups_page'))
+    return redirect(url_for('web.settings_page'))
 
 
 @bp.route('/ui/access-groups/delete/<group_id>', methods=['POST'])
@@ -991,7 +989,7 @@ def delete_access_group(group_id):
     with state_lock:
         if group_id not in access_groups:
             cloudflared_agent_state["last_action_status"] = f"Error: Access Group with ID '{group_id}' not found."
-            return redirect(url_for('web.access_groups_page'))
+            return redirect(url_for('web.settings_page'))
 
         is_in_use = any(
             rule.get('access_group_id') == group_id
@@ -1000,14 +998,14 @@ def delete_access_group(group_id):
 
         if is_in_use:
             cloudflared_agent_state["last_action_status"] = f"Error: Cannot delete Access Group '{access_groups[group_id]['display_name']}' because it is currently in use."
-            return redirect(url_for('web.access_groups_page'))
+            return redirect(url_for('web.settings_page'))
 
         display_name = access_groups[group_id]['display_name']
         del access_groups[group_id]
         save_state()
 
     cloudflared_agent_state["last_action_status"] = f"Success: Access Group '{display_name}' has been deleted."
-    return redirect(url_for('web.access_groups_page'))
+    return redirect(url_for('web.settings_page'))
 
 
 @bp.route('/cloudflare-ping')
