@@ -1,10 +1,14 @@
 <p align="center">
-  <a href="https://dockflare.app">
+  <a href="https://dockflare.app" title="Now you're thinking with tunnels">
     <img src="images/bannertr.png" width="500px" alt="DockFlare Banner" />
   </a>
 </p>
 
-<h1 align="center">Automated Cloudflare Tunnels & Access Management</h1>
+<h1 align="center">Automate Cloudflare Tunnels with Docker Labels</h1>
+
+<p align="center">
+  <em>Go from container to publicly-secured URL in seconds. No manual Cloudflare dashboard configuration required.</em>
+</p>
 
 <p align="center">
   <a href="https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.0-blue.svg?style=for-the-badge" alt="Release"></a>
