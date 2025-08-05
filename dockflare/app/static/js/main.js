@@ -473,6 +473,7 @@ function updateManualRuleServiceFields() {
     let showNoTlsVerify = false;
     let showOriginServerName = false;
 
+    if (manualServiceAddressInput) manualServiceAddressInput.style.display = '';
     if (manualServicePrefixSpan) manualServicePrefixSpan.classList.add('hidden');
     if (manualServiceAddressInput) manualServiceAddressInput.placeholder = 'host:port or status code';
     if (manualServiceAddressLabel) manualServiceAddressLabel.textContent = 'URL (Required for most types)';
@@ -508,6 +509,7 @@ function updateManualRuleServiceFields() {
         showNoTlsVerify = false;
         showOriginServerName = false;
     }
+
     if (noTlsVerifyDiv) {
         noTlsVerifyDiv.style.display = showNoTlsVerify ? '' : 'none';
     }
