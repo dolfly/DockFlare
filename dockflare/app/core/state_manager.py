@@ -110,6 +110,7 @@ def load_state():
                 rule_copy.setdefault("source", "docker")
                 rule_copy.setdefault("path", None)
                 rule_copy.setdefault("http_host_header", None)
+                rule_copy.setdefault("access_group_id", None)
                 
                 managed_rules[final_key] = rule_copy
 
