@@ -11,6 +11,7 @@
 </p>
 <p align="center">
   <img src="https://img.shields.io/badge/Listen_to_the-Podcast-20a6e2?style=for-the-badge&logo=soundcloud" alt="Listen to the Podcast"></a>
+https://github.com/user-attachments/assets/6731a86a-e277-4649-be6c-a2fc593031d3
 </p>
 <p align="center">
   <a href="https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.1-blue.svg?style=for-the-badge" alt="Release"></a>
