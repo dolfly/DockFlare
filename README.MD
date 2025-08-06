@@ -9,7 +9,7 @@
 <p align="center">
   <em>Go from container to publicly-secured URL in seconds. No manual Cloudflare dashboard configuration required.</em>
 </p>
-
+![DockFlare Podcast Video](images/DockFlare_Podcast.mp4)
 <p align="center">
   <a href="https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v2.0.0"><img src="https://img.shields.io/badge/Release-v2.0.1-blue.svg?style=for-the-badge" alt="Release"></a>
   <a href="https://hub.docker.com/r/alplat/dockflare"><img src="https://img.shields.io/docker/pulls/alplat/dockflare?style=for-the-badge" alt="Docker Pulls"></a>
