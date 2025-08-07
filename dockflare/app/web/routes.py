@@ -115,10 +115,13 @@ def add_security_headers_bp(response):
     
     csp = {
         "default-src": ["'self'"],
-        "script-src": ["'self'"],
-        "style-src": ["'self'", "'unsafe-inline'"],
+        # Allow inline scripts for onclick handlers to work
+        "script-src": ["'self'", "'unsafe-inline'"],
+        # Allow styles from rsms.me for the Inter font
+        "style-src": ["'self'", "'unsafe-inline'", "https://rsms.me"],
         "img-src": ["'self'", "data:"],
-        "font-src": ["'self'"],
+        # Allow fonts from rsms.me
+        "font-src": ["'self'", "https://rsms.me"],
         "connect-src": ["'self'"],
         "frame-src": ["'none'"]
     }
