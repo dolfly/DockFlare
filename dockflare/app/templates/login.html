@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - DockFlare</title>
+    <link href="{{ url_for('static', filename='css/output.css') }}" rel="stylesheet">
+</head>
+<body class="bg-base-200 flex items-center justify-center h-screen">
+    <div class="card w-96 bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">DockFlare Login</h2>
+            <form method="POST" action="{{ url_for('web.login') }}">
+                {{ csrf_token() }}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Password</span>
+                    </label>
+                    <input type="password" name="password" placeholder="password" class="input input-bordered" required>
+                </div>
+                {% if error %}
+                    <div class="alert alert-error mt-4">
+                        <span>{{ error }}</span>
+                    </div>
+                {% endif %}
+                <div class="form-control mt-6">
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

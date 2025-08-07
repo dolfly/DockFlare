@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- DockFlare Version ---
-APP_VERSION = "v2.0.1"
+APP_VERSION = "v2.0.5"
 # --- web: https://dockflare.app ---
 # --- github: https://github.com/ChrispyBacon-dev/DockFlare ---
 
@@ -68,6 +68,9 @@ CUSTOM_LABEL_PREFIX = os.getenv('LABEL_PREFIX')
 # DEPRECATED: This will be removed in a future version.
 LABEL_PREFIX = CUSTOM_LABEL_PREFIX or PRIMARY_LABEL_PREFIX
 
+DOCKFLARE_PASSWORD = os.getenv('DOCKFLARE_PASSWORD')
+SECRET_KEY = os.getenv('SECRET_KEY')
+
 GRACE_PERIOD_SECONDS = int(os.getenv('GRACE_PERIOD_SECONDS', 28800))
 CLEANUP_INTERVAL_SECONDS = int(os.getenv('CLEANUP_INTERVAL_SECONDS', 60))
 AGENT_STATUS_UPDATE_INTERVAL_SECONDS = int(os.getenv('AGENT_STATUS_UPDATE_INTERVAL_SECONDS', 10))
@@ -106,6 +109,9 @@ else:
 for var_name in REQUIRED_VARS_BASE:
     if not globals().get(var_name):
         missing_vars.append(var_name)
+
+if DOCKFLARE_PASSWORD and not SECRET_KEY:
+    missing_vars.append("SECRET_KEY (required when DOCKFLARE_PASSWORD is set)")
 
 if missing_vars:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
