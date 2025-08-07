@@ -59,8 +59,9 @@ from app.core.access_manager import (
     find_cloudflare_access_application_by_hostname 
 )
 from app.core.reconciler import reconcile_state_threaded 
-from app.core.docker_handler import is_valid_hostname, is_valid_service 
+from app.core.docker_handler import is_valid_hostname, is_valid_service
 from app.core.utils import get_rule_key
+from app.web.forms import LoginForm
 
 bp = Blueprint('web', __name__)
 
@@ -71,17 +72,17 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('web.status_page'))
 
-    error = None
-    if request.method == 'POST':
-        password = request.form.get('password')
+    form = LoginForm()
+    if form.validate_on_submit():
+        password = form.password.data
         if check_password_hash(config.DOCKFLARE_PASSWORD, password):
             user = User.get('dockflare_user')
             login_user(user)
             return redirect(url_for('web.status_page'))
         else:
-            error = "Invalid password"
+            flash("Invalid password", "error")
 
-    return render_template('login.html', error=error)
+    return render_template('login.html', form=form)
 
 @bp.route('/logout')
 @login_required

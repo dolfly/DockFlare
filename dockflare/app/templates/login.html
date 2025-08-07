@@ -10,21 +10,23 @@
     <div class="card w-96 bg-base-100 shadow-xl">
         <div class="card-body">
             <h2 class="card-title">DockFlare Login</h2>
-            <form method="POST" action="{{ url_for('web.login') }}">
-                {{ csrf_token() }}
-                <div class="form-control">
-                    <label class="label">
-                        <span class="label-text">Password</span>
-                    </label>
-                    <input type="password" name="password" placeholder="password" class="input input-bordered" required>
-                </div>
-                {% if error %}
-                    <div class="alert alert-error mt-4">
-                        <span>{{ error }}</span>
-                    </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category in ['error', 'success', 'warning', 'info'] else 'info' }} mt-4">
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
                 {% endif %}
+            {% endwith %}
+            <form method="POST" action="{{ url_for('web.login') }}">
+                {{ form.hidden_tag() }}
+                <div class="form-control">
+                    {{ form.password.label(class="label") }}
+                    {{ form.password(class="input input-bordered", placeholder="password") }}
+                </div>
                 <div class="form-control mt-6">
-                    <button type="submit" class="btn btn-primary">Login</button>
+                    {{ form.submit(class="btn btn-primary") }}
                 </div>
             </form>
         </div>
