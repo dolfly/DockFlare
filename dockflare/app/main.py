@@ -192,7 +192,7 @@ def main_application_entrypoint():
     logging.info("--- web: http://dockflare.app ---")
     logging.info("-" * 52)
 
-    # === Pre-Flight Setup Check ===
+    # === DockFlare Pre-Flight Setup Check ===
     data_path = os.path.dirname(config.STATE_FILE_PATH)
     key_file = os.path.join(data_path, 'dockflare.key')
     config_file = os.path.join(data_path, 'dockflare_config.dat')
@@ -231,7 +231,7 @@ def main_application_entrypoint():
                 config.CF_HEADERS['Authorization'] = f"Bearer {app.config['CF_API_TOKEN']}"
 
             app.is_configured = True
-            logging.info("Application is configured and in Operational Mode.")
+            logging.info("DockFlare is configured and in Operational Mode.")
         except Exception as e:
             logging.error(f"Failed to load or decrypt configuration: {e}. Starting in Pre-Flight mode.", exc_info=True)
             app.is_configured = False
