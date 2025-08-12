@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 *   The `/ping` endpoint is now exempt from authentication to allow for Docker health checks.
+*   The `/ping` endpoint now dynamically reports the application version via the config.APP_VERSION variable.
 *   The "Change Password" form on the settings page is now hidden when password login is disabled.
 *   The user creation page now provides clearer instructions depending on whether the user is in a migration or a fresh setup flow.
 *   Updated the security warning text related to disabling password login for better clarity.
