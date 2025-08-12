@@ -42,8 +42,7 @@ class SettingsForm(FlaskForm):
 class SecuritySettingsForm(FlaskForm):
     """Form for editing security settings."""
     disable_password_login = BooleanField(
-        'Disable Password Login',
-        description="If selected, password-based login will be disabled. Access to DockFlare will only be possible through a Cloudflare Access policy."
+        'Disable Password Login'
     )
     submit_security_settings = SubmitField('Save Security Settings')
 
