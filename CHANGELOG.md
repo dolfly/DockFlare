@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [v2.1.0] - 2025-08-12
+
+This release focuses on simplifying the initial setup, enhancing security with UI authentication, and improving overall usability.
+
+### New
+
+-   **Pre-Flight Setup Wizard:** A new browser-based setup wizard for first-time installations replaces the need for `.env` files. This guides users through configuring Cloudflare credentials and tunnel settings step-by-step.
+-   **UI Authentication:** The DockFlare UI is now protected by a login page.
+-   **Password Management:** Users can now change their UI password from a new "Security" section on the Settings page. A secure, manual process for password resets has been implemented.
+-   **Post-Setup Configuration:** Core settings (Tunnel Name, Zone IDs, Rule Grace Period) can now be modified directly from the UI at any time.
+-   **Seamless Migration:** An automatic migration process is in place for existing users to import settings from their `.env` file and create a new UI password.
+
+### Changed
+
+-   **Logout Button:** A logout button has been added to the main navigation bar.
+-   **UI/UX:** The theme selector is now an icon-only button for a cleaner interface.
+
+### Security
+
+-   **Encrypted Configuration:** All sensitive credentials, including the Cloudflare API token and UI password, are now stored in a fully encrypted `dockflare_config.dat` file.
+
+### Removed
+
+-   **`.env` File Support:** DockFlare no longer uses `.env` files for configuration after the initial migration. All settings are managed through the UI and the encrypted configuration file.
+
+## [v2.0.4] - 2025-08-12
+
+This is a dedicated security hardening release that reintroduces security enhancements from a previously rolled-back version (v2.0.5). A special thanks to GitHub user **@bcurran3** and Reddit user **t2_hur2hqu6k** for their valuable feedback and for helping make DockFlare more secure.
+
+### Security
+
+-   **CSRF Protection:** All forms in the web UI are now protected with anti-CSRF tokens to prevent Cross-Site Request Forgery attacks.
+-   **Strengthened Content Security Policy (CSP):** The CSP has been made more restrictive to mitigate the risk of Cross-Site Scripting (XSS) and other injection attacks.
+-   **Pinned Dependencies:** All Python dependencies in `requirements.txt` are now pinned to specific versions to ensure build reliability and prevent potential supply-chain attacks.
+
 ## [v2.0.1] - 2025-08-05
 
 This is a follow-up release to address several minor bugs found after the major v2.0 update. It also restores support for Bastion mode and introduces a new backup and restore feature.
