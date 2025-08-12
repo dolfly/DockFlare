@@ -93,7 +93,7 @@ def gating_logic():
                     return redirect(url_for('setup.step_import_env'))
                 else:
     
-                    return redirect(url_for('setup.step1_api_credentials'))
+                    return redirect(url_for('setup.step1_admin_user'))
             except Exception as e:
                 logging.error(f"Error during setup redirection logic: {e}", exc_info=True)
     
