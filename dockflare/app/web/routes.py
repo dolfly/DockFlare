@@ -109,8 +109,8 @@ def gating_logic():
             return
 
         if not current_user.is_authenticated:
-    
-            if request.endpoint and not request.endpoint.startswith('auth.') and request.endpoint != 'static':
+            exempt_endpoints = ['static', 'web.ping', 'web.cloudflare_ping_route']
+            if request.endpoint and not request.endpoint.startswith('auth.') and request.endpoint not in exempt_endpoints:
                 try:
                     return redirect(url_for('auth.login'))
                 except:
