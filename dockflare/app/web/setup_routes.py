@@ -27,9 +27,7 @@ from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash
 from app import config
 
-
 setup_bp = Blueprint('setup', __name__, url_prefix='/setup', template_folder='../templates')
-
 
 # Step 1
 class AdminUserForm(FlaskForm):
@@ -64,17 +62,24 @@ class ImportEnvForm(FlaskForm):
     """Form for acknowledging the .env import."""
     submit = SubmitField('Proceed to User Creation')
 
-
 @setup_bp.route('/', methods=['GET'])
 @setup_bp.route('/step1', methods=['GET', 'POST'])
 def step1_admin_user():
     form = AdminUserForm()
+    is_migration = session.get('is_env_import', False)
+
     if form.validate_on_submit():
         session['username'] = form.username.data
         session['password'] = form.password.data
-        return redirect(url_for('setup.step2_api_credentials'))
         
-    return render_template('setup/step1_user.html', form=form, title="Step 1: Setup Web Access", current_step=1)
+        if is_migration:
+            
+            return redirect(url_for('setup.step4_finalize'))
+        else:
+            
+            return redirect(url_for('setup.step2_api_credentials'))
+        
+    return render_template('setup/step1_user.html', form=form, title="Step 1: Setup Web Access", current_step=1, is_migration=is_migration)
 
 @setup_bp.route('/step2', methods=['GET', 'POST'])
 def step2_api_credentials():
@@ -201,7 +206,7 @@ def step4_finalize():
 def step_import_env():
     """Handles the import of settings from environment variables for migration."""
     if request.method == 'POST' and 'cancel' in request.form:
-        
+        # Clear session data from .env import
         keys_to_clear = [
             'is_env_import', 'cf_api_token', 'cf_account_id', 'tunnel_name', 
             'cf_zone_id', 'tunnel_dns_scan_zone_names', 'grace_period_seconds'
@@ -210,7 +215,7 @@ def step_import_env():
             session.pop(key, None)
         flash('Migration cancelled. Please start the setup from scratch.', 'info')
         return redirect(url_for('setup.step1_admin_user'))
-    
+
     if not session.get('is_env_import'):
         
         return redirect(url_for('setup.step1_admin_user'))
