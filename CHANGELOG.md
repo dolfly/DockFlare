@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.1] - 2025-08-12
+
+### Added
+
+*   **Revamped Setup Wizard:** The initial setup wizard has been re-sequenced for a more logical flow (User -> Cloudflare -> Tunnel -> Finalize).
+*   **Setup Step Indicator:** A visual progress indicator has been added to all setup pages.
+*   **Detailed Setup Explanations:** Added clear, descriptive text to each step and field in the setup process to improve user guidance.
+*   **Disable Password Login:** Added a new option on the Settings page under "Security" to disable password-based login. This allows for public access to the dashboard, intended for use with an external authentication provider like Cloudflare Access.
+*   **Cancel Migration Option:** Added a "Start Fresh" button to the `.env` migration screen, allowing you to cancel the migration and begin a manual setup.
+
+### Fixed
+
+*   Corrected the initial redirect for the setup process, which was pointing to a non-existent route.
+*   Fixed a template error that caused a crash on the final step of the setup wizard.
+*   Corrected the setup flow logic. When a user proceeds with a migration, they are now correctly taken to the final step after user creation, bypassing unnecessary manual configuration.
+*   The "Disable Password Login" setting now persists correctly after restarting the DockFlare container.
+*   Resolved a redirect loop (`ERR_TOO_MANY_REDIRECTS`) that occurred when password login was disabled.
+
+### Changed
+
+*   The `/ping` endpoint is now exempt from authentication to allow for Docker health checks.
+*   The "Change Password" form on the settings page is now hidden when password login is disabled.
+*   The user creation page now provides clearer instructions depending on whether the user is in a migration or a fresh setup flow.
+*   Updated the security warning text related to disabling password login for better clarity.
+
 ## [v2.1.0] - 2025-08-12
 
 This release focuses on simplifying the initial setup, enhancing security with UI authentication, and improving overall usability.
