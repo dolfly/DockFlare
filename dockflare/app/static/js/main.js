@@ -85,8 +85,8 @@ const themeManager = (function() {
     };
 })();
 
-function initializeEditManualRuleModal() {
-    const editButtons = document.querySelectorAll('.edit-manual-rule-btn');
+function initializeEditRuleModal() {
+    const editButtons = document.querySelectorAll('.edit-rule-btn');
     const modal = document.getElementById('edit_manual_rule_modal');
 
     if (!editButtons.length || !modal) {
@@ -529,7 +529,7 @@ document.addEventListener('DOMContentLoaded', function() {
         updateManualRuleServiceFields(); // Run once on load
         setupPathInput(document.getElementById('manual_path_display'), document.getElementById('manual_path'));
         setupPathInput(document.getElementById('edit_manual_path_display'), document.getElementById('edit_manual_path'));
-        initializeEditManualRuleModal();
+        initializeEditRuleModal();
     }
 
     // Logic for new Access Group dropdown in ADD Manual Rule Modal
@@ -557,9 +557,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 el.disabled = isDisabled;
             });
         });
-    }    
+    }
 
-document.querySelectorAll('.tunnel-dns-toggle').forEach(button => {
+    // Universal handler for all policy type dropdowns to show/hide the email auth field
+    document.querySelectorAll('.policy-type-select').forEach(select => {
+
+
+        const container = select.closest('.dropdown-content, .modal-box, form');
+        if (!container) {
+            console.warn('Could not find container for policy select:', select);
+            return;
+        }
+
+        const emailField = container.querySelector('.auth-email-field');
+        if (!emailField) {
+            // This is expected for some policy selectors that don't have an email field.
+            return;
+        }
+
+        const toggleEmailField = () => {
+            if (select.value === 'authenticate_email') {
+                emailField.classList.remove('hidden');
+            } else {
+                emailField.classList.add('hidden');
+            }
+        };
+
+        // Add the event listener for user interactions
+        select.addEventListener('change', toggleEmailField);
+    
+    });
+
+    document.querySelectorAll('.tunnel-dns-toggle').forEach(button => {
         button.addEventListener('click', async function() {
             const tunnelId = this.dataset.tunnelId;
             const dnsRecordsDisplayRow = this.closest('tr').nextElementSibling;
