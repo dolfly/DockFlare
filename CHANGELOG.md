@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [v2.1.2] - 2025-08-14
+
+### Changed
+- **Unified Ingress Rule Editing:** The "Manage Policy" dropdown has been completely replaced by a unified editing modal. All rules (manual or from labels) can now be fully edited using the same comprehensive form.
+- The table column for editing has been renamed from "Manage Policy" to "Manage Rule".
+- The editing modal has been renamed from "Edit Manual Ingress Rule" to "Edit Ingress Rule".
+- The redundant "Edit" button in the "Actions" column for manual rules has been removed to streamline the UI.
+- When a rule from a container label is edited via the UI, it is now correctly marked with a "UI Override" flag, and the "Revert to Labels" functionality is preserved.
+
+### Removed
+- Removed the `ui_update_access_policy` backend route and associated frontend logic, as it was made obsolete by the new unified editing modal.
+
+### New
+- Added Favicon: The web UI now has a favicon, making it easier to spot in your browser tabs.
+
 ## [2.1.1] - 2025-08-12
 
 ### Added
