@@ -395,6 +395,14 @@ def settings_page():
     all_account_tunnels_list = get_all_account_cloudflare_tunnels()
     cf_account_id = current_app.config.get('CF_ACCOUNT_ID')
 
+    try:
+        with open(os.path.join(current_app.static_folder, 'json', 'countries.json')) as f:
+            countries = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        countries = []
+        flash('Could not load country list for Access Group modal.', 'error')
+
+
     return render_template(
         'settings.html',
         settings_form=settings_form,
@@ -404,6 +412,7 @@ def settings_page():
         access_groups=groups_for_template,
         used_group_ids=used_group_ids,
         all_account_tunnels=all_account_tunnels_list,
+        countries=countries,
         tunnel_state=template_tunnel_state,
         agent_state=template_agent_state,
         display_token=display_token_val,
@@ -1074,24 +1083,31 @@ def ui_edit_manual_rule_route():
 
     return redirect(url_for('web.status_page'))
 
-def _parse_and_build_policy_from_form(email_str):
-    if not email_str or not email_str.strip():
-        return []
-    
+def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_list=None):
     include_rules = []
-    
-    parts = [part.strip() for part in email_str.split(',') if part.strip()]
-    for part in parts:
-        if part.startswith('@'):
-            include_rules.append({"email_domain": {"domain": part[1:]}})
-        else:
-            include_rules.append({"email": {"email": part}})
+
+    if email_str and email_str.strip():
+        email_parts = [part.strip() for part in email_str.split(',') if part.strip()]
+        for part in email_parts:
+            if part.startswith('@'):
+                include_rules.append({"email_domain": {"domain": part[1:]}})
+            else:
+                include_rules.append({"email": {"email": part}})
+
+    if ip_ranges_str and ip_ranges_str.strip():
+        ip_parts = [part.strip() for part in ip_ranges_str.split(',') if part.strip()]
+        for ip in ip_parts:
+            include_rules.append({"ip": {"ip": ip}})
+
+    if countries_list:
+        for country in countries_list:
+            include_rules.append({"geo": {"country_code": country}})
             
     if not include_rules:
         return []
 
     return [
-        {"name": "Allow defined users and domains", "decision": "allow", "include": include_rules},
+        {"name": "Allow defined users, domains, IPs, and countries", "decision": "allow", "include": include_rules},
         {"name": "Default Deny", "decision": "deny", "include": [{"everyone": {}}]}
     ]
 
@@ -1117,7 +1133,11 @@ def create_access_group():
             "session_duration": form.get('session_duration', '24h').strip(),
             "app_launcher_visible": form.get('app_launcher_visible') == 'on',
             "auto_redirect_to_identity": form.get('auto_redirect') == 'on',
-            "policies": _parse_and_build_policy_from_form(form.get('emails', ''))
+            "policies": _parse_and_build_policy_from_form(
+                form.get('emails', ''),
+                form.get('ip_ranges', ''),
+                request.form.getlist('countries')
+            )
         }
         access_groups[group_id] = new_group
         save_state()
@@ -1146,7 +1166,11 @@ def edit_access_group(group_id):
             "session_duration": form.get('session_duration', '24h').strip(),
             "app_launcher_visible": form.get('app_launcher_visible') == 'on',
             "auto_redirect_to_identity": form.get('auto_redirect') == 'on',
-            "policies": _parse_and_build_policy_from_form(form.get('emails', ''))
+            "policies": _parse_and_build_policy_from_form(
+                form.get('emails', ''),
+                form.get('ip_ranges', ''),
+                request.form.getlist('countries')
+            )
         }
         access_groups[group_id] = updated_group
         save_state()
