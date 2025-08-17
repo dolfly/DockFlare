@@ -227,6 +227,34 @@ from app.web.forms import ChangePasswordForm, SecuritySettingsForm, SettingsForm
 from werkzeug.security import check_password_hash, generate_password_hash
 from cryptography.fernet import Fernet
 
+@bp.route('/access-policies', methods=['GET'])
+@login_required
+def access_policies_page():
+    """Renders the Access Policies page."""
+    groups_for_template = {}
+    used_group_ids = set()
+
+    with state_lock:
+        used_group_ids = {
+            rule.get('access_group_id') for rule in managed_rules.values()
+            if rule.get('source') == 'docker' and rule.get('access_group_id')
+        }
+        groups_for_template = copy.deepcopy(access_groups)
+
+    try:
+        with open(os.path.join(current_app.static_folder, 'json', 'countries.json')) as f:
+            countries = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        countries = []
+        flash('Could not load country list for Access Group modal.', 'error')
+
+    return render_template(
+        'access_policies.html',
+        access_groups=groups_for_template,
+        used_group_ids=used_group_ids,
+        countries=countries
+    )
+
 @bp.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings_page():
@@ -377,17 +405,10 @@ def settings_page():
         settings_form.grace_period_seconds.data = current_app.config.get('GRACE_PERIOD_SECONDS')
         security_settings_form.disable_password_login.data = current_app.config.get('DISABLE_PASSWORD_LOGIN', False)
 
-    groups_for_template = {}
-    used_group_ids = set()
     template_tunnel_state = {}
     template_agent_state = {}
 
     with state_lock:
-        used_group_ids = {
-            rule.get('access_group_id') for rule in managed_rules.values()
-            if rule.get('source') == 'docker' and rule.get('access_group_id')
-        }
-        groups_for_template = copy.deepcopy(access_groups)
         template_tunnel_state = tunnel_state.copy()
         template_agent_state = cloudflared_agent_state.copy()
 
@@ -395,32 +416,13 @@ def settings_page():
     all_account_tunnels_list = get_all_account_cloudflare_tunnels()
     cf_account_id = current_app.config.get('CF_ACCOUNT_ID')
     
-    try:
-        with open(os.path.join(current_app.static_folder, 'json', 'countries.json')) as f:
-            countries = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        countries = []
-        flash('Could not load country list for Access Group modal.', 'error')
-
-
-    try:
-        with open(os.path.join(current_app.static_folder, 'json', 'countries.json')) as f:
-            countries = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        countries = []
-        flash('Could not load country list for Access Group modal.', 'error')
-
-
     return render_template(
         'settings.html',
         settings_form=settings_form,
         change_password_form=change_password_form,
         security_settings_form=security_settings_form,
         cf_credentials_form=cf_credentials_form,
-        access_groups=groups_for_template,
-        used_group_ids=used_group_ids,
         all_account_tunnels=all_account_tunnels_list,
-        countries=countries,
         tunnel_state=template_tunnel_state,
         agent_state=template_agent_state,
         display_token=display_token_val,
