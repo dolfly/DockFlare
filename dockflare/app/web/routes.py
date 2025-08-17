@@ -1100,6 +1100,7 @@ def ui_edit_manual_rule_route():
 def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_list=None):
     policies = []
     allow_include_rules = []
+    country_exclude_rules = []
 
     if email_str and email_str.strip():
         email_parts = [part.strip() for part in email_str.split(',') if part.strip()]
@@ -1115,29 +1116,30 @@ def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_l
             allow_include_rules.append({"ip": {"ip": ip}})
 
     if countries_list:
-        country_rules = [{"geo": {"country_code": country}} for country in countries_list]
-        policies.insert(0, {
-            "name": "Block selected countries",
-            "decision": "block",
-            "include": country_rules
-        })
+        country_exclude_rules = [{"geo": {"country_code": country}} for country in countries_list]
 
     if allow_include_rules:
-        policies.append({
+        main_allow_policy = {
             "name": "Allow defined users, domains, and IPs",
             "decision": "allow",
             "include": allow_include_rules
-        })
+        }
+        if country_exclude_rules:
+            main_allow_policy["name"] += " (excluding blocked countries)"
+            main_allow_policy["exclude"] = country_exclude_rules
+        
+        policies.append(main_allow_policy)
         policies.append({
             "name": "Default Deny",
             "decision": "deny",
             "include": [{"everyone": {}}]
         })
-    elif countries_list:
+    elif country_exclude_rules:
         policies.append({
-            "name": "Allow everyone else",
+            "name": "Allow all except blocked countries",
             "decision": "allow",
-            "include": [{"everyone": {}}]
+            "include": [{"everyone": {}}],
+            "exclude": country_exclude_rules
         })
 
     return policies
