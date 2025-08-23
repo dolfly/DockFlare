@@ -1119,13 +1119,15 @@ def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_l
     if countries_list:
         country_rules = [{"geo": {"country_code": country.upper()}} for country in countries_list]
         if country_policy_mode == 'block_selected':
-            # 1. Deny selected countries. This MUST be first.
-            policies.append({"name": "Block selected countries", "decision": "deny", "include": country_rules})
-            # 2. Allow specific users/IPs if they exist.
-            if allow_include_rules:
-                policies.append({"name": "Allow defined users and IPs", "decision": "allow", "include": allow_include_rules})
-            # 3. Bypass everyone else.
-            policies.append({"name": "Bypass for everyone else", "decision": "bypass", "include": [{"everyone": {}}]})
+            # Create a single policy to bypass everyone except the selected countries.
+            policy = {
+                "name": "Bypass all except selected countries",
+                "decision": "bypass",
+                "include": [{"everyone": {}}],
+                "exclude": country_rules
+            }
+            policies.append(policy)
+            # NOTE: allow_include_rules are ignored in this mode as they can't be combined.
         
         else:  # Default to 'allow_selected'
             # 1. Allow specific users/IPs if they exist.
