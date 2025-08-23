@@ -1,6 +1,7 @@
 import os
 import re
 import markdown
+import pymdownx
 from flask import Blueprint, render_template, current_app, abort
 from flask_login import login_required
 
@@ -70,11 +71,27 @@ def help_page(page='Home.md'):
 
 
     extensions = [
-        'extra',  
-        'toc',    
-        'nl2br',  
+        'markdown.extensions.extra',
+        'markdown.extensions.toc',
+        'markdown.extensions.nl2br',
+        'markdown.extensions.meta',
+        'markdown.extensions.sane_lists',
+        'pymdownx.superfences',
+        'pymdownx.highlight',
+        'pymdownx.magiclink',
+        'pymdownx.tasklist',
+        'pymdownx.tilde',
     ]
-    html_content = markdown.markdown(md_content, extensions=extensions)
+    extension_configs = {
+        'pymdownx.highlight': {
+            'use_pygments': True,
+            'linenums': False
+        },
+        'pymdownx.superfences': {},
+        'pymdownx.tasklist': {'custom_checkbox': True},
+        'pymdownx.magiclink': {},
+    }
+    html_content = markdown.markdown(md_content, extensions=extensions, extension_configs=extension_configs, output_format='html5')
     
     navigation = parse_docs_nav()
 
