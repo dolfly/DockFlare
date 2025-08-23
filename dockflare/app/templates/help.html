@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Help - {{ title }}{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    /* Custom styles for the prose content to improve readability */
+    .prose table {
+        width: 100%;
+    }
+    .prose th {
+        background-color: oklch(var(--b2));
+    }
+    .prose a {
+        text-decoration: underline;
+    }
+    .prose a:hover {
+        text-decoration: none;
+    }
+    .prose code:not(pre > code) {
+        font-size: 0.9em;
+        padding: 0.2em 0.4em;
+        margin: 0;
+        border-radius: 6px;
+        background-color: oklch(var(--b2));
+    }
+    .prose pre > code {
+        background-color: transparent;
+        padding: 0;
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="flex flex-col md:flex-row gap-8">
+    <!-- Left Sidebar Navigation -->
+    <aside class="w-full md:w-1/4 lg:w-1/5 flex-shrink-0">
+        <div class="sticky top-24">
+            <h2 class="text-xl font-bold mb-4">Documentation</h2>
+            <ul class="menu bg-base-200 rounded-box p-2">
+                {% for item in navigation %}
+                    {% if item.is_category %}
+                        <li>
+                            <details open>
+                                <summary class="font-semibold text-base-content/70">{{ item.name }}</summary>
+                                <ul>
+                                    {% for child in item.children %}
+                                    <li class="{{ 'bordered border-primary' if child.link == current_page else '' }}"><a href="{{ url_for('help.help_page', page=child.link) }}">{{ child.name }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </details>
+                        </li>
+                    {% else %}
+                        <li class="{{ 'bordered border-primary' if item.link == current_page else '' }}"><a href="{{ url_for('help.help_page', page=item.link) }}">{{ item.name }}</a></li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="w-full md:w-3/4 lg:w-4/5">
+        <article class="prose lg:prose-xl max-w-none bg-base-100 p-6 sm:p-8 rounded-box shadow-lg">
+            {{ content|safe }}
+        </article>
+    </main>
+</div>
+{% endblock %}
