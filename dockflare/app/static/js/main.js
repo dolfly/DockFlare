@@ -439,8 +439,15 @@ function openEditAccessGroupModal(groupId, details) {
     document.getElementById('group_auto_redirect').checked = details.auto_redirect_to_identity || false;
 
     let emailText = '';
+    let ipRangeText = '';
+    let selectedCountries = [];
+    let countryPolicyMode = 'allow_selected'; // Default
+
     if (details.policies) {
         const emails = [];
+        const ipRanges = [];
+        
+        let hasCountryRule = false;
         details.policies.forEach(policy => {
             if (policy.include) {
                 policy.include.forEach(rule => {
@@ -448,13 +455,36 @@ function openEditAccessGroupModal(groupId, details) {
                         emails.push(rule.email.email);
                     } else if (rule.email_domain && rule.email_domain.domain) {
                         emails.push(`@${rule.email_domain.domain}`);
+                    } else if (rule.ip && rule.ip.ip) {
+                        ipRanges.push(rule.ip.ip);
+                    } else if (rule.geo && rule.geo.country_code) {
+                        hasCountryRule = true;
+                        selectedCountries.push(rule.geo.country_code);
                     }
                 });
             }
+            // Determine policy mode by looking at the decision of a policy that contains a country rule.
+            if (policy.include && policy.include.some(r => r.geo) && policy.decision === 'deny') {
+                countryPolicyMode = 'block_selected';
+            }
         });
+
         emailText = emails.join(', ');
+        ipRangeText = ipRanges.join(', ');
     }
+
     document.getElementById('group_emails').value = emailText;
+    document.getElementById('group_ip_ranges').value = ipRangeText;
+    
+    const countryPolicySelect = document.getElementById('country_policy_mode');
+    countryPolicySelect.value = countryPolicyMode;
+    // Trigger change to update help text
+    countryPolicySelect.dispatchEvent(new Event('change'));
+
+    const countrySelect = document.getElementById('group_countries');
+    Array.from(countrySelect.options).forEach(option => {
+        option.selected = selectedCountries.includes(option.value);
+    });
 
     modal.showModal();
 }
@@ -660,6 +690,25 @@ document.addEventListener('DOMContentLoaded', function() {
             openEditAccessGroupModal(groupId, details);
         });
     });
+
+    const policyModeSelect = document.getElementById('country_policy_mode');
+    if (policyModeSelect) {
+        const helpText = document.getElementById('country_policy_help_text');
+        const countrySelectLabel = document.querySelector('label[for="group_countries"] .label-text');
+
+        const updateHelpText = () => {
+            if (policyModeSelect.value === 'allow_selected') {
+                helpText.textContent = 'Selected countries will be allowed. All other countries will be blocked.';
+                if(countrySelectLabel) countrySelectLabel.textContent = 'Allowed Countries';
+            } else {
+                helpText.textContent = 'Selected countries will be blocked. All other countries will be allowed.';
+                if(countrySelectLabel) countrySelectLabel.textContent = 'Blocked Countries';
+            }
+        };
+
+        policyModeSelect.addEventListener('change', updateHelpText);
+        updateHelpText(); // Initial call
+    }
 
     // Universal Form/Link Protocol Correction
     document.querySelectorAll('form.protocol-aware-form').forEach(form => {
