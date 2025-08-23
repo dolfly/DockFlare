@@ -22,23 +22,23 @@ def parse_docs_nav():
     link_regex = re.compile(r'\[([^\]]+)\]\(([^)]+\.md)\)')
     
     for line in lines:
-        # Top level items
+        
         if line.startswith('*   '):
             item_text = line[4:].strip()
             
-            # Category header (bold, no link)
+            
             if item_text.startswith('**') and not link_regex.search(item_text):
                 category_name = item_text.replace('**', '').strip()
                 category = {'name': category_name, 'is_category': True, 'children': []}
                 nav_structure.append(category)
-            # Top-level link item
+            
             else:
                 match = link_regex.search(item_text)
                 if match:
                     link_item = {'name': match.group(1), 'link': match.group(2), 'is_category': False}
                     nav_structure.append(link_item)
         
-        # Child items
+        
         elif line.startswith('    *   '):
             if nav_structure and nav_structure[-1].get('is_category'):
                 item_text = line[8:].strip()
@@ -55,8 +55,7 @@ def parse_docs_nav():
 def help_page(page='Home.md'):
     """Renders a documentation page from a markdown file."""
     docs_path = os.path.join(current_app.root_path, 'templates', 'docs')
-    
-    # Security: Sanitize page name and prevent path traversal.
+        
     safe_page = os.path.normpath(page).lstrip('./\\')
     if '..' in safe_page.split(os.path.sep) or not safe_page.endswith('.md'):
         abort(404)
@@ -69,7 +68,21 @@ def help_page(page='Home.md'):
     with open(file_path, 'r', encoding='utf-8') as f:
         md_content = f.read()
 
-    html_content = markdown.markdown(md_content, extensions=['fenced_code', 'tables', 'admonition', 'pymdownx.sane_lists', 'pymdownx.brk'])
+    extensions = [
+        'pymdownx.extra',
+        'pymdownx.magiclink',
+        'pymdownx.tilde',
+        'pymdownx.caret',
+        'pymdownx.smartsymbols',
+        'pymdownx.details',
+        'pymdownx.superfences',
+        'pymdownx.tabbed',
+        'pymdownx.sane_lists',
+        'toc',
+        'admonition',
+        'pymdownx.brk'
+    ]
+    html_content = markdown.markdown(md_content, extensions=extensions)
     
     navigation = parse_docs_nav()
 
