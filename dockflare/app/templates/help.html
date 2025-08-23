@@ -47,13 +47,13 @@
                                 <summary class="font-semibold text-base-content/70">{{ item.name }}</summary>
                                 <ul>
                                     {% for child in item.children %}
-                                    <li class="{{ 'bordered border-primary' if child.link == current_page else '' }}"><a href="{{ url_for('help.help_page', page=child.link) }}">{{ child.name }}</a></li>
+                                    <li><a href="{{ url_for('help.help_page', page=child.link) }}" class="{{ 'active' if child.link == current_page else '' }}">{{ child.name }}</a></li>
                                     {% endfor %}
                                 </ul>
                             </details>
                         </li>
                     {% else %}
-                        <li class="{{ 'bordered border-primary' if item.link == current_page else '' }}"><a href="{{ url_for('help.help_page', page=item.link) }}">{{ item.name }}</a></li>
+                        <li><a href="{{ url_for('help.help_page', page=item.link) }}" class="{{ 'active' if item.link == current_page else '' }}">{{ item.name }}</a></li>
                     {% endif %}
                 {% endfor %}
             </ul>
