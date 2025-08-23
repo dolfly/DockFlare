@@ -113,19 +113,23 @@
 
                     const details = JSON.parse(this.dataset.groupDetails);
                     if (details.policies) {
-                        const countryPolicy = details.policies.find(p =>
-                            p.include && p.include.some(i => i.geo && i.geo.country_code)
-                        );
+                        const countryPolicy = details.policies.find(p => p.include && p.include.some(i => i.geo));
+                        const everyonePolicy = details.policies.find(p => p.include && p.include.some(i => i.everyone));
 
                         const countryCodes = (countryPolicy ? countryPolicy.include : [])
                             .filter(i => i.geo && i.geo.country_code)
                             .map(i => i.geo.country_code);
 
                         countrySelectInstance.setValue(countryCodes);
-
-                        const countryActionSelect = modal.querySelector('#group_country_action');
-                        if (countryActionSelect) {
-                            countryActionSelect.value = countryPolicy ? countryPolicy.decision : 'bypass';
+                        
+                        const countryModeSelect = modal.querySelector('#group_country_policy_mode');
+                        if (countryModeSelect) {
+                            if (countryPolicy && countryPolicy.decision === 'deny' && everyonePolicy && everyonePolicy.decision === 'bypass') {
+                                countryModeSelect.value = 'block_selected';
+                            } else {
+                                // Default to "allow selected" for any other configuration, which is the safer and more common use case.
+                                countryModeSelect.value = 'allow_selected';
+                            }
                         }
                     }
                 }, 100);
@@ -141,9 +145,9 @@
                     countrySelectInstance.clear();
                     const modal = document.getElementById('access_group_modal');
                     if (!modal) return;
-                    const countryActionSelect = modal.querySelector('#group_country_action');
-                    if (countryActionSelect) {
-                        countryActionSelect.value = 'bypass';
+                    const countryModeSelect = modal.querySelector('#group_country_policy_mode');
+                    if (countryModeSelect) {
+                        countryModeSelect.value = 'allow_selected';
                     }
                 }, 100);
             });
