@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [v2.1.4] - 2025-08-23
+
+### New
+- **Geo-Fencing Support:** Access Groups now support country-based blocking, allowing you to easily block traffic from specific countries (thanks @psybernoid, #183).
+- **Multiple Policies per Rule:** You can now apply multiple Access Groups to a single ingress rule, both via Docker labels (`dockflare.access.groups`) and the web UI, to combine and layer policies (thanks @psybernoid, #183).
+
+### Changed
+- **UI/UX Refinement:** The Access Groups manager has been moved from the Settings page to its own dedicated "Access Policies" page in the main navigation bar for improved visibility and workflow.
+- **IP-Based Access Policies:** Access Groups now fully support creating policies based on allowed IP ranges (CIDR notation), in addition to emails.
+
+
 ## [v2.1.3] - 2025-08-15
 
 ### New
