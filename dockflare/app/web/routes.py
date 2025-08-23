@@ -1097,11 +1097,10 @@ def ui_edit_manual_rule_route():
 
     return redirect(url_for('web.status_page'))
 
-def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_list=None, country_policy_mode='allow_selected'):
+def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_list=None):
     policies = []
     allow_include_rules = []
 
-    
     if email_str and email_str.strip():
         email_parts = [part.strip() for part in email_str.split(',') if part.strip()]
         for part in email_parts:
@@ -1115,37 +1114,26 @@ def _parse_and_build_policy_from_form(email_str, ip_ranges_str=None, countries_l
         for ip in ip_parts:
             allow_include_rules.append({"ip": {"ip": ip}})
 
-    
+    if allow_include_rules:
+        policies.append({"name": "Allow defined users and IPs", "decision": "allow", "include": allow_include_rules})
+
+
     if countries_list:
         country_rules = [{"geo": {"country_code": country.upper()}} for country in countries_list]
-        if country_policy_mode == 'block_selected':
-    
-            policy = {
-                "name": "Bypass all except selected countries",
-                "decision": "bypass",
-                "include": [{"everyone": {}}],
-                "exclude": country_rules
-            }
-            policies.append(policy)
-    
+
+
+        policies.append({
+            "name": "Block selected countries",
+            "decision": "bypass",
+            "include": [{"everyone": {}}],
+            "exclude": country_rules
+        })
+    elif allow_include_rules:
         
-        else:  # Default to 'allow_selected'
-    
-            if allow_include_rules:
-                policies.append({"name": "Allow defined users and IPs", "decision": "allow", "include": allow_include_rules})
-    
-            policies.append({"name": "Allow selected countries", "decision": "allow", "include": country_rules})
-    
-            policies.append({"name": "Default Deny", "decision": "deny", "include": [{"everyone": {}}]})
-    
-    
+        policies.append({"name": "Default Deny", "decision": "deny", "include": [{"everyone": {}}]})
     else:
-        if allow_include_rules:
-            policies.append({"name": "Allow defined users and IPs", "decision": "allow", "include": allow_include_rules})
-            policies.append({"name": "Default Deny", "decision": "deny", "include": [{"everyone": {}}]})
-        else:
-    
-            policies.append({"name": "Default Deny (No rules defined)", "decision": "deny", "include": [{"everyone": {}}]})
+        
+        policies.append({"name": "Default Deny (No rules defined)", "decision": "deny", "include": [{"everyone": {}}]})
 
     return policies
 
@@ -1174,8 +1162,7 @@ def create_access_group():
             "policies": _parse_and_build_policy_from_form(
                 form.get('emails', ''),
                 form.get('ip_ranges', ''),
-                request.form.getlist('countries'),
-                form.get('country_policy_mode', 'allow_selected')
+                request.form.getlist('countries')
             )
         }
         access_groups[group_id] = new_group
@@ -1208,8 +1195,7 @@ def edit_access_group(group_id):
             "policies": _parse_and_build_policy_from_form(
                 form.get('emails', ''),
                 form.get('ip_ranges', ''),
-                request.form.getlist('countries'),
-                form.get('country_policy_mode', 'allow_selected')
+                request.form.getlist('countries')
             )
         }
         access_groups[group_id] = updated_group

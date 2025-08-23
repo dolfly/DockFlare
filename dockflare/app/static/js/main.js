@@ -447,13 +447,11 @@ function openEditAccessGroupModal(groupId, details) {
     let emailText = '';
     let ipRangeText = '';
     let selectedCountries = [];
-    let countryPolicyMode = 'allow_selected'; // Default
 
     if (details.policies && Array.isArray(details.policies)) {
         const emails = [];
         const ipRanges = [];
 
-        // Check for the specific "block selected countries" pattern first.
         const blockPolicy = details.policies.find(p =>
             p.decision === 'bypass' &&
             p.include && Array.isArray(p.include) && p.include.some(i => i.everyone) &&
@@ -461,37 +459,24 @@ function openEditAccessGroupModal(groupId, details) {
         );
 
         if (blockPolicy) {
-            countryPolicyMode = 'block_selected';
-            // In block mode, countries are in the 'exclude' array.
+            
             blockPolicy.exclude.forEach(rule => {
                 if (rule.geo && rule.geo.country_code) {
                     selectedCountries.push(rule.geo.country_code);
                 }
             });
-            // Also parse emails/IPs from other policies in case of a weird state
-            details.policies.forEach(p => {
-                if (p === blockPolicy) return;
-                if (p.include) {
-                    p.include.forEach(rule => {
-                        if (rule.email && rule.email.email) emails.push(rule.email.email);
-                        else if (rule.email_domain && rule.email_domain.domain) emails.push(`@${rule.email_domain.domain}`);
-                        else if (rule.ip && rule.ip.ip) ipRanges.push(rule.ip.ip);
-                    });
-                }
-            });
-        } else {
-            countryPolicyMode = 'allow_selected';
-            details.policies.forEach(policy => {
-                if (policy.include) {
-                    policy.include.forEach(rule => {
-                        if (rule.email && rule.email.email) emails.push(rule.email.email);
-                        else if (rule.email_domain && rule.email_domain.domain) emails.push(`@${rule.email_domain.domain}`);
-                        else if (rule.ip && rule.ip.ip) ipRanges.push(rule.ip.ip);
-                        else if (rule.geo && rule.geo.country_code) selectedCountries.push(rule.geo.country_code);
-                    });
-                }
-            });
         }
+        
+        
+        details.policies.forEach(policy => {
+            if (policy.include) {
+                policy.include.forEach(rule => {
+                    if (rule.email && rule.email.email) emails.push(rule.email.email);
+                    else if (rule.email_domain && rule.email_domain.domain) emails.push(`@${rule.email_domain.domain}`);
+                    else if (rule.ip && rule.ip.ip) ipRanges.push(rule.ip.ip);
+                });
+            }
+        });
 
         emailText = [...new Set(emails)].join(', ');
         ipRangeText = [...new Set(ipRanges)].join(', ');
@@ -499,11 +484,6 @@ function openEditAccessGroupModal(groupId, details) {
 
     document.getElementById('group_emails').value = emailText;
     document.getElementById('group_ip_ranges').value = ipRangeText;
-    
-    const countryPolicySelect = document.getElementById('country_policy_mode');
-    countryPolicySelect.value = countryPolicyMode;
-    // Trigger change to update help text
-    countryPolicySelect.dispatchEvent(new Event('change'));
 
     const countrySelect = document.getElementById('group_countries');
     if (countrySelect && countrySelect.tomselect) {
@@ -724,25 +704,6 @@ document.addEventListener('DOMContentLoaded', function() {
         createAccessGroupBtn.addEventListener('click', function() {
             openCreateAccessGroupModal();
         });
-    }
-
-    const policyModeSelect = document.getElementById('country_policy_mode');
-    if (policyModeSelect) {
-        const helpText = document.getElementById('country_policy_help_text');
-        const countrySelectLabel = document.querySelector('label[for="group_countries"] .label-text');
-
-        const updateHelpText = () => {
-            if (policyModeSelect.value === 'allow_selected') {
-                helpText.textContent = 'Selected countries will be allowed. All other countries will be blocked.';
-                if(countrySelectLabel) countrySelectLabel.textContent = 'Allowed Countries';
-            } else {
-                helpText.textContent = 'Selected countries will be blocked. All other countries will be allowed.';
-                if(countrySelectLabel) countrySelectLabel.textContent = 'Blocked Countries';
-            }
-        };
-
-        policyModeSelect.addEventListener('change', updateHelpText);
-        updateHelpText(); // Initial call
     }
 
     // Universal Form/Link Protocol Correction
