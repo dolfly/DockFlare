@@ -74,10 +74,9 @@ def help_page(page='Home.md'):
         'markdown.extensions.extra',
         'markdown.extensions.toc',
         'markdown.extensions.meta',
-        'markdown.extensions.sane_lists',
+        'markdown.extensions.nl2br',
         'pymdownx.superfences',
         'pymdownx.highlight',
-        'pymdownx.magiclink',
         'pymdownx.tasklist',
         'pymdownx.tilde',
     ]
@@ -88,16 +87,14 @@ def help_page(page='Home.md'):
         },
         'pymdownx.superfences': {},
         'pymdownx.tasklist': {'custom_checkbox': True},
-        'pymdownx.magiclink': {},
     }
 
-  
+
     html_content = markdown.markdown(
         md_content,
         extensions=extensions,
         extension_configs=extension_configs,
-        output_format='html5',
-        nl2br=True
+        output_format='html5'
     )
     
     navigation = parse_docs_nav()
