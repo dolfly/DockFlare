@@ -102,6 +102,11 @@ def create_app():
             return User(user_id)
         return None
 
+    @app_instance.context_processor
+    def inject_version():
+        """Injects the app version into all templates."""
+        return dict(app_version=config.APP_VERSION)
+
     app_instance.reconciliation_info = {
         "in_progress": False,
         "progress": 0,
