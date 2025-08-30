@@ -213,7 +213,7 @@ def status_page():
     display_token_val = get_display_token_ui(template_tunnel_state.get("token"))
     cf_account_id = current_app.config.get('CF_ACCOUNT_ID')
 
-    # Build public hostname index mapping for Cloudflare Zero Trust UI links
+    
     public_hostname_indices = {}
     try:
         effective_tunnel_id = template_tunnel_state.get("id") or config.EXTERNAL_TUNNEL_ID
@@ -305,7 +305,7 @@ def settings_page():
     security_settings_form = SecuritySettingsForm(prefix='security')
     cf_credentials_form = CloudflareCredentialsForm(prefix='cf_creds')
 
-    # Distinguish between form submissions
+    
     if request.method == 'POST':
         if settings_form.submit_settings.data and settings_form.validate():
             data_path = os.path.dirname(config.STATE_FILE_PATH)
@@ -438,7 +438,7 @@ def settings_page():
                 flash('An error occurred while updating credentials.', 'danger')
 
 
-    # Populate forms for GET request
+    
     if request.method == 'GET':
         settings_form.tunnel_name.data = current_app.config.get('TUNNEL_NAME')
         settings_form.cf_zone_id.data = current_app.config.get('CF_ZONE_ID')
@@ -672,53 +672,69 @@ def version_check():
 
         
         try:
+            
+            try:
+                hub_api_url = f"https://hub.docker.com/v2/repositories/{repo}/tags/{tag}/"
+                r_hub = requests.get(hub_api_url, timeout=10)
+                if r_hub.status_code == 200:
+                    hub_data = r_hub.json()
+                    
+                    pushed_at = hub_data.get('tag_last_pushed') or hub_data.get('last_updated')
+                    if pushed_at:
+                        result['remote_pushed_at'] = pushed_at
+                        logging.debug(f"Version check: found remote_pushed_at via Docker Hub API v2: {pushed_at}")
+            except Exception as e_hub:
+                logging.debug(f"Version check: Docker Hub API v2 lookup failed, will proceed with manifest check. Error: {e_hub}")
+
+            
             token = None
             auth_url = f"https://auth.docker.io/token?service=registry.docker.io&scope=repository:{repo}:pull"
             r_tok = requests.get(auth_url, timeout=10)
             if r_tok.status_code == 200:
                 token = r_tok.json().get('token')
+            
             headers = {'Accept': 'application/vnd.docker.distribution.manifest.v2+json'}
             if token:
                 headers['Authorization'] = f"Bearer {token}"
+            
             manifest_url = f"https://registry-1.docker.io/v2/{repo}/manifests/{tag}"
             r = requests.get(manifest_url, headers=headers, timeout=10)
+            
             if r.status_code == 200:
                 remote_digest = r.headers.get('Docker-Content-Digest')
                 
-                try:
-                    manifest_json = r.json()
-                    config_digest = None
-                    if isinstance(manifest_json, dict):
-                        cfg = manifest_json.get('config') or {}
-                        config_digest = cfg.get('digest')
-                    
-                    if config_digest:
-                        blob_url = f"https://registry-1.docker.io/v2/{repo}/blobs/{config_digest}"
-                        r_blob = requests.get(blob_url, headers=headers, timeout=10)
-                        if r_blob.status_code == 200:
-                            try:
-                                cfg_json = r_blob.json()
-                                logging.debug(f"Version check: config blob content: {json.dumps(cfg_json, indent=2)}")
-                                created = None
-                                if isinstance(cfg_json, dict):
-                                    created = cfg_json.get('created')
-                                    if not created:
-                                        history = cfg_json.get('history')
-                                        if isinstance(history, list) and history:
-                                            try:
+                
+                if 'remote_pushed_at' not in result:
+                    logging.debug("Version check: remote_pushed_at not found via Hub API, attempting manifest blob inspection.")
+                    try:
+                        manifest_json = r.json()
+                        config_digest = None
+                        if isinstance(manifest_json, dict):
+                            cfg = manifest_json.get('config') or {}
+                            config_digest = cfg.get('digest')
+                        
+                        if config_digest:
+                            blob_url = f"https://registry-1.docker.io/v2/{repo}/blobs/{config_digest}"
+                            
+                            r_blob = requests.get(blob_url, headers=headers, timeout=10)
+                            if r_blob.status_code == 200:
+                                try:
+                                    cfg_json = r_blob.json()
+                                    created = None
+                                    if isinstance(cfg_json, dict):
+                                        created = cfg_json.get('created')
+                                        
+                                        if not created:
+                                            history = cfg_json.get('history')
+                                            if isinstance(history, list) and history:
                                                 created = history[0].get('created')
-                                            except Exception:
-                                                created = None
-                                if created:
-                                    result['remote_pushed_at'] = created
-                            except Exception as e_blob_parse:
-                                logging.debug(f"Version check: failed to parse config blob: {e_blob_parse}")
-                                
-                                pass
-                except Exception as e_manifest_parse:
-                    logging.debug(f"Version check: failed to parse manifest: {e_manifest_parse}")
-                    
-                    pass
+                                    if created:
+                                        result['remote_pushed_at'] = created
+                                        logging.debug(f"Version check: found remote_pushed_at via manifest blob: {created}")
+                                except Exception as e_blob_parse:
+                                    logging.debug(f"Version check: failed to parse config blob for timestamp: {e_blob_parse}")
+                    except Exception as e_manifest_parse:
+                        logging.debug(f"Version check: failed to parse manifest for timestamp fallback: {e_manifest_parse}")
         except Exception as e_remote:
             logging.debug(f"Version check: failed to fetch remote manifest/digest: {e_remote}")
 
