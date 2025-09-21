@@ -15,7 +15,7 @@
   </a>
 </p>
 <p align="center">
-  <a href="https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v2.1.7"><img src="https://img.shields.io/badge/Release-v2.1.7-blue.svg?style=for-the-badge" alt="Release"></a>
+  <a href="https://github.com/ChrispyBacon-dev/DockFlare/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/Release-v3.0.0-blue.svg?style=for-the-badge" alt="Release"></a>
   <a href="https://hub.docker.com/r/alplat/dockflare"><img src="https://img.shields.io/docker/pulls/alplat/dockflare?style=for-the-badge" alt="Docker Pulls"></a>
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Made%20with-Python-1f425f.svg?style=for-the-badge" alt="Python"></a>
   <a href="https://github.com/ChrispyBacon-dev/DockFlare/blob/main/LICENSE.MD"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg?style=for-the-badge" alt="License"></a>
@@ -26,7 +26,7 @@
   <a href="https://dockflare.app">🌐 Website</a> ·
   <a href="https://dockflare.app/docs">📚 Documentation</a> ·
   <a href="https://github.com/ChrispyBacon-dev/DockFlare/issues">🐛 Report a Bug</a> ·
-  <a href="https://ko-fi.com/chrispybacon">❤️ Sponsor</a>
+  <a href="https://github.com/sponsors/ChrispyBacon-dev">❤️ Sponsor</a>
 </p>
 
 <p align="center">
@@ -41,15 +41,15 @@ DockFlare is a powerful, self-hosted ingress controller that simplifies Cloudfla
 
 It enables secure, hassle-free public access to both Dockerized and non-Dockerized applications with minimal direct interaction with Cloudflare, making it the perfect tool for centralizing and streamlining your access management.
 
-### ✨ What's New in DockFlare 2.1: The Usability & Security Update
+### ✨ What's New in DockFlare 3.0: Multi-Server & Agent Release
 
-This release overhauls the user experience, focusing on security and ease of use.
+DockFlare 3.0 elevates the project from a single-node helper to a distributed fleet orchestrator.
 
-- **Browser-Based Setup**: Say goodbye to `.env` files! A new "Pre-Flight" wizard guides you through the initial setup in your browser.
-- **Enhanced Security**: The UI is now password-protected. All credentials are encrypted and stored in a secure `dockflare_config.dat` file.
-- **Seamless Migration**: Existing users are automatically guided through a simple migration process to adopt the new security model.
-- **Full UI Configuration**: Core settings can now be modified directly from the UI after setup.
-- **⚠️ Breaking Change**: `.env` files are no longer used for configuration after the initial setup/migration.
+- **DockFlare Agent**: Deploy the lightweight agent next to workloads on any host. Agents stream container events, maintain their own tunnels, and obey commands from the master.
+- **Fleet Management UI**: A dedicated *Agents* page lets you enrol nodes with API keys, assign tunnels, monitor health, and trigger actions without touching the CLI.
+- **Security Hardening**: Master API calls now require an explicit master key that is revealed on demand, agent tokens are revocable, and sensitive setup routes stay locked after onboarding. The DockFlare Agent container now runs as the unprivileged `dockflare` user (UID/GID 65532) and the reference compose stack proxies Docker access through `tecnativa/docker-socket-proxy` for least-privilege isolation.
+- **Redis Backplane**: The master now uses Redis for caching, queue fan-out, and cross-process signalling—ready for future scaling.
+- **Documentation Refresh**: New guides cover the master/agent architecture, configuration tips, and upgrade considerations.
 
 ## Getting Started & Documentation
 
@@ -63,6 +63,7 @@ For comprehensive documentation, please refer to the official project website:
 
 Before you begin, ensure you have the following:
 - Docker & Docker Compose installed.
+- A Redis instance (the quick-start stack below runs one for you).
 - A Cloudflare Account.
 - Your **Cloudflare Account ID**.
 - The **Zone ID** for the domain you wish to use.
@@ -81,27 +82,45 @@ Before you begin, ensure you have the following:
 1.  **Create `docker-compose.yml`**:
     ```yaml
     version: '3.8'
-    services:
-      dockflare:
-        image: alplat/dockflare:stable
-        container_name: dockflare
-        restart: unless-stopped
-        ports:
-          - "5000:5000"
-        volumes:
-          - /var/run/docker.sock:/var/run/docker.sock:ro
-          # This volume is crucial for persisting your encrypted configuration
-          - ./dockflare_data:/app/data
-        networks:
-          - cloudflare-net
-
+services:
+  dockflare:
+    image: alplat/dockflare:stable
+    container_name: dockflare
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
     volumes:
-      dockflare_data:
-
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Persist encrypted configuration, state, and audit logs
+      - ./dockflare_data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     networks:
-      cloudflare-net:
-       name: cloudflare-net
-       external: true
+      - cloudflare-net
+      - dockflare-internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: dockflare-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - ./dockflare_redis:/data
+    networks:
+      - dockflare-internal
+
+volumes:
+  dockflare_data:
+  dockflare_redis:
+
+networks:
+  cloudflare-net:
+    name: cloudflare-net
+    external: true
+  dockflare-internal:
+    name: dockflare-internal
     ```
 
 2.  **Run DockFlare**:
@@ -113,6 +132,10 @@ Before you begin, ensure you have the following:
 
 4.  **For Existing Users**: If you are upgrading, DockFlare will detect your old `.env` file and automatically guide you through a quick migration process.
 
+Redis runs on a private `dockflare-internal` network so only the DockFlare container can access it.
+
+💡 *Need to manage workloads on additional hosts?* Deploy the [DockFlare Agent](https://github.com/ChrispyBacon-dev/DockFlare-Agent-prd) next to your containers, enrol it from the master UI, and let DockFlare orchestrate the tunnels for you. The agent image now runs as the non-root `dockflare` user (UID/GID 65532), so ensure any mounted directories are writable by that account or adjust the build-time `DOCKFLARE_UID/DOCKFLARE_GID` args. A full guide is available in the new [Multi-Server Agent](dockflare/app/templates/docs/Multi-Server-Agent.md) documentation.
+
 </details>
 
 ## 🏷️ How It Works & Labeling Containers
@@ -122,6 +145,7 @@ DockFlare's power comes from its flexible, layered approach to configuration.
 - **Access Groups First (Recommended)**: The easiest and most maintainable way to secure services is to create an **Access Group** in the UI and apply it with a single label.
 - **Individual Labels for One-Offs**: For services that don't fit a group, you can still use individual `dockflare.access.*` labels for initial configuration.
 - **UI for Dynamic Overrides**: The Web UI can override the access policy for any service, whether it was configured by a group or by individual labels. UI changes are persistent and stored in the encrypted `dockflare_config.dat` file.
+- **DNS Zone Auto-Detection**: Starting with v3.0, DockFlare automatically infers the correct Cloudflare zone from each hostname. You only need `dockflare.zonename` when intentionally sending a record to a different zone.
 
 <details>
 <summary>📝 Labeling Your Containers (Examples)</summary>
@@ -178,6 +202,11 @@ Use these labels only when **not** using `dockflare.access.group`.
 
 
 </details>
+
+## Known Issues
+
+- Running Cloudflare WARP locally (for example on macOS) can block the managed `cloudflared` container from establishing a tunnel, resulting in repeated handshake failures and missing `cert.pem` errors. Disable WARP before testing DockFlare on the same host.
+- Deleting the DockFlare data volume clears stored agent API keys. Generate new keys and re-enroll agents after a reset; stale keys will be refused.
 
 ## License
 

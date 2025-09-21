@@ -1,26 +1,51 @@
 version: '3.8'
 services:
   dockflare:
-    image: alplat/dockflare:stable  # alplat/dockflare:unstable docker tag for beta versions
-    # build: ./dockflare  # Uncomment to build from source instead
+    #image: alplat/dockflare:stable  # alplat/dockflare:unstable docker tag for beta versions
+    build: ./dockflare  # Uncomment to build from source instead
     container_name: dockflare
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "5001:5000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Required to monitor Docker events
       - dockflare_data:/app/data  # Persistent storage for state
     networks:
       - cloudflare-net  # Network for communication with other containers
+      - dockflare-internal
+    depends_on:
+      - redis
     environment:
       - STATE_FILE_PATH=/app/data/state.json
       - TZ=Europe/Zurich  # Set your timezone here
-    #labels: # Optional
-    #- dockflare.enable=true
-    #- dockflare.hostname=dockflare.yourdomain.tld
-    #- dockflare.service=http://dockflare:5000  
+      - REDIS_URL=redis://redis:6379/0
+      - CACHE_ENABLED=true
+      - DNS_RECORDS_CACHE_TIMEOUT=300
+    labels: # Optional
+    - dockflare.enable=true
+    - dockflare.hostname=master.dockflare.app
+    - dockflare.service=http://host.docker.internal:5001  
+    - dockflare.access.policy=bypass
+  redis:
+    image: redis:7-alpine
+    container_name: dockflare-redis
+    restart: unless-stopped
+    networks:
+      - dockflare-internal
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
 volumes:
   dockflare_data:
+  redis-data:
 networks:
   cloudflare-net:
    name: cloudflare-net
+   external: true
+  dockflare-internal:
+    name: dockflare-internal

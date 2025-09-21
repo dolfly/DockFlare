@@ -15,6 +15,28 @@
 
     <div id="reconciliation-status" class="mb-8"></div>
     <div id="reconciliation-status-message" class="text-sm opacity-75 mb-1"></div>
+    
+    {% if cache_status is defined and cache_status is not none %}
+    <div class="flex items-center gap-2 mb-4">
+        <div class="badge badge-sm {% if cache_status.connected %}badge-success{% else %}badge-warning{% endif %} gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.678 48.678 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3" />
+            </svg>
+            Cache: {% if cache_status.connected %}Connected{% else %}Fallback{% endif %}
+        </div>
+        <span class="text-xs opacity-75">
+            {% if cache_status.connected %}
+                Redis cache active
+            {% else %}
+                Using in-memory cache
+            {% endif %}
+            ({{ cache_status.dns_records_count|default(0) }} DNS records cached)
+            {% if cache_status.error is defined and cache_status.error %}
+                <span class="text-error">(Error: {{ cache_status.error }})</span>
+            {% endif %}
+        </span>
+    </div>
+    {% endif %}
 
     <section class="card bg-base-100 shadow-xl mb-8 sm:mb-12 transition-all duration-300 hover:shadow-2xl">
          <div class="card-body">
@@ -52,6 +74,7 @@
                         <thead>
                             <tr>
                                 <th class="p-3 w-auto">Status</th>
+                                <th class="p-3">Tunnel Name</th>
                                 <th class="p-3 w-1/4">Hostname</th> 
                                 <th class="p-3 w-1/6">Path</th>
                                 <th class="p-3 w-1/5">Service Target</th>
@@ -74,6 +97,12 @@
                                                 {{ details.status.replace('_',' ') }}
                                             </span>
                                         {% endif %}
+                                    </td>
+                                    <td class="p-3 whitespace-nowrap align-top">
+                                        <div class="flex flex-col">
+                                            <span class="text-sm opacity-90">{{ details.tunnel_name or 'N/A' }}</span>
+                                            <span class="text-xs opacity-60 mt-1">Zone: {{ details.zone_name or 'Unknown' }}</span>
+                                        </div>
                                     </td>
                                     <td class="p-3 whitespace-nowrap">
                                     {% set display_hostname = details.hostname if details.hostname else hostname.split('|')[0] %}
@@ -229,29 +258,48 @@
                 <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
             </form>
             <h3 class="font-bold text-lg mb-6">Add New Manual Ingress Rule</h3>
-            <form action="{{ url_for('web.ui_add_manual_rule_route') }}" method="POST" class="protocol-aware-form flex flex-col flex-grow min-h-0">
+            <form id="add_manual_rule_form" action="{{ url_for('web.ui_add_manual_rule_route') }}" method="POST" class="protocol-aware-form flex flex-col flex-grow min-h-0">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" id="manual_zone_id" name="manual_zone_id" />
                 <div class="flex-grow overflow-y-auto space-y-6 p-1">
                     <div>
                         <h4 class="text-md font-semibold mb-2">Public Hostname</h4>
                         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-start">
                             <div class="md:col-span-2">
                                 <label class="label" for="manual_subdomain"><span class="label-text">Subdomain</span></label>
-                                <input type="text" id="manual_subdomain" name="manual_subdomain" placeholder="(optional) subdomain" class="input input-bordered w-full" />
+                                <input type="text" id="manual_subdomain" name="manual_subdomain" placeholder="(optional) subdomain" class="input input-bordered w-full" autocomplete="off" />
                             </div>
                             <div class="md:col-span-3">
                                 <label class="label" for="manual_domain_name"><span class="label-text">Domain (Required)</span></label>
-                                <input type="text" id="manual_domain_name" name="manual_domain_name" placeholder="example.com" class="input input-bordered w-full" required />
-                                <div class="text-xs opacity-60 mt-1">This will be combined with the subdomain to form the full hostname.</div>
+                                <input type="text" id="manual_domain_name" name="manual_domain_name" placeholder="example.com" class="input input-bordered w-full" autocomplete="off" required />
+                                <div class="text-xs opacity-60 mt-1">Combined with subdomain to build the public hostname.</div>
                             </div>
                             <div class="md:col-span-2">
                                 <label class="label" for="manual_path_display"><span class="label-text">Path</span></label>
                                 <div class="join w-full">
                                     <span class="join-item btn btn-disabled normal-case pointer-events-none bg-base-200 border-base-300 !min-h-[3rem] !h-[3rem] px-3">/</span>
-                                    <input type="text" id="manual_path_display" placeholder="(optional) path" class="input input-bordered join-item w-full" />
+                                    <input type="text" id="manual_path_display" placeholder="(optional) path" class="input input-bordered join-item w-full" autocomplete="off" />
                                 </div>
                                 <input type="hidden" id="manual_path" name="manual_path" />
-                                 <div class="text-xs opacity-60 mt-1">If blank, rule applies to the root. User types "app", submitted as "/app".</div>
+                                <div class="text-xs opacity-60 mt-1">Leave blank for root. "app" becomes "/app".</div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <label class="label" for="manual_tunnel_id"><span class="label-text">Tunnel (Required)</span></label>
+                            <select id="manual_tunnel_id" name="manual_tunnel_id" class="select select-bordered w-full" data-default-tunnel-id="{{ default_tunnel_id or '' }}" required>
+                                <option value="" disabled selected>Select a tunnel...</option>
+                            </select>
+                            <div class="text-xs opacity-60 mt-1">Choose which Cloudflare Tunnel will serve this hostname.</div>
+                        </div>
+                        <div class="mt-4 p-3 rounded-lg bg-base-200/60" id="manual_zone_container">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-semibold">Zone Detection</span>
+                                <span class="badge badge-outline badge-sm hidden" id="manual_zone_status_badge"></span>
+                            </div>
+                            <p class="text-xs opacity-80 mt-2" id="manual_zone_message">Enter a hostname to auto-detect the Cloudflare zone. Select a zone if multiple matches are found.</p>
+                            <div class="hidden mt-3" id="manual_zone_selector_wrapper">
+                                <label class="label" for="manual_zone_selector"><span class="label-text">Select Zone</span></label>
+                                <select id="manual_zone_selector" class="select select-bordered w-full"></select>
                             </div>
                         </div>
                     </div>
@@ -365,8 +413,9 @@
                         </div>
                     </div>
                 </div>
+                <div id="manual_rule_feedback" class="hidden alert mt-4"></div>
                 <div class="modal-action mt-8 pt-4 border-t border-base-300">
-                  <button type="submit" class="btn btn-primary">Add Rule</button>
+                  <button type="submit" class="btn btn-primary" id="manual_rule_submit_btn">Add Rule</button>
                 </div>
             </form>
         </div>
@@ -382,17 +431,17 @@
             <form action="{{ url_for('web.ui_edit_manual_rule_route') }}" method="POST" class="protocol-aware-form flex flex-col flex-grow min-h-0" id="edit_manual_rule_form">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="flex-grow overflow-y-auto space-y-6 p-1">
-                    <input type="hidden" name="original_rule_key" id="edit_original_rule_key" />
+                    <input type="hidden" name="edit_rule_key" id="edit_original_rule_key" />
                     <div>
                         <h4 class="text-md font-semibold mb-2">Public Hostname</h4>
                         <div class="grid grid-cols-1 md:grid-cols-7 gap-4 items-start">
                             <div class="md:col-span-2">
                                 <label class="label" for="edit_manual_subdomain"><span class="label-text">Subdomain</span></label>
-                                <input type="text" id="edit_manual_subdomain" name="manual_subdomain" placeholder="(optional) subdomain" class="input input-bordered w-full" />
+                                <input type="text" id="edit_manual_subdomain" name="edit_subdomain" placeholder="(optional) subdomain" class="input input-bordered w-full" />
                             </div>
                             <div class="md:col-span-3">
                                 <label class="label" for="edit_manual_domain_name"><span class="label-text">Domain (Required)</span></label>
-                                <input type="text" id="edit_manual_domain_name" name="manual_domain_name" placeholder="example.com" class="input input-bordered w-full" required />
+                                <input type="text" id="edit_manual_domain_name" name="edit_domain_name" placeholder="example.com" class="input input-bordered w-full" required />
                             </div>
                             <div class="md:col-span-2">
                                 <label class="label" for="edit_manual_path_display"><span class="label-text">Path</span></label>
@@ -400,16 +449,27 @@
                                     <span class="join-item btn btn-disabled normal-case pointer-events-none bg-base-200 border-base-300 !min-h-[3rem] !h-[3rem] px-3">/</span>
                                     <input type="text" id="edit_manual_path_display" placeholder="(optional) path" class="input input-bordered join-item w-full" />
                                 </div>
-                                <input type="hidden" id="edit_manual_path" name="manual_path" />
+                                <input type="hidden" id="edit_manual_path" name="edit_path" />
                             </div>
                         </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div class="rounded-lg bg-base-200/60 p-3">
+                                <p class="text-sm font-semibold">Tunnel</p>
+                                <p class="text-sm mt-1" id="edit_rule_tunnel_value">—</p>
+                            </div>
+                            <div class="rounded-lg bg-base-200/60 p-3">
+                                <p class="text-sm font-semibold">Zone</p>
+                                <p class="text-sm mt-1" id="edit_rule_zone_value">—</p>
+                            </div>
+                        </div>
+                        <div class="alert alert-info hidden mt-4" id="edit_rule_agent_hint">Managed by Agent; tunnel is not editable.</div>
                     </div>
                     <div>
                         <h4 class="text-md font-semibold mb-2">Service</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                             <div>
                                 <label class="label" for="edit_manual_service_type"><span class="label-text">Type (Required)</span></label>
-                                <select name="manual_service_type" id="edit_manual_service_type" class="select select-bordered w-full" required>
+                                <select name="edit_service_type" id="edit_manual_service_type" class="select select-bordered w-full" required>
                                     <option value="" disabled>Select...</option>
                                     <option value="http">HTTP</option>
                                     <option value="https">HTTPS</option>
@@ -424,7 +484,7 @@
                                 <label class="label" for="edit_manual_service_address">
                                     <span class="label-text" id="edit_manual_service_address_label">URL or Status Code</span>
                                 </label>
-                                <input type="text" id="edit_manual_service_address" name="manual_service_address" placeholder="host:port or status code" class="input input-bordered w-full" />
+                                <input type="text" id="edit_manual_service_address" name="edit_service_address" placeholder="host:port or status code" class="input input-bordered w-full" />
                             </div>
                         </div>
                     </div>
@@ -436,7 +496,7 @@
                                 <label class="label" for="edit_manual_access_group">
                                     <span class="label-text font-medium">1. Assign Access Group(s) (Recommended)</span>
                                 </label>
-                                <select name="manual_access_groups" id="edit_manual_access_group" multiple>
+                                <select name="edit_access_groups" id="edit_manual_access_group" multiple>
                                     {% if access_groups %}
                                         {% for group_id, details in access_groups.items()|sort %}
                                             <option value="{{ group_id }}">{{ details.display_name }} (ID: {{ group_id }})</option>
@@ -453,7 +513,7 @@
                                     <label class="label" for="edit_manual_access_policy_type">
                                         <span class="label-text font-medium">2. Configure Manually</span>
                                     </label>
-                                    <select name="manual_access_policy_type" id="edit_manual_access_policy_type" class="select select-bordered w-full policy-type-select">
+                                    <select name="edit_access_policy_type" id="edit_manual_access_policy_type" class="select select-bordered w-full policy-type-select">
                                         <option value="none">None (Public - No App)</option>
                                         <option value="bypass">Bypass (Public App)</option>
                                         <option value="authenticate_email">Authenticate by Email</option>
@@ -462,7 +522,7 @@
                                 </div>
                                 <div class="auth-email-field hidden">
                                     <label class="label" for="edit_manual_auth_email"><span class="label-text">Allowed Email(s) or Domain(s)</span></label>
-                                    <input type="text" id="edit_manual_auth_email" name="manual_auth_email" placeholder="user@example.com, @domain.com" class="input input-bordered w-full" />
+                                    <input type="text" id="edit_manual_auth_email" name="edit_auth_email" placeholder="user@example.com, @domain.com" class="input input-bordered w-full" />
                                 </div>
                             </div>
                         </div>
@@ -471,23 +531,23 @@
                     <div class="space-y-4 pt-4 border-t border-base-300 mt-6">
                         <div class="form-control">
                             <label class="label" for="edit_manual_zone_name_override"><span class="label-text">Cloudflare Zone Name (Override/Specific)</span></label>
-                            <input type="text" id="edit_manual_zone_name_override" name="manual_zone_name_override" placeholder="yourdomain.com (if different from Domain Name)" class="input input-bordered w-full" />
+                            <input type="text" id="edit_manual_zone_name_override" name="edit_zone_name_override" placeholder="yourdomain.com (if different from Domain Name)" class="input input-bordered w-full" />
                         </div>
                         <div id="edit_manual_no_tls_verify_div" class="form-control">
                           <label class="label cursor-pointer justify-start gap-2">
-                            <input type="checkbox" name="manual_no_tls_verify" id="edit_manual_no_tls_verify" class="checkbox checkbox-sm" />
+                            <input type="checkbox" name="edit_no_tls_verify" id="edit_manual_no_tls_verify" class="checkbox checkbox-sm" />
                             <span class="label-text">Disable TLS Verification</span>
                           </label>
                         </div>
                         <div class="form-control" id="edit_manual_origin_server_name_div">
                             <label class="label" for="edit_manual_origin_server_name"><span class="label-text">Origin Server Name (SNI)</span></label>
-                            <input type="text" id="edit_manual_origin_server_name" name="manual_origin_server_name" placeholder="e.g., internal.service.local" class="input input-bordered w-full" />
+                            <input type="text" id="edit_manual_origin_server_name" name="edit_origin_server_name" placeholder="e.g., internal.service.local" class="input input-bordered w-full" />
                         </div>
                         <div class="form-control">
                             <label class="label" for="edit_manual_http_host_header">
                                 <span class="label-text">HTTP Host Header (Optional)</span>
                             </label>
-                            <input type="text" id="edit_manual_http_host_header" name="manual_http_host_header"
+                            <input type="text" id="edit_manual_http_host_header" name="edit_http_host_header"
                                    placeholder="e.g., api.example.com"
                                    class="input input-bordered w-full" />
                             <label class="label">

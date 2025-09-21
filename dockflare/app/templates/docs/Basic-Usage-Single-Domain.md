@@ -30,8 +30,13 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./dockflare_data:/app/data
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     networks:
       - cloudflare-net
+      - dockflare-internal
 
   # Add your new service here
   nginx-webserver:
@@ -46,14 +51,29 @@ services:
       - "dockflare.hostname=nginx.example.com"
       - "dockflare.service=http://nginx-webserver:80"
 
+  redis:
+    image: redis:7-alpine
+    container_name: dockflare-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - ./dockflare_redis:/data
+    networks:
+      - dockflare-internal
+
 volumes:
   dockflare_data:
+  dockflare_redis:
 
 networks:
   cloudflare-net:
     name: cloudflare-net
     external: true
+  dockflare-internal:
+    name: dockflare-internal
 ```
+> **Why Redis?** DockFlare relies on Redis for caching, log streaming, and cross-thread messaging. Running it on a private `dockflare-internal` network keeps Redis reachable only by DockFlare while workloads stay on `cloudflare-net`.
+
 
 ### 2. Understanding the Labels
 
@@ -80,3 +100,29 @@ You can verify this in a few ways:
 *   **Cloudflare Dashboard**: You will see the new CNAME record in your DNS settings and the new ingress rule in your tunnel configuration.
 
 After a few moments for DNS to propagate, you should be able to navigate to `https://nginx.example.com` in your browser and see the default NGINX welcome page.
+
+## Backup & Restore Deep Dive
+
+DockFlare ships with a first-class backup flow so you can move or recover an instance in minutes.
+
+### What the backup archive contains
+
+When you download a backup from **Settings → Backup & Restore** (or the onboarding wizard), DockFlare generates a `.zip` with the following files:
+
+| File | Description |
+| --- | --- |
+| `dockflare_config.dat` | Encrypted configuration payload (Cloudflare credentials, UI password hash, tunnel defaults, master API key, etc.). |
+| `dockflare.key` | The Fernet key used to decrypt `dockflare_config.dat` and other encrypted payloads. Keep it with the archive. |
+| `agent_keys.dat` | Encrypted registry of agent API keys, metadata, and revocation status. |
+| `state.json` | Plain JSON snapshot of runtime state—managed rules, agents, access groups. This is included so operators can inspect or migrate specific pieces if needed. |
+| `manifest.json` | Checksums and versioning information for each file in the archive. |
+
+The backup is self-contained: restoring it via the wizard/apply endpoint writes each file to `/app/data/` and immediately schedules a container restart so the encrypted configuration is reloaded on boot.
+
+### Restoring and compatibility notes
+
+- **Wizard & Settings UI**: Upload the `.zip` and DockFlare will import it, reload state, and exit. Docker restarts the container automatically, so you land back in operational mode without manual intervention.
+- **Legacy `state.json`**: For troubleshooting or advanced workflows you can still upload just a `state.json` file. DockFlare will populate the runtime state from it but skip the encrypted config; you must re-enter credentials afterwards.
+- **Automation**: Because the restart is automatic, make sure any reverse proxy health checks allow for a brief restart window (~5 s) after a restore.
+
+Backups do **not** include the Redis dataset; it only caches data that DockFlare can recompute. The `/app/data` volume alongside the archive is the critical piece to secure and back up.

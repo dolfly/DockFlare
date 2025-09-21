@@ -4,6 +4,24 @@ let initialConnectMessageCleared = false;
 let activeLogSource = null;
 let eventSourceHealthCheck = null;
 let pingInterval = null;
+let manualTunnelTomSelect = null;
+let cachedTunnels = null;
+let cachedZones = null;
+let manualZoneDetectionTimeout = null;
+
+function getMasterApiKey() {
+    const meta = document.querySelector('meta[name="dockflare-api-key"]');
+    return meta && meta.content ? meta.content : null;
+}
+
+function buildApiHeaders(initial = {}) {
+    const headers = { ...initial };
+    const key = getMasterApiKey();
+    if (key) {
+        headers['Authorization'] = `Bearer ${key}`;
+    }
+    return headers;
+}
 
 function initializeAllTomSelects() {
     const multiCheckboxOptions = {
@@ -25,6 +43,14 @@ function initializeAllTomSelects() {
         maxOptions: null, 
     };
 
+    const singleSelectOptions = {
+        create: false,
+        sortField: {
+            field: 'text',
+            direction: 'asc'
+        }
+    };
+
     // Initialize selects on the Dashboard page (Add/Edit Rule modals)
     const addGroupSelect = document.getElementById('manual_access_group');
     if (addGroupSelect) {
@@ -33,6 +59,11 @@ function initializeAllTomSelects() {
     const editGroupSelect = document.getElementById('edit_manual_access_group');
     if (editGroupSelect) {
         new TomSelect(editGroupSelect, multiCheckboxOptions);
+    }
+
+    const manualTunnelSelect = document.getElementById('manual_tunnel_id');
+    if (manualTunnelSelect) {
+        manualTunnelTomSelect = new TomSelect(manualTunnelSelect, singleSelectOptions);
     }
 
     // Initialize select on the Access Policies page (Access Group modal)
@@ -163,22 +194,55 @@ function initializeEditRuleModal() {
                 const accessGroupSelect = modal.querySelector('#edit_manual_access_group');
                 const manualPolicySelect = modal.querySelector('#edit_manual_access_policy_type');
 
-                if (details.access_group_id) {
-                    accessGroupSelect.value = details.access_group_id;
-                } else {
-                    accessGroupSelect.value = '';
+                const selectedGroups = Array.isArray(details.access_group_id)
+                    ? details.access_group_id
+                    : (details.access_group_id ? [details.access_group_id] : []);
+
+                if (accessGroupSelect) {
+                    if (accessGroupSelect.tomselect) {
+                        accessGroupSelect.tomselect.clear();
+                        if (selectedGroups.length) {
+                            accessGroupSelect.tomselect.setValue(selectedGroups, true);
+                        }
+                    } else {
+                        accessGroupSelect.value = selectedGroups.length ? selectedGroups[0] : '';
+                    }
                 }
-                
-                manualPolicySelect.value = details.access_policy_type || 'none';
-                
-                accessGroupSelect.dispatchEvent(new Event('change'));
-                manualPolicySelect.dispatchEvent(new Event('change'));
+
+                if (manualPolicySelect) {
+                    manualPolicySelect.value = details.access_policy_type || 'none';
+                    manualPolicySelect.dispatchEvent(new Event('change'));
+                }
+                if (accessGroupSelect) {
+                    accessGroupSelect.dispatchEvent(new Event('change'));
+                }
 
                 modal.querySelector('#edit_manual_auth_email').value = details.auth_email || '';
                 modal.querySelector('#edit_manual_zone_name_override').value = '';
                 modal.querySelector('#edit_manual_no_tls_verify').checked = details.no_tls_verify || false;
                 modal.querySelector('#edit_manual_origin_server_name').value = details.origin_server_name || '';
                 modal.querySelector('#edit_manual_http_host_header').value = details.http_host_header || '';
+
+                const tunnelDisplay = modal.querySelector('#edit_rule_tunnel_value');
+                const zoneDisplay = modal.querySelector('#edit_rule_zone_value');
+                const agentHint = modal.querySelector('#edit_rule_agent_hint');
+
+                if (tunnelDisplay) {
+                    const tunnelId = details.tunnel_id;
+                    const tunnelName = details.tunnel_name || (tunnelId ? 'Tunnel' : 'N/A');
+                    if (tunnelId) {
+                        const shortId = tunnelId.length > 12 ? `${tunnelId.slice(0, 12)}…` : tunnelId;
+                        tunnelDisplay.textContent = `${tunnelName} (${shortId})`;
+                    } else {
+                        tunnelDisplay.textContent = tunnelName;
+                    }
+                }
+                if (zoneDisplay) {
+                    zoneDisplay.textContent = details.zone_name || details.zone_id || '—';
+                }
+                if (agentHint) {
+                    agentHint.classList.toggle('hidden', details.source !== 'agent');
+                }
 
                 modal.showModal();
             } catch (e) {
@@ -233,6 +297,31 @@ function fixResourcesAndBase() {
             } catch (e) {}
         }
         return origFetch.call(this, processedUrl, options);
+    };
+}
+
+function connectStateUpdateSource() {
+    if (!window.EventSource) {
+        console.error("Browser doesn't support Server-Sent Events. State auto-refresh disabled.");
+        return;
+    }
+
+    const streamUrl = `${document.baseURI}stream-state-updates`;
+    const eventSource = new EventSource(streamUrl);
+
+    eventSource.onmessage = function(event) {
+        if (event.data === "update") {
+            console.log("State update received, reloading page.");
+            window.location.reload(true);
+        }
+    };
+
+    eventSource.onerror = function(err) {
+        console.error("State update stream connection error. It will be retried automatically by the browser.", err);
+        eventSource.close();
+        // The browser will automatically try to reconnect. If we want to implement a custom backoff, we can do it here.
+        // For now, we'll rely on the default behavior.
+        setTimeout(connectStateUpdateSource, 5000); // Reconnect after 5 seconds
     };
 }
 
@@ -439,6 +528,276 @@ function setupPathInput(displayElement, hiddenElement) {
     });
 }
 
+function buildManualHostname(subdomain, domain) {
+    const domainPart = (domain || '').trim();
+    const subdomainPart = (subdomain || '').trim();
+    if (!domainPart) return '';
+    return subdomainPart ? `${subdomainPart}.${domainPart}` : domainPart;
+}
+
+async function fetchAccountTunnels() {
+    if (cachedTunnels !== null) return cachedTunnels;
+    try {
+        const response = await fetch('/api/v2/tunnels/account', {
+            headers: buildApiHeaders()
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        cachedTunnels = Array.isArray(data.tunnels) ? data.tunnels : [];
+    } catch (error) {
+        console.error('Failed to load account tunnels', error);
+        cachedTunnels = [];
+    }
+    return cachedTunnels;
+}
+
+async function fetchAccountZones() {
+    if (cachedZones !== null) return cachedZones;
+    try {
+        const response = await fetch('/api/v2/zones', {
+            headers: buildApiHeaders()
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        cachedZones = Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Failed to load account zones', error);
+        cachedZones = [];
+    }
+    return cachedZones;
+}
+
+function getZoneById(zoneId) {
+    if (!Array.isArray(cachedZones)) return null;
+    return cachedZones.find(zone => zone && zone.id === zoneId) || null;
+}
+
+function detectZoneForHostname(hostname) {
+    if (!hostname) return { status: 'empty' };
+    if (!Array.isArray(cachedZones) || cachedZones.length === 0) {
+        return { status: 'not_found', candidates: [] };
+    }
+    let normalizedHost = hostname.toLowerCase();
+    if (normalizedHost.startsWith('*.')) {
+        normalizedHost = normalizedHost.slice(2);
+    }
+    const matches = [];
+    cachedZones.forEach(zone => {
+        const zoneName = (zone && zone.name ? zone.name : '').toLowerCase();
+        if (!zoneName) return;
+        if (normalizedHost === zoneName || normalizedHost.endsWith(`.${zoneName}`)) {
+            matches.push(zone);
+        }
+    });
+    if (matches.length === 0) {
+        return { status: 'not_found', candidates: [] };
+    }
+    const longestLength = Math.max(...matches.map(z => (z.name || '').length));
+    const topMatches = matches.filter(z => (z.name || '').length === longestLength);
+    if (topMatches.length === 1) {
+        return { status: 'ok', zone: topMatches[0] };
+    }
+    return { status: 'ambiguous', candidates: topMatches };
+}
+
+function populateZoneSelector(selector, zones, placeholderText = 'Select a zone...') {
+    if (!selector) return;
+    selector.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = placeholderText;
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    selector.appendChild(placeholder);
+    (zones || []).forEach(zone => {
+        if (!zone || !zone.id) return;
+        const option = document.createElement('option');
+        option.value = zone.id;
+        option.textContent = zone.name ? `${zone.name} (${zone.id.slice(0, 8)}${zone.id.length > 8 ? '…' : ''})` : zone.id;
+        selector.appendChild(option);
+    });
+}
+
+function setZoneBadge(badgeEl, text, variant) {
+    if (!badgeEl) return;
+    badgeEl.textContent = text;
+    badgeEl.classList.remove('hidden', 'badge-success', 'badge-warning', 'badge-error', 'badge-info');
+    const variantClass = variant ? `badge-${variant}` : 'badge-info';
+    badgeEl.classList.add(variantClass);
+    badgeEl.classList.remove('hidden');
+}
+
+function updateManualZoneUI(state, elements) {
+    if (!elements) return;
+    const { zoneIdInput, selectorWrapper, selectorEl, messageEl, badgeEl } = elements;
+    if (!zoneIdInput || !messageEl) return;
+
+    const hideBadge = () => {
+        if (badgeEl) {
+            badgeEl.classList.add('hidden');
+        }
+    };
+
+    switch (state.status) {
+        case 'empty':
+            zoneIdInput.value = '';
+            if (selectorWrapper) selectorWrapper.classList.add('hidden');
+            hideBadge();
+            messageEl.textContent = 'Enter a hostname to auto-detect the Cloudflare zone.';
+            break;
+        case 'override':
+            zoneIdInput.value = '';
+            if (selectorWrapper) selectorWrapper.classList.add('hidden');
+            if (state.zoneName) {
+                setZoneBadge(badgeEl, 'Override', 'info');
+                messageEl.textContent = `Using zone override: ${state.zoneName}`;
+            } else {
+                hideBadge();
+                messageEl.textContent = 'Using zone override.';
+            }
+            break;
+        case 'ok':
+            zoneIdInput.value = state.zone && state.zone.id ? state.zone.id : '';
+            if (selectorWrapper) selectorWrapper.classList.add('hidden');
+            setZoneBadge(badgeEl, 'Detected', 'success');
+            messageEl.textContent = state.zone && state.zone.name ? `Detected zone: ${state.zone.name}` : 'Detected zone from hostname.';
+            break;
+        case 'ambiguous':
+            zoneIdInput.value = '';
+            if (selectorWrapper && selectorEl) {
+                populateZoneSelector(selectorEl, state.candidates, 'Select a matching zone...');
+                selectorWrapper.classList.remove('hidden');
+            }
+            setZoneBadge(badgeEl, 'Select zone', 'warning');
+            messageEl.textContent = 'Multiple zones match this hostname. Choose the correct zone below.';
+            break;
+        case 'not_found':
+            zoneIdInput.value = '';
+            if (selectorWrapper && selectorEl) {
+                populateZoneSelector(selectorEl, cachedZones || [], 'Select a zone...');
+                selectorWrapper.classList.remove('hidden');
+            }
+            setZoneBadge(badgeEl, 'Zone required', 'warning');
+            messageEl.textContent = 'No zone matched this hostname. Select the appropriate zone manually.';
+            break;
+        case 'selected':
+            zoneIdInput.value = state.zone && state.zone.id ? state.zone.id : '';
+            if (selectorWrapper) selectorWrapper.classList.remove('hidden');
+            setZoneBadge(badgeEl, 'Selected', 'success');
+            messageEl.textContent = state.zone && state.zone.name ? `Zone selected: ${state.zone.name}` : 'Zone selected.';
+            break;
+        default:
+            break;
+    }
+}
+
+async function populateManualTunnelOptions(feedbackEl) {
+    if (!manualTunnelTomSelect) return;
+    const tunnels = await fetchAccountTunnels();
+    manualTunnelTomSelect.clearOptions();
+    if (Array.isArray(tunnels) && tunnels.length > 0) {
+        tunnels.forEach(tunnel => {
+            if (!tunnel || !tunnel.id) return;
+            const label = tunnel.name ? `${tunnel.name} (${tunnel.id.slice(0, 8)}${tunnel.id.length > 8 ? '…' : ''})` : tunnel.id;
+            manualTunnelTomSelect.addOption({ value: tunnel.id, text: label });
+        });
+        manualTunnelTomSelect.refreshOptions(false);
+        const defaultId = manualTunnelTomSelect.input.dataset.defaultTunnelId;
+        if (defaultId && tunnels.some(t => t && t.id === defaultId)) {
+            manualTunnelTomSelect.setValue(defaultId, true);
+        } else {
+            manualTunnelTomSelect.clear(true);
+        }
+        if (feedbackEl) {
+            feedbackEl.classList.add('hidden');
+            feedbackEl.classList.remove('alert-warning', 'alert-error', 'alert-success');
+        }
+    } else {
+        manualTunnelTomSelect.refreshOptions(false);
+        if (feedbackEl) {
+            feedbackEl.textContent = 'No tunnels were found for this account. Configure a Cloudflare Tunnel before adding rules.';
+            feedbackEl.classList.remove('hidden');
+            feedbackEl.classList.remove('alert-success', 'alert-error');
+            feedbackEl.classList.add('alert-warning');
+        }
+    }
+}
+
+async function initializeManualRuleForm() {
+    const form = document.getElementById('add_manual_rule_form');
+    if (!form) return;
+
+    const subdomainInput = document.getElementById('manual_subdomain');
+    const domainInput = document.getElementById('manual_domain_name');
+    const zoneIdInput = document.getElementById('manual_zone_id');
+    const zoneMessageEl = document.getElementById('manual_zone_message');
+    const zoneBadgeEl = document.getElementById('manual_zone_status_badge');
+    const zoneSelectorWrapper = document.getElementById('manual_zone_selector_wrapper');
+    const zoneSelectorEl = document.getElementById('manual_zone_selector');
+    const zoneOverrideInput = document.getElementById('manual_zone_name_override');
+    const feedbackEl = document.getElementById('manual_rule_feedback');
+
+    const elements = {
+        zoneIdInput,
+        selectorWrapper: zoneSelectorWrapper,
+        selectorEl: zoneSelectorEl,
+        messageEl: zoneMessageEl,
+        badgeEl: zoneBadgeEl
+    };
+
+    await populateManualTunnelOptions(feedbackEl);
+    await fetchAccountZones();
+
+    const triggerDetection = async () => {
+        const overrideValue = zoneOverrideInput ? zoneOverrideInput.value.trim() : '';
+        if (overrideValue) {
+            updateManualZoneUI({ status: 'override', zoneName: overrideValue }, elements);
+            return;
+        }
+        const hostname = buildManualHostname(subdomainInput ? subdomainInput.value : '', domainInput ? domainInput.value : '');
+        if (!hostname) {
+            updateManualZoneUI({ status: 'empty' }, elements);
+            return;
+        }
+        const detectionResult = detectZoneForHostname(hostname);
+        updateManualZoneUI(detectionResult, elements);
+    };
+
+    const scheduleDetection = () => {
+        if (manualZoneDetectionTimeout) {
+            clearTimeout(manualZoneDetectionTimeout);
+        }
+        manualZoneDetectionTimeout = setTimeout(triggerDetection, 200);
+    };
+
+    if (subdomainInput) subdomainInput.addEventListener('input', scheduleDetection);
+    if (domainInput) domainInput.addEventListener('input', scheduleDetection);
+
+    if (zoneOverrideInput) {
+        zoneOverrideInput.addEventListener('input', () => {
+            if (zoneOverrideInput.value.trim()) {
+                updateManualZoneUI({ status: 'override', zoneName: zoneOverrideInput.value.trim() }, elements);
+            } else {
+                scheduleDetection();
+            }
+        });
+    }
+
+    if (zoneSelectorEl) {
+        zoneSelectorEl.addEventListener('change', () => {
+            const selectedId = zoneSelectorEl.value;
+            if (!selectedId) {
+                zoneIdInput.value = '';
+                return;
+            }
+            const zone = getZoneById(selectedId) || { id: selectedId };
+            updateManualZoneUI({ status: 'selected', zone }, elements);
+        });
+    }
+
+    scheduleDetection();
+}
+
 function openCreateAccessGroupModal() {
     const modal = document.getElementById('access_group_modal');
     if (!modal) return;
@@ -606,6 +965,49 @@ document.addEventListener('DOMContentLoaded', function() {
         setupPathInput(document.getElementById('manual_path_display'), document.getElementById('manual_path'));
         setupPathInput(document.getElementById('edit_manual_path_display'), document.getElementById('edit_manual_path'));
         initializeEditRuleModal();
+        initializeManualRuleForm();
+    }
+
+    const deleteTunnelModal = document.getElementById('delete_tunnel_modal');
+    if (deleteTunnelModal) {
+        const confirmInput = document.getElementById('delete_tunnel_confirm_input');
+        const confirmButton = document.getElementById('delete_tunnel_confirm_button');
+        const tunnelIdField = document.getElementById('delete_tunnel_id');
+        const warningText = document.getElementById('delete_tunnel_warning_text');
+
+        const updateConfirmState = () => {
+            if (!confirmButton) return;
+            confirmButton.disabled = confirmInput.value.trim().toLowerCase() !== 'delete';
+        };
+
+        if (confirmInput) {
+            confirmInput.addEventListener('input', updateConfirmState);
+        }
+
+        document.querySelectorAll('.delete-tunnel-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const tunnelId = button.dataset.tunnelId || '';
+                const tunnelName = button.dataset.tunnelName || '';
+                const friendlyName = tunnelName || tunnelId;
+                const safeName = friendlyName
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+                if (tunnelIdField) {
+                    tunnelIdField.value = tunnelId;
+                }
+                if (warningText) {
+                    warningText.innerHTML = `Deleting <span class="font-semibold">${safeName}</span> will disconnect any agents currently connected to this Cloudflare Tunnel. This action cannot be undone.`;
+                }
+                if (confirmInput) {
+                    confirmInput.value = '';
+                    updateConfirmState();
+                }
+                deleteTunnelModal.showModal();
+            });
+        });
     }
 
     // Logic for new Access Group dropdown in ADD Manual Rule Modal
@@ -765,6 +1167,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('reconciliation-status')) {
         updateReconciliationStatus();
         setInterval(updateReconciliationStatus, 2000);
+        connectStateUpdateSource();
     }
     
     startServerPing();

@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Management{% endblock %}
+
+{% block content %}
+<section class="card bg-base-100 shadow-xl mb-8 sm:mb-12 transition-all duration-300 hover:shadow-2xl">
+  <div class="card-body">
+    <h1 class="card-title text-2xl sm:text-3xl border-b border-base-300 pb-3 mb-6">DockFlare Agents Management</h1>
+
+    <div class="mb-6">
+      <button id="btn-generate-key" class="btn btn-primary">Generate New API Key</button>
+      <button id="btn-force-reconcile" class="btn btn-secondary ml-2">Force Reconciliation</button>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table table-zebra table-sm w-full">
+        <thead>
+          <tr>
+            <th class="p-3">Agent ID</th>
+            <th class="p-3">Display Name</th>
+            <th class="p-3">Version</th>
+            <th class="p-3">Status</th>
+            <th class="p-3">Last Seen</th>
+            <th class="p-3">Assigned Tunnel</th>
+            <th class="p-3">Cloudflared Version</th>
+            <th class="p-3">Tunnel Status</th>
+            <th class="p-3">Last Event</th>
+            <th class="p-3 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="agents-table-body">
+          <!-- Agent rows will be inserted here by JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-8">
+      <h2 class="text-xl font-semibold mb-4 border-t border-base-300 pt-6 mt-6">API Keys</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-zebra table-sm w-full">
+          <thead>
+            <tr>
+              <th class="p-3">Key (Partial)</th>
+              <th class="p-3">Owner</th>
+              <th class="p-3">Created At</th>
+              <th class="p-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="api-keys-table-body">
+            <!-- API Key rows will be inserted here by JavaScript -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block modals %}
+<!-- Modal for API Key generation -->
+<dialog id="modal-generate-key" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">Generate New Agent API Key</h3>
+    <form id="form-generate-key" class="py-4">
+      <div class="form-control w-full">
+        <label class="label" for="owner-input"><span class="label-text">Owner (Optional, for reference)</span></label>
+        <input type="text" id="owner-input" name="owner" placeholder="e.g., 'remote-server-1' or 'testing-key'" class="input input-bordered w-full" />
+      </div>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Generate</button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-generate-key').close()">Cancel</button>
+      </div>
+    </form>
+    <div id="generated-key-container" class="mt-4 hidden prose">
+      <p class="text-error">Please copy this key now. You will not be able to see it again.</p>
+      <div class="relative bg-base-200 p-3 rounded-md">
+        <code class="font-mono break-all" id="generated-key-text"></code>
+        <button id="btn-copy-key" class="btn btn-ghost btn-sm absolute top-1 right-1">Copy</button>
+      </div>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Modal for Agent Enrollment -->
+<dialog id="modal-enroll-agent" class="modal">
+  <div class="modal-box w-11/12 max-w-lg">
+    <h3 class="font-bold text-lg">Enroll Agent</h3>
+    <p class="py-4">Select an existing Cloudflare Tunnel to assign to this agent, or create a new tunnel by providing a name.</p>
+    <form id="form-enroll-agent">
+      <input type="hidden" id="enroll-agent-id" name="agent_id">
+      <div class="form-control w-full">
+        <label class="label" for="enroll-tunnel-select"><span class="label-text">Existing Tunnels</span></label>
+        <select id="enroll-tunnel-select" class="select select-bordered">
+          <option disabled selected>Loading tunnels...</option>
+        </select>
+      </div>
+      <div class="divider">OR</div>
+      <div class="form-control w-full">
+        <label class="label" for="enroll-new-tunnel-name"><span class="label-text">Create New Tunnel</span></label>
+        <input type="text" id="enroll-new-tunnel-name" placeholder="e.g., my-new-remote-server" class="input input-bordered w-full" />
+      </div>
+      <div class="modal-action">
+        <button type="submit" class="btn btn-primary">Enroll Agent</button>
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-enroll-agent').close()">Cancel</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Helper function for API calls
+  async function apiCall(url, method = 'GET', body = null) {
+    const options = {
+      method: method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    };
+    const apiKeyMeta = document.querySelector('meta[name="dockflare-api-key"]');
+    if (apiKeyMeta && apiKeyMeta.content) {
+      options.headers['Authorization'] = `Bearer ${apiKeyMeta.content}`;
+    }
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`API Error (${res.status}): ${errorData.message || 'Something went wrong.'}`);
+        return null;
+      }
+      return await res.json();
+    } catch (error) {
+      console.error('Network or parsing error:', error);
+      alert('An unexpected error occurred. Please check your network connection.');
+      return null;
+    }
+  }
+
+  // Helper for time ago
+  function timeAgo(dateString) {
+    if (!dateString) return 'Never';
+    const now = new Date();
+    const past = new Date(dateString);
+    const seconds = Math.floor((now - past) / 1000);
+
+    let interval = seconds / 31536000;
+    if (interval > 1) return Math.floor(interval) + " years ago";
+    interval = seconds / 2592000;
+    if (interval > 1) return Math.floor(interval) + " months ago";
+    interval = seconds / 86400;
+    if (interval > 1) return Math.floor(interval) + " days ago";
+    interval = seconds / 3600;
+    if (interval > 1) return Math.floor(interval) + " hours ago";
+    interval = seconds / 60;
+    if (interval > 1) return Math.floor(interval) + " minutes ago";
+    return Math.floor(seconds) + " seconds ago";
+  }
+
+  // Helper for status badges
+  const getStatusBadge = (status) => {
+    if (!status) return `<span class="badge badge-ghost badge-sm">Unknown</span>`;
+    status = status.toLowerCase();
+    let badgeClass = 'badge-ghost';
+    if (status === 'connected') badgeClass = 'badge-success';
+    if (status === 'disconnected') badgeClass = 'badge-error';
+    if (status === 'enrolled') badgeClass = 'badge-info'; // For agents waiting for tunnel assignment
+    return `<span class="badge ${badgeClass} badge-sm">${status}</span>`;
+  };
+
+  const getTunnelStatusBadge = (tunnelStatus) => {
+    if (!tunnelStatus || !tunnelStatus.status) {
+      return `<span class="badge badge-ghost badge-sm">Unknown</span>`;
+    }
+    const status = tunnelStatus.status.toLowerCase();
+    let badgeClass = 'badge-ghost'; // Default for unknown statuses from CF
+    if (status === 'healthy') badgeClass = 'badge-success';
+    if (status === 'degraded') badgeClass = 'badge-warning';
+    if (status === 'down' || status === 'error') badgeClass = 'badge-error';
+    if (status === 'inactive') badgeClass = 'badge-ghost';
+    if (status === 'pending') badgeClass = 'badge-info';
+
+    // Keep old statuses for backward compatibility or other parts of the app that might use them
+    if (status === 'running') badgeClass = 'badge-success';
+    if (['exited', 'stopped', 'created'].includes(status)) badgeClass = 'badge-warning';
+    if (['not_found', 'not_running'].includes(status)) badgeClass = 'badge-error';
+    return `<span class="badge ${badgeClass} badge-sm">${status}</span>`;
+  };
+
+  const copyToClipboard = (text, buttonElement) => {
+    navigator.clipboard.writeText(text).then(() => {
+      const originalText = buttonElement.innerHTML;
+      buttonElement.innerHTML = '<i class="fas fa-check"></i> Copied!';
+      setTimeout(() => {
+        buttonElement.innerHTML = originalText;
+      }, 2000);
+    }, (err) => {
+      alert('Failed to copy text: ' + err);
+    });
+  };
+
+  // --- Data Rendering ---
+  const agentsTableBody = document.getElementById('agents-table-body');
+  const apiKeysTableBody = document.getElementById('api-keys-table-body');
+  const generateKeyModal = document.getElementById('modal-generate-key');
+  const enrollAgentModal = document.getElementById('modal-enroll-agent');
+  const enrollTunnelSelect = document.getElementById('enroll-tunnel-select');
+
+  const renderAgentsTable = (agents) => {
+    agentsTableBody.innerHTML = '';
+    if (!agents || Object.keys(agents).length === 0) {
+      agentsTableBody.innerHTML = '<tr><td colspan="10" class="text-center p-4">No agents have registered yet.</td></tr>';
+      return;
+    }
+    for (const [agentId, agent] of Object.entries(agents)) {
+      const tr = document.createElement('tr');
+
+      // Compose status badges: enrollment/status + derived online health
+      const enrollmentBadge = getStatusBadge(agent.status);
+      const healthBadge = getStatusBadge(agent.health || (agent.online ? 'connected' : 'disconnected'));
+      const statusHtml = `${enrollmentBadge} ${healthBadge}`;
+
+      const lastSeenText = timeAgo(agent.last_seen);
+
+      const cloudflaredVersion = agent.tunnel_version || (agent.tunnel_status && agent.tunnel_status.version) || '<i>N/A</i>';
+
+      tr.innerHTML = `
+        <td class="p-3 whitespace-nowrap">${agentId}</td>
+        <td class="p-3 whitespace-nowrap">${agent.display_name || '<i>N/A</i>'}</td>
+        <td class="p-3 whitespace-nowrap">${agent.version || '<i>N/A</i>'}</td>
+        <td class="p-3">${statusHtml}</td>
+        <td class="p-3 whitespace-nowrap">${lastSeenText}</td>
+        <td class="p-3 whitespace-nowrap">${agent.assigned_tunnel_name || '<i>None</i>'}</td>
+        <td class="p-3 whitespace-nowrap">${cloudflaredVersion}</td>
+        <td class="p-3">${getTunnelStatusBadge(agent.tunnel_status)}</td>
+        <td class="p-3 whitespace-nowrap">${agent.last_event ? agent.last_event.type : '<i>None</i>'}</td>
+        <td class="p-3 text-center">
+          <button class="btn btn-xs btn-primary btn-enroll" data-agent-id="${agentId}" ${agent.status === 'enrolled' && agent.assigned_tunnel_name ? 'disabled' : ''}>Enroll</button>
+          <button class="btn btn-xs btn-error btn-remove ml-2" data-agent-id="${agentId}">Remove</button>
+        </td>
+      `;
+
+      // If agent is offline, visually highlight the row (light red background and left accent)
+      if (agent.online === false) {
+        tr.style.backgroundColor = '#fff5f5'; // light red
+        tr.style.borderLeft = '4px solid #f87171'; // red-400 accent
+      }
+
+      agentsTableBody.appendChild(tr);
+    }
+  };
+
+  const renderApiKeysTable = (apiKeys) => {
+    apiKeysTableBody.innerHTML = '';
+    if (Object.keys(apiKeys).length === 0) {
+      apiKeysTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4">No API keys have been generated.</td></tr>';
+      return;
+    }
+    for (const [keyId, meta] of Object.entries(apiKeys)) {
+      const owner = meta.owner || '<i>N/A</i>';
+      const createdAt = meta.created_at ? new Date(meta.created_at).toLocaleString() : '<i>N/A</i>';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="p-3 whitespace-nowrap font-mono break-all">${keyId.substring(0, 8)}...</td>
+        <td class="p-3 whitespace-nowrap">${owner}</td>
+        <td class="p-3 whitespace-nowrap">${createdAt}</td>
+        <td class="p-3 whitespace-nowrap">
+          <button class="btn btn-xs btn-error btn-revoke-key" data-key-id="${keyId}">Revoke</button>
+        </td>
+      `;
+      apiKeysTableBody.appendChild(tr);
+    }
+  };
+
+  const populateTunnelSelect = (tunnels, selectedTunnelName = null) => {
+    enrollTunnelSelect.innerHTML = '<option value="">-- Select an existing tunnel --</option>';
+    if (Object.keys(tunnels).length === 0) {
+      enrollTunnelSelect.innerHTML += '<option disabled>No existing tunnels</option>';
+      return;
+    }
+    for (const [tunnelId, tunnel] of Object.entries(tunnels)) {
+      if (!tunnel || !tunnel.name) {
+        continue;
+      }
+      const option = document.createElement('option');
+      option.value = tunnel.name;
+      option.dataset.tunnelId = tunnelId;
+      option.textContent = tunnel.name;
+      if (selectedTunnelName === tunnel.name) {
+        option.selected = true;
+      }
+      enrollTunnelSelect.appendChild(option);
+    }
+  };
+
+
+  // --- Event Handlers and Actions ---
+
+  // Main data fetch function
+  async function fetchData() {
+    // Use overview endpoint which provides agents, agent_keys and account tunnels.
+    const data = await apiCall('/api/v2/overview');
+    if (data) {
+      renderAgentsTable(data.agents || {});
+      renderApiKeysTable(data.agent_keys || {});
+      populateTunnelSelect(data.all_account_tunnels || {}); // For the enroll modal
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    fetchData();
+
+    // Generate New API Key button
+    document.getElementById('btn-generate-key').addEventListener('click', () => {
+      document.getElementById('generated-key-container').classList.add('hidden');
+      document.getElementById('form-generate-key').reset();
+      document.getElementById('form-generate-key').classList.remove('hidden');
+      generateKeyModal.showModal();
+    });
+
+    // Copy Generated Key button
+    document.getElementById('btn-copy-key').addEventListener('click', (e) => {
+      const keyText = document.getElementById('generated-key-text').textContent;
+      if (keyText) {
+        copyToClipboard(keyText, e.target);
+      }
+    });
+
+    // Generate Key form submission
+    document.getElementById('form-generate-key').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const owner = document.getElementById('owner-input').value.trim();
+      const result = await apiCall('/api/v2/agents/generate-key', 'POST', { owner });
+      if (result && result.key) {
+        document.getElementById('generated-key-text').textContent = result.key;
+        document.getElementById('generated-key-container').classList.remove('hidden');
+        document.getElementById('form-generate-key').classList.add('hidden');
+        fetchData(); // Refresh API keys table
+      }
+    });
+
+    // Force Reconciliation button
+    document.getElementById('btn-force-reconcile').addEventListener('click', async () => {
+      if (confirm('This will start a full reconciliation of all services against Cloudflare. This can be useful to fix any drift between DockFlare and Cloudflare. Continue?')) {
+        const result = await apiCall('/api/v2/reconcile', 'POST');
+        if (result) {
+          alert('Reconciliation process has been started. You can monitor its progress on the Dashboard page.');
+        }
+      }
+    });
+
+    // Agent table actions (Enroll, Remove)
+    agentsTableBody.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-enroll')) {
+        const agentId = e.target.getAttribute('data-agent-id');
+        document.getElementById('enroll-agent-id').value = agentId;
+        // Reset and show the enroll modal
+        document.getElementById('form-enroll-agent').reset();
+        enrollAgentModal.showModal();
+      } else if (e.target.classList.contains('btn-remove')) {
+        const agentId = e.target.getAttribute('data-agent-id');
+        if (confirm(`Are you sure you want to remove agent "${agentId}"? This will also delete the associated Cloudflare tunnel and all related resources.`)) {
+          const success = await apiCall(`/api/v2/agents/${agentId}/remove`, 'POST');
+          if (success) {
+            alert('Agent removed successfully.');
+            fetchData();
+          }
+        }
+      }
+    });
+
+    // Enroll Agent form submission
+    document.getElementById('form-enroll-agent').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const agentId = document.getElementById('enroll-agent-id').value;
+      const selectedTunnelName = enrollTunnelSelect.value;
+      const newTunnelName = document.getElementById('enroll-new-tunnel-name').value.trim();
+
+      let tunnelIdentifier = '';
+
+      if (newTunnelName) {
+        tunnelIdentifier = newTunnelName;
+      } else if (selectedTunnelName) {
+        tunnelIdentifier = selectedTunnelName;
+      } else {
+        alert('Please select an existing tunnel or enter a new tunnel name.');
+        return;
+      }
+
+      const body = { tunnel_name: tunnelIdentifier };
+      const success = await apiCall(`/api/v2/agents/${agentId}/enroll`, 'POST', body);
+
+      if (success) {
+        alert('Agent enrolled successfully.');
+        enrollAgentModal.close();
+        fetchData(); // Refresh agents table
+      }
+    });
+
+
+    // API Keys table actions (Revoke Key)
+    apiKeysTableBody.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-revoke-key')) {
+        const keyId = e.target.getAttribute('data-key-id');
+        if (confirm(`Are you sure you want to revoke API key "${keyId.substring(0, 8)}..."? This action is irreversible.`)) {
+          const success = await apiCall('/api/v2/agents/revoke-key', 'POST', { key: keyId });
+          if (success) {
+            alert('API key revoked successfully.');
+            fetchData(); // Refresh API keys table
+          }
+        }
+      }
+    });
+
+  });
+</script>
+{% endblock %}

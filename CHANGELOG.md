@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [v3.0.0] - 2025-09-20
+
+### Added
+- **DockFlare Agent** for remote hosts, including secure registration, enrolment, and command polling.
+- **Agents UI** to generate API keys, enrol nodes, monitor heartbeats, and trigger tunnel actions.
+- **Redis-backed cache** powering agent queues, heartbeats, and future scaling work.
+- **Master key reveal flow**: the key is fetched on demand via a CSRF-protected endpoint instead of being rendered inline.
+- **Documentation** covering the multi-server architecture and updated quick-start instructions.
+- **Automatic zone detection** for label-driven services; DockFlare guesses the Cloudflare zone from the hostname and only uses the default when detection fails.
+
+### Changed
+- Quick-start Docker Compose now includes a Redis service and sets `REDIS_URL` for the master container.
+- Settings page exposes "Show Master API Key" modal instead of displaying secrets in the HTML.
+- Setup wizard routes are locked once configuration files are present to prevent re-entry after onboarding.
+
+### Security
+- Hardened API by requiring the master key for admin routes and agent API keys for polling endpoints.
+- Added reveal-on-demand modal so the master key is not embedded in the UI source.
+
+### Migration Notes
+- Redis is now required; update your Compose/Helm deployments accordingly.
+- Existing installations should read the new *DockFlare Agent & Multi-Server Architecture* guide before rolling out agents.
+
 ## [v2.1.7] - 2025-08-30
 
 ### New

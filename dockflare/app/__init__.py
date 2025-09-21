@@ -25,14 +25,15 @@ from flask_login import LoginManager
 from .core.user import User
 import docker
 from docker.errors import APIError
-
 from . import config
+from .core.cache import init_app as init_cache
 
 tunnel_state = { "name": config.TUNNEL_NAME, "id": None, "token": None, "status_message": "Initializing...", "error": None }
 cloudflared_agent_state = { "container_status": "unknown", "last_action_status": None }
 
 log_queue = queue.Queue(maxsize=config.MAX_LOG_QUEUE_SIZE)
-log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(threadName)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+state_update_queue = queue.Queue(maxsize=50) 
+log_formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S')
 
 class QueueLogHandler(logging.Handler):
     def __init__(self, log_queue_instance):
@@ -81,6 +82,7 @@ def create_app():
     app_instance = Flask(__name__)
     app_instance.secret_key = os.urandom(24)
     app_instance.config['PREFERRED_URL_SCHEME'] = 'http'
+    app_instance.config['APP_VERSION'] = config.APP_VERSION
 
     # Initialize CSRF Protection
     csrf = CSRFProtect(app_instance)
@@ -115,6 +117,10 @@ def create_app():
         "start_time": 0,
         "status": "Not started"
     }
+
+    # Initialize cache
+    init_cache(app_instance)
+    logging.info("Cache initialized.")
 
     with app_instance.app_context():
         from .web import routes as web_routes

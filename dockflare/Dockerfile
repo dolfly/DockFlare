@@ -36,24 +36,10 @@ FROM python:3.13-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
-ENV CLOUDFLARED_VERSION="2024.1.5"
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/* \
-    && ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "amd64" ]; then \
-        CLOUDFLARED_ARCH="linux-amd64"; \
-    elif [ "$ARCH" = "arm64" ]; then \
-        CLOUDFLARED_ARCH="linux-arm64"; \
-    else \
-        echo "Unsupported architecture: $ARCH" && exit 1; \
-    fi && \
-    wget -q "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-${CLOUDFLARED_ARCH}.deb" && \
-    dpkg -i "cloudflared-${CLOUDFLARED_ARCH}.deb" && \
-    rm "cloudflared-${CLOUDFLARED_ARCH}.deb" && \
-    cloudflared --version && \
-    mkdir -p /root/.cloudflared
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
