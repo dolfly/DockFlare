@@ -21,6 +21,34 @@ Modify your `docker-compose.yml` file to include the `nginx` service. The key is
 version: '3.8'
 
 services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - CONTAINERS=1
+      - EVENTS=1
+      - NETWORKS=1
+      - IMAGES=1
+      - POST=1
+      - PING=1
+      - INFO=1
+      - EXEC=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dockflare-internal
+
+  dockflare-init:
+    image: alpine:3.20
+    command: ["sh", "-c", "chown -R 65532:65532 /app/data"]
+    volumes:
+      - dockflare_data:/app/data
+    networks:
+      - dockflare-internal
+    restart: "no"
+
   dockflare:
     image: alplat/dockflare:stable
     container_name: dockflare
@@ -28,12 +56,17 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./dockflare_data:/app/data
+      - dockflare_data:/app/data
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
     depends_on:
-      - redis
+      docker-socket-proxy:
+        condition: service_started
+      dockflare-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
     networks:
       - cloudflare-net
       - dockflare-internal
@@ -44,9 +77,8 @@ services:
     container_name: my-nginx
     restart: unless-stopped
     networks:
-      - cloudflare-net # Must be on the same network as DockFlare
+      - cloudflare-net
     labels:
-      # --- DockFlare Configuration ---
       - "dockflare.enable=true"
       - "dockflare.hostname=nginx.example.com"
       - "dockflare.service=http://nginx-webserver:80"
@@ -57,7 +89,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     volumes:
-      - ./dockflare_redis:/data
+      - dockflare_redis:/data
     networks:
       - dockflare-internal
 
@@ -72,7 +104,7 @@ networks:
   dockflare-internal:
     name: dockflare-internal
 ```
-> **Why Redis?** DockFlare relies on Redis for caching, log streaming, and cross-thread messaging. Running it on a private `dockflare-internal` network keeps Redis reachable only by DockFlare while workloads stay on `cloudflare-net`.
+> **Why Redis?** DockFlare relies on Redis for caching, log streaming, and cross-thread messaging. Running it on the private `dockflare-internal` network keeps Redis reachable only by DockFlare, while workloads stay isolated on `cloudflare-net`.
 
 
 ### 2. Understanding the Labels

@@ -26,7 +26,7 @@ This document explains how DockFlare secures both the Master node and enrolled A
 - **Cloudflare Tunnel Transport** – Agents expose no inbound ports. All traffic traverses the Cloudflare tunnel managed by the Master, reducing the attack surface on remote hosts.
 - **Authenticated Agent Calls** – Agent REST calls include their API key and are bound to their recorded agent ID. Token mismatches or revoked keys are rejected.
 - **Redis Backplane** – DockFlare relies on Redis for caching, log streaming, and cross-thread signalling. The recommended compose stack keeps Redis on a dedicated `dockflare-internal` network so workloads on `cloudflare-net` cannot reach it directly. Secure external Redis services with auth/TLS if you use them.
-- **Least-privilege runtime** – Agents run as the `dockflare` user (UID/GID 65532) inside the container and are designed to reach Docker through the bundled socket proxy so only inspection and lifecycle endpoints are exposed.
+- **Least-privilege runtime** – Both the master and agents run as the `dockflare` user (UID/GID 65532) and talk to Docker exclusively through the bundled socket proxy, keeping the exposed API surface minimal.
 
 ## 5. Authentication & Authorization
 
@@ -44,7 +44,7 @@ This document explains how DockFlare secures both the Master node and enrolled A
 
 | Area | Recommendation |
 | --- | --- |
-| Docker Volumes | Persist `/app/data` (encrypted config, keys, state). Persist `/app/logs` if file logging is enabled. |
+| Docker Volumes | Persist `/app/data` (encrypted config, keys, state). Persist `/app/logs` if file logging is enabled, and ensure host mounts are writable by UID/GID 65532 or your overridden build args. |
 | Redis | Run `redis:7-alpine` alongside DockFlare on a private network (`dockflare-internal`) or point `REDIS_URL` to a hardened instance (auth/TLS). Avoid exposing Redis publicly. |
 | Backups | Download the `.zip` regularly and store it with `dockflare.key`. Both files are required to decrypt the configuration on restore. |
 | Agents | Treat API keys like credentials. Deploy them with the socket proxy so only required Docker endpoints are exposed, and remember the container runs as the unprivileged `dockflare` user (UID/GID 65532); align host permissions or rebuild with matching `DOCKFLARE_UID/DOCKFLARE_GID`. |
