@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:v0.4.1
@@ -21,7 +22,6 @@ services:
 
   dockflare-init:
     image: alpine:3.20
-    container_name: dockflare-init
     command: ["sh", "-c", "chown -R ${DOCKFLARE_UID:-65532}:${DOCKFLARE_GID:-65532} /app/data"]
     volumes:
       - dockflare_data:/app/data
@@ -30,20 +30,22 @@ services:
     restart: "no"
 
   dockflare:
-    build:
-      context: ./dockflare
-      args:
-        DOCKFLARE_UID: ${DOCKFLARE_UID:-65532}
-        DOCKFLARE_GID: ${DOCKFLARE_GID:-65532}
+    image: alplat/dockflare:unstable
     container_name: dockflare
     restart: unless-stopped
     ports:
-      - "5001:5000"
+      - "5000:5000"
+    #labels: 
+      # -- Cloudflare Tunnel Configuration (via DockFlare) OPTIONAL -- 
+      #- dockflare.enable=true
+      #- dockflare.hostname=dockflare.domain.tld
+      #- dockflare.service=http://dockflare:5000
+      #- dockflare.access.policy=default_tld
     volumes:
       - dockflare_data:/app/data
-    networks:
-      - cloudflare-net
-      - dockflare-internal
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
     depends_on:
       docker-socket-proxy:
         condition: service_started
@@ -51,36 +53,23 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
-    environment:
-      - STATE_FILE_PATH=/app/data/state.json
-      - TZ=Europe/Zurich
-      - REDIS_URL=redis://redis:6379/0
-      - CACHE_ENABLED=true
-      - DNS_RECORDS_CACHE_TIMEOUT=300
-      - DOCKER_HOST=tcp://docker-socket-proxy:2375
-    labels:
-      - dockflare.enable=true
-      - dockflare.hostname=master.dockflare.app
-      - dockflare.service=http://host.docker.internal:5001
-      - dockflare.access.policy=bypass
+    networks:
+      - cloudflare-net
+      - dockflare-internal
 
   redis:
     image: redis:7-alpine
     container_name: dockflare-redis
     restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    volumes:
+      - dockflare_redis:/data
     networks:
       - dockflare-internal
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
 volumes:
   dockflare_data:
-  redis-data:
+  dockflare_redis:
 
 networks:
   cloudflare-net:
