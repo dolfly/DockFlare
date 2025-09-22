@@ -83,6 +83,34 @@ Before you begin, ensure you have the following:
     ```yaml
     version: '3.8'
 services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - CONTAINERS=1
+      - EVENTS=1
+      - NETWORKS=1
+      - IMAGES=1
+      - POST=1
+      - PING=1
+      - INFO=1
+      - EXEC=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dockflare-internal
+
+  dockflare-init:
+    image: alpine:3.20
+    command: ["sh", "-c", "chown -R 65532:65532 /app/data"]
+    volumes:
+      - dockflare_data:/app/data
+    networks:
+      - dockflare-internal
+    restart: "no"
+
   dockflare:
     image: alplat/dockflare:stable
     container_name: dockflare
@@ -90,13 +118,17 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Persist encrypted configuration, state, and audit logs
-      - ./dockflare_data:/app/data
+      - dockflare_data:/app/data
     environment:
       - REDIS_URL=redis://redis:6379/0
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
     depends_on:
-      - redis
+      docker-socket-proxy:
+        condition: service_started
+      dockflare-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
     networks:
       - cloudflare-net
       - dockflare-internal
@@ -107,7 +139,7 @@ services:
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     volumes:
-      - ./dockflare_redis:/data
+      - dockflare_redis:/data
     networks:
       - dockflare-internal
 
@@ -132,9 +164,9 @@ networks:
 
 4.  **For Existing Users**: If you are upgrading, DockFlare will detect your old `.env` file and automatically guide you through a quick migration process.
 
-Redis runs on a private `dockflare-internal` network so only the DockFlare container can access it.
+The master now runs as the unprivileged `dockflare` user (UID/GID 65532) and only talks to Docker through the bundled socket proxy. If you bind-mount a host directory instead of using the named volume above, make sure it is writable by that UID/GID or adjust the `DOCKFLARE_UID`/`DOCKFLARE_GID` build args.
 
-💡 *Need to manage workloads on additional hosts?* Deploy the [DockFlare Agent](https://github.com/ChrispyBacon-dev/DockFlare-Agent-prd) next to your containers, enrol it from the master UI, and let DockFlare orchestrate the tunnels for you. The agent image now runs as the non-root `dockflare` user (UID/GID 65532), so ensure any mounted directories are writable by that account or adjust the build-time `DOCKFLARE_UID/DOCKFLARE_GID` args. A full guide is available in the new [Multi-Server Agent](dockflare/app/templates/docs/Multi-Server-Agent.md) documentation.
+💡 *Need to manage workloads on additional hosts?* Deploy the [DockFlare Agent](https://github.com/ChrispyBacon-dev/DockFlare-Agent-prd) next to your containers, enrol it from the master UI, and let DockFlare orchestrate the tunnels for you. Both the master and agent images run as the non-root `dockflare` user by default, so align your volume permissions or override the build args if required. A full guide is available in the new [Multi-Server Agent](dockflare/app/templates/docs/Multi-Server-Agent.md) documentation.
 
 </details>
 

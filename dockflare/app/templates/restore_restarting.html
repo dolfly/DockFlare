@@ -1,10 +1,10 @@
-{% extends "layout.html" %}
+{% extends "base.html" %}
 
 {% block title %}DockFlare is Restarting{% endblock %}
 
 {% block content %}
 <div class="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
-  <img src="{{ url_for('static', filename='images/logo.svg') }}" alt="DockFlare Logo" class="w-24 h-24 animate-pulse" />
+  <img src="{{ url_for('static', filename='images/logo.gif') }}" alt="DockFlare Logo" class="w-24 h-24 animate-pulse" />
   <div class="space-y-2">
     <h1 class="text-3xl font-semibold">Hold tight, DockFlare is rebooting...</h1>
     <p class="text-lg opacity-80">We’re loading your restored configuration and giving the tunnel hamsters a quick pep talk.</p>
@@ -23,14 +23,33 @@
 <script>
   (function() {
     const seconds = {{ countdown_seconds }};
+    const redirectUrl = "{{ url_for('auth.login') }}";
+    const pingUrl = "{{ url_for('web.ping') }}";
     const countdownEl = document.getElementById('countdown');
     const progressEl = document.getElementById('progress');
     let remaining = seconds;
 
+    const pollForReady = () => {
+      fetch(pingUrl, { cache: 'no-store' })
+        .then(response => {
+          if (response.ok) {
+            window.location.replace(redirectUrl);
+            return;
+          }
+          setTimeout(pollForReady, 1000);
+        })
+        .catch(() => {
+          setTimeout(pollForReady, 1000);
+        });
+    };
+
     const tick = () => {
       remaining -= 1;
       if (remaining < 0) {
-        window.location.reload();
+        clearInterval(timerId);
+        countdownEl.textContent = 0;
+        progressEl.value = seconds;
+        pollForReady();
         return;
       }
       countdownEl.textContent = remaining;
@@ -40,7 +59,7 @@
     countdownEl.textContent = seconds;
     progressEl.setAttribute('max', seconds);
     progressEl.value = 0;
-    setInterval(tick, 1000);
+    const timerId = setInterval(tick, 1000);
   })();
 </script>
 {% endblock %}

@@ -134,7 +134,7 @@ def restore_from_backup():
             current_app.import_from_env = False
 
             if is_full_archive:
-                return render_template('restore_restarting.html', countdown_seconds=5)
+                return render_template('restore_restarting.html', countdown_seconds=7)
 
             return redirect(url_for('auth.login'))
         except Exception as err:

@@ -1,31 +1,69 @@
 version: '3.8'
 services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.1
+    container_name: docker-socket-proxy
+    restart: unless-stopped
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - CONTAINERS=1
+      - EVENTS=1
+      - NETWORKS=1
+      - IMAGES=1
+      - POST=1
+      - PING=1
+      - INFO=1
+      - EXEC=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dockflare-internal
+
+  dockflare-init:
+    image: alpine:3.20
+    container_name: dockflare-init
+    command: ["sh", "-c", "chown -R ${DOCKFLARE_UID:-65532}:${DOCKFLARE_GID:-65532} /app/data"]
+    volumes:
+      - dockflare_data:/app/data
+    networks:
+      - dockflare-internal
+    restart: "no"
+
   dockflare:
-    #image: alplat/dockflare:stable  # alplat/dockflare:unstable docker tag for beta versions
-    build: ./dockflare  # Uncomment to build from source instead
+    build:
+      context: ./dockflare
+      args:
+        DOCKFLARE_UID: ${DOCKFLARE_UID:-65532}
+        DOCKFLARE_GID: ${DOCKFLARE_GID:-65532}
     container_name: dockflare
     restart: unless-stopped
     ports:
       - "5001:5000"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # Required to monitor Docker events
-      - dockflare_data:/app/data  # Persistent storage for state
+      - dockflare_data:/app/data
     networks:
-      - cloudflare-net  # Network for communication with other containers
+      - cloudflare-net
       - dockflare-internal
     depends_on:
-      - redis
+      docker-socket-proxy:
+        condition: service_started
+      dockflare-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
     environment:
       - STATE_FILE_PATH=/app/data/state.json
-      - TZ=Europe/Zurich  # Set your timezone here
+      - TZ=Europe/Zurich
       - REDIS_URL=redis://redis:6379/0
       - CACHE_ENABLED=true
       - DNS_RECORDS_CACHE_TIMEOUT=300
-    labels: # Optional
-    - dockflare.enable=true
-    - dockflare.hostname=master.dockflare.app
-    - dockflare.service=http://host.docker.internal:5001  
-    - dockflare.access.policy=bypass
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
+    labels:
+      - dockflare.enable=true
+      - dockflare.hostname=master.dockflare.app
+      - dockflare.service=http://host.docker.internal:5001
+      - dockflare.access.policy=bypass
+
   redis:
     image: redis:7-alpine
     container_name: dockflare-redis
@@ -43,9 +81,10 @@ services:
 volumes:
   dockflare_data:
   redis-data:
+
 networks:
   cloudflare-net:
-   name: cloudflare-net
-   external: true
+    name: cloudflare-net
+    external: true
   dockflare-internal:
     name: dockflare-internal
