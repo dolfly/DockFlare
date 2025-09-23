@@ -254,64 +254,54 @@
     }
     for (const [agentId, agent] of Object.entries(agents)) {
       const tr = document.createElement('tr');
-      tr.className = agent.online === false ? 'opacity-60' : ''; // Visually dim offline agents
-      
-      const statusHtml = `<div class="flex flex-col gap-1">
-        ${getStatusBadge(agent.status)}
-        ${getStatusBadge(agent.health || (agent.online ? 'connected' : 'disconnected'))}
-      </div>`;
+
+      const enrollmentBadge = getStatusBadge(agent.status);
+      const healthBadge = getStatusBadge(agent.health || (agent.online ? 'connected' : 'disconnected'));
+      const statusHtml = `${enrollmentBadge} ${healthBadge}`;
 
       const lastSeenText = timeAgo(agent.last_seen);
       const cloudflaredVersion = agent.tunnel_version || (agent.tunnel_status && agent.tunnel_status.version) || '<i>N/A</i>';
-      
+
       const migrationStatus = agent.migration_status;
       let migrationHtml = '<span class="badge badge-ghost badge-sm">None</span>';
       if (migrationStatus) {
         if (migrationStatus.completed_at) {
           migrationHtml = '<span class="badge badge-success badge-sm">Complete</span>';
         } else if (migrationStatus.has_conflicts || migrationStatus.has_orphaned) {
-          migrationHtml = `<button class="btn btn-xs btn-warning btn-migration-assistant" data-agent-id="${agentId}">Resolve Issues</button>`;
+          const issues = [];
+          if (migrationStatus.has_conflicts) issues.push('conflicts');
+          if (migrationStatus.has_orphaned) issues.push('orphaned');
+          migrationHtml = `<span class="badge badge-warning badge-sm">Needs attention (${issues.join(', ')})</span>`;
         } else if (migrationStatus.auto_imported > 0) {
           migrationHtml = `<span class="badge badge-info badge-sm">Auto-imported ${migrationStatus.auto_imported}</span>`;
         }
       }
 
-  
-      const actionsHtml = `
-        <div class="dropdown dropdown-end">
-          <label tabindex="0" class="btn btn-ghost btn-xs">Actions</label>
-          <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-            <li class="${agent.status === 'enrolled' && agent.assigned_tunnel_name ? 'disabled' : ''}">
-                <a class="btn-enroll" data-agent-id="${agentId}">Enroll Agent</a>
-            </li>
-            <li><a class="btn-rename-agent" data-agent-id="${agentId}">Rename</a></li>
-            <li class="${!agent.assigned_tunnel_name ? 'disabled' : ''}">
-                <a class="btn-trigger-migration" data-agent-id="${agentId}">Run Migration Analysis</a>
-            </li>
-             <li class="${agent.status !== 'enrolled' ? 'disabled' : ''}">
-                <a class="btn-redeploy-tunnel" data-agent-id="${agentId}">Redeploy Tunnel</a>
-            </li>
-            <li class="${agent.status !== 'enrolled' ? 'disabled' : ''}">
-                <a class="btn-roll-key" data-agent-id="${agentId}">Roll API Key</a>
-            </li>
-            <div class="divider my-1"></div>
-            <li><a class="btn-remove text-error" data-agent-id="${agentId}">Remove Agent</a></li>
-          </ul>
-        </div>
-      `;
-
       tr.innerHTML = `
-        <td class="p-3 font-mono text-xs">${agentId}</td>
+        <td class="p-3 whitespace-nowrap">${agentId}</td>
         <td class="p-3 whitespace-nowrap">${agent.display_name || '<i>N/A</i>'}</td>
         <td class="p-3 whitespace-nowrap">${agent.version || '<i>N/A</i>'}</td>
         <td class="p-3">${statusHtml}</td>
         <td class="p-3 whitespace-nowrap">${lastSeenText}</td>
         <td class="p-3 whitespace-nowrap">${agent.assigned_tunnel_name || '<i>None</i>'}</td>
-        <td class="p-3">${migrationHtml}</td>
+        <td class="p-3">${migrationHtml}${migrationStatus && (migrationStatus.has_conflicts || migrationStatus.has_orphaned) ? `<button class="btn btn-xs btn-info ml-2 btn-migration-assistant" data-agent-id="${agentId}" title="Open Migration Assistant">Resolve</button>` : ''}</td>
         <td class="p-3 whitespace-nowrap">${cloudflaredVersion}</td>
         <td class="p-3">${getTunnelStatusBadge(agent.tunnel_status)}</td>
-        <td class="p-3 text-right">${actionsHtml}</td>
+        <td class="p-3 text-center">
+          <button class="btn btn-xs btn-primary btn-enroll" data-agent-id="${agentId}" ${agent.status === 'enrolled' && agent.assigned_tunnel_name ? 'disabled' : ''}>Enroll</button>
+          <button class="btn btn-xs btn-secondary btn-roll-key ml-1" data-agent-id="${agentId}" ${agent.status !== 'enrolled' ? 'disabled' : ''} title="Roll API Key">Roll Key</button>
+          <button class="btn btn-xs btn-info btn-trigger-migration ml-1" data-agent-id="${agentId}" ${!agent.assigned_tunnel_name ? 'disabled' : ''} title="Trigger Migration">Migration</button>
+          <button class="btn btn-xs btn-warning btn-redeploy-tunnel ml-1" data-agent-id="${agentId}" ${agent.status !== 'enrolled' ? 'disabled' : ''} title="Redeploy Tunnel Container">Redeploy</button>
+          <button class="btn btn-xs btn-ghost btn-rename-agent ml-1" data-agent-id="${agentId}" title="Rename Agent">Rename</button>
+          <button class="btn btn-xs btn-error btn-remove ml-1" data-agent-id="${agentId}">Remove</button>
+        </td>
       `;
+
+      if (agent.online === false) {
+        tr.style.backgroundColor = '#fff5f5';
+        tr.style.borderLeft = '4px solid #f87171';
+      }
+
       agentsTableBody.appendChild(tr);
     }
   };
@@ -341,16 +331,11 @@
   
 
   const fetchData = async () => {
-    try {
-      const agentsData = await apiCall('/api/v2/agents');
-      if (agentsData) {
-        renderAgentsTable(agentsData.agents);
-        renderApiKeysTable(agentsData.api_keys);
-      }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      agentsTableBody.innerHTML = '<tr><td colspan="10" class="text-center p-4 text-error">Failed to load agents data.</td></tr>';
-      apiKeysTableBody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-error">Failed to load API keys data.</td></tr>';
+    const data = await apiCall('/api/v2/overview');
+    if (data) {
+      window.lastFetchedData = data;
+      renderAgentsTable(data.agents || {});
+      renderApiKeysTable(data.agent_keys || {});
     }
   };
 
@@ -360,143 +345,186 @@
 
   setInterval(refreshData, 5000);
 
-  document.addEventListener('DOMContentLoaded', () => {
+  const openRenameModal = (agentId) => {
+    const data = window.lastFetchedData;
+    if (!data || !data.agents || !data.agents[agentId]) {
+      alert('Agent data not available. Please refresh the page.');
+      return;
+    }
 
+    const agent = data.agents[agentId];
+    document.getElementById('rename-agent-id').value = agentId;
+    document.getElementById('rename-display-name').value = agent.display_name || '';
+    document.getElementById('modal-rename-agent').showModal();
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
     fetchData();
 
     document.getElementById('btn-generate-key').addEventListener('click', () => {
+      document.getElementById('generated-key-container').classList.add('hidden');
+      document.getElementById('form-generate-key').reset();
+      document.getElementById('form-generate-key').classList.remove('hidden');
       document.getElementById('modal-generate-key').showModal();
     });
 
-    document.getElementById('btn-force-reconcile').addEventListener('click', async () => {
-      const result = await apiCall('/api/v2/agents/reconcile', 'POST');
-      if (result) {
-        alert('Reconciliation triggered successfully!');
-        fetchData();
+    document.getElementById('btn-copy-key').addEventListener('click', (e) => {
+      const keyText = document.getElementById('generated-key-text').textContent;
+      if (keyText) {
+        copyToClipboard(keyText, e.target);
       }
     });
 
     document.getElementById('form-generate-key').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const owner = formData.get('owner');
+      const owner = document.getElementById('owner-input').value.trim();
       const result = await apiCall('/api/v2/agents/generate-key', 'POST', { owner });
-      if (result && result.api_key) {
-        document.getElementById('generated-key-text').textContent = result.api_key;
+      if (result && result.key) {
+        document.getElementById('generated-key-text').textContent = result.key;
         document.getElementById('generated-key-container').classList.remove('hidden');
+        document.getElementById('form-generate-key').classList.add('hidden');
         fetchData();
       }
     });
 
-    document.getElementById('btn-copy-key').addEventListener('click', (e) => {
-      const keyText = document.getElementById('generated-key-text').textContent;
-      copyToClipboard(keyText, e.target);
+    document.getElementById('btn-force-reconcile').addEventListener('click', async () => {
+      if (confirm('This will start a full reconciliation of all services against Cloudflare. This can be useful to fix any drift between DockFlare and Cloudflare. Continue?')) {
+        const result = await apiCall('/api/v2/reconcile', 'POST');
+        if (result) {
+          alert('Reconciliation process has been started. You can monitor its progress on the Dashboard page.');
+        }
+      }
     });
 
-    document.addEventListener('click', async (e) => {
+    agentsTableBody.addEventListener('click', async (e) => {
       if (e.target.classList.contains('btn-enroll')) {
         const agentId = e.target.getAttribute('data-agent-id');
         document.getElementById('enroll-agent-id').value = agentId;
-        document.getElementById('modal-enroll-agent').showModal();
+        document.getElementById('form-enroll-agent').reset();
 
-        const tunnelsData = await apiCall('/api/v2/tunnels');
         const tunnelSelect = document.getElementById('enroll-tunnel-select');
-        tunnelSelect.innerHTML = '<option disabled selected>Select a tunnel...</option>';
-        if (tunnelsData && tunnelsData.tunnels) {
-          Object.entries(tunnelsData.tunnels).forEach(([tunnelId, tunnel]) => {
-            const option = document.createElement('option');
-            option.value = tunnel.name;
-            option.textContent = `${tunnel.name} (${tunnelId.substring(0, 8)})`;
-            tunnelSelect.appendChild(option);
-          });
+        tunnelSelect.innerHTML = '<option value="">-- Select an existing tunnel --</option>';
+
+        if (window.lastFetchedData && window.lastFetchedData.all_account_tunnels) {
+          const tunnels = window.lastFetchedData.all_account_tunnels;
+          if (Object.keys(tunnels).length === 0) {
+            tunnelSelect.innerHTML += '<option disabled>No existing tunnels</option>';
+          } else {
+            for (const [tunnelId, tunnel] of Object.entries(tunnels)) {
+              if (tunnel && tunnel.name) {
+                const option = document.createElement('option');
+                option.value = tunnel.name;
+                option.dataset.tunnelId = tunnelId;
+                option.textContent = tunnel.name;
+                tunnelSelect.appendChild(option);
+              }
+            }
+          }
         }
-      }
 
-      if (e.target.classList.contains('btn-rename-agent')) {
+        document.getElementById('modal-enroll-agent').showModal();
+      } else if (e.target.classList.contains('btn-remove')) {
         const agentId = e.target.getAttribute('data-agent-id');
-        document.getElementById('rename-agent-id').value = agentId;
-        document.getElementById('modal-rename-agent').showModal();
-      }
-
-      if (e.target.classList.contains('btn-revoke-key')) {
-        if (confirm('Are you sure you want to revoke this API key?')) {
-          const keyId = e.target.getAttribute('data-key-id');
-          const result = await apiCall('/api/v2/agents/revoke-key', 'POST', { key_id: keyId });
-          if (result) {
+        if (confirm(`Are you sure you want to remove agent "${agentId}"? This will also delete the associated Cloudflare tunnel and all related resources.`)) {
+          const success = await apiCall(`/api/v2/agents/${agentId}/remove`, 'POST');
+          if (success) {
+            alert('Agent removed successfully.');
             fetchData();
           }
         }
-      }
-
-      if (e.target.classList.contains('btn-remove')) {
-        if (confirm('Are you sure you want to remove this agent?')) {
-          const agentId = e.target.getAttribute('data-agent-id');
-          const result = await apiCall(`/api/v2/agents/${agentId}/remove`, 'POST');
-          if (result) {
+      } else if (e.target.classList.contains('btn-roll-key')) {
+        const agentId = e.target.getAttribute('data-agent-id');
+        if (confirm(`Are you sure you want to roll the API key for agent "${agentId}"? The agent will need to be updated with the new key.`)) {
+          const result = await apiCall(`/api/v2/agents/${agentId}/roll-key`, 'POST');
+          if (result && result.new_key) {
+            alert(`Agent API key rolled successfully. New key: ${result.new_key}\n\nPlease update your agent configuration with this new key. You will not be able to see it again.`);
             fetchData();
           }
         }
-      }
-
-      if (e.target.classList.contains('btn-trigger-migration')) {
+      } else if (e.target.classList.contains('btn-trigger-migration')) {
         const agentId = e.target.getAttribute('data-agent-id');
-        const result = await apiCall(`/api/v2/agents/${agentId}/trigger-migration`, 'POST');
-        if (result) {
-          fetchData();
+        if (confirm(`Trigger migration analysis for agent "${agentId}"? This will analyze the assigned tunnel for migration opportunities.`)) {
+          const result = await apiCall(`/api/v2/agents/${agentId}/trigger-migration`, 'POST');
+          if (result && result.status === 'success') {
+            alert(`Migration analysis completed successfully!\n\nImported: ${result.result.imported_count} rules\nConflicts: ${result.result.conflicts.length}\nOrphaned: ${result.result.orphaned.length}`);
+            fetchData();
+          }
         }
-      }
-
-      if (e.target.classList.contains('btn-redeploy-tunnel')) {
-        if (confirm('Are you sure you want to redeploy the tunnel for this agent?')) {
-          const agentId = e.target.getAttribute('data-agent-id');
+      } else if (e.target.classList.contains('btn-redeploy-tunnel')) {
+        const agentId = e.target.getAttribute('data-agent-id');
+        if (confirm(`Redeploy tunnel container for agent "${agentId}"? This will restart the cloudflared tunnel container.`)) {
           const result = await apiCall(`/api/v2/agents/${agentId}/redeploy-tunnel`, 'POST');
-          if (result) {
+          if (result && result.status === 'success') {
+            alert('Tunnel redeploy command sent successfully. The agent will restart its cloudflared container.');
             fetchData();
           }
         }
-      }
-
-      if (e.target.classList.contains('btn-roll-key')) {
-        if (confirm('Are you sure you want to roll the API key for this agent? The old key will be revoked.')) {
-          const agentId = e.target.getAttribute('data-agent-id');
-          const result = await apiCall(`/agents/${agentId}/roll-key`, 'POST');
-          if (result) {
-            fetchData();
-          }
-        }
+      } else if (e.target.classList.contains('btn-rename-agent')) {
+        const agentId = e.target.getAttribute('data-agent-id');
+        openRenameModal(agentId);
       }
     });
 
     document.getElementById('form-enroll-agent').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const agentId = formData.get('agent_id');
-      const tunnelName = document.getElementById('enroll-tunnel-select').value !== 'Select a tunnel...'
-        ? document.getElementById('enroll-tunnel-select').value
-        : document.getElementById('enroll-new-tunnel-name').value;
+      const agentId = document.getElementById('enroll-agent-id').value;
+      const selectedTunnelName = document.getElementById('enroll-tunnel-select').value;
+      const newTunnelName = document.getElementById('enroll-new-tunnel-name').value.trim();
 
-      if (!tunnelName) {
-        alert('Please select an existing tunnel or provide a name for a new tunnel.');
+      let tunnelIdentifier = '';
+
+      if (newTunnelName) {
+        tunnelIdentifier = newTunnelName;
+      } else if (selectedTunnelName) {
+        tunnelIdentifier = selectedTunnelName;
+      } else {
+        alert('Please select an existing tunnel or enter a new tunnel name.');
         return;
       }
 
-      const result = await apiCall(`/api/v2/agents/${agentId}/enroll`, 'POST', { tunnel_name: tunnelName });
-      if (result) {
+      const body = { tunnel_name: tunnelIdentifier };
+      const success = await apiCall(`/api/v2/agents/${agentId}/enroll`, 'POST', body);
+
+      if (success) {
+        alert('Agent enrolled successfully.');
         document.getElementById('modal-enroll-agent').close();
         fetchData();
       }
     });
 
+    apiKeysTableBody.addEventListener('click', async (e) => {
+      if (e.target.classList.contains('btn-revoke-key')) {
+        const keyId = e.target.getAttribute('data-key-id');
+        if (confirm(`Are you sure you want to revoke API key "${keyId.substring(0, 8)}..."? This action is irreversible.`)) {
+          const success = await apiCall('/api/v2/agents/revoke-key', 'POST', { key: keyId });
+          if (success) {
+            alert('API key revoked successfully.');
+            fetchData();
+          }
+        }
+      }
+    });
+
     document.getElementById('form-rename-agent').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
-      const agentId = formData.get('agent_id');
-      const displayName = formData.get('display_name');
+      const agentId = document.getElementById('rename-agent-id').value;
+      const displayName = document.getElementById('rename-display-name').value.trim();
 
-      const result = await apiCall(`/api/v2/agents/${agentId}/rename`, 'POST', { display_name: displayName });
-      if (result) {
-        document.getElementById('modal-rename-agent').close();
-        fetchData();
+      if (!displayName) {
+        alert('Please enter a display name.');
+        return;
+      }
+
+      try {
+        const result = await apiCall(`/api/v2/agents/${agentId}/rename`, 'POST', { display_name: displayName });
+        if (result && result.status === 'success') {
+          alert('Agent renamed successfully.');
+          document.getElementById('modal-rename-agent').close();
+          fetchData();
+        }
+      } catch (error) {
+        console.error('Rename failed:', error);
+        alert('Failed to rename agent. Please check the logs.');
       }
     });
 
