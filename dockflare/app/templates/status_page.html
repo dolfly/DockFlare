@@ -151,7 +151,9 @@
                                             <span class="text-sm opacity-90">{{ details.tunnel_name or 'N/A' }}</span>
                                             <span class="text-xs opacity-60 mt-1">Zone: {{ details.zone_name or 'Unknown' }}</span>
                                             {% if details.source == 'agent' and details.agent_id %}
-                                                <span class="text-xs opacity-60 mt-1" data-role="agent-name">Agent: {{ details.agent_id[:8] }}</span>
+                                                {% set agent_info = agents.get(details.agent_id) %}
+                                                {% set agent_display_name = agent_info.display_name if agent_info else details.agent_id[:8] %}
+                                                <span class="text-xs opacity-60 mt-1" data-role="agent-name">Agent: {{ agent_display_name }}</span>
                                             {% endif %}
                                         </div>
                                     </td>
