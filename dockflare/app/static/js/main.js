@@ -3,6 +3,7 @@ const maxLogLines = 250;
 let initialConnectMessageCleared = false;
 let activeLogSource = null;
 let eventSourceHealthCheck = null;
+let logsEnabled = false;
 let pingInterval = null;
 let manualTunnelTomSelect = null;
 let cachedTunnels = null;
@@ -544,6 +545,53 @@ function addLogLine(message, type = 'log') {
     }
 }
 
+function setupLogControls() {
+    const enableBtn = document.getElementById('enable-logs-btn');
+    const disableBtn = document.getElementById('disable-logs-btn');
+    const clearBtn = document.getElementById('clear-logs-btn');
+    const logOutput = document.getElementById('log-output');
+
+    if (!enableBtn || !disableBtn || !clearBtn || !logOutput) return;
+
+    enableBtn.addEventListener('click', () => {
+        logsEnabled = true;
+        logOutput.classList.remove('hidden');
+        logOutput.textContent = 'Connecting to log stream...';
+        connectEventSource();
+        enableBtn.classList.add('hidden');
+        disableBtn.classList.remove('hidden');
+    });
+
+    disableBtn.addEventListener('click', () => {
+        logsEnabled = false;
+        disconnectEventSource();
+        logOutput.classList.add('hidden');
+        enableBtn.classList.remove('hidden');
+        disableBtn.classList.add('hidden');
+    });
+
+    clearBtn.addEventListener('click', () => {
+        if (logOutput) {
+            logOutput.textContent = activeLogSource ? 'Log cleared...\n' : 'Click "Enable Logs" to start streaming...';
+        }
+    });
+}
+
+function disconnectEventSource() {
+    if (activeLogSource) {
+        try {
+            activeLogSource.close();
+        } catch (e) {
+            console.error("Error closing log stream:", e);
+        }
+        activeLogSource = null;
+    }
+    if (eventSourceHealthCheck) {
+        clearInterval(eventSourceHealthCheck);
+        eventSourceHealthCheck = null;
+    }
+}
+
 function connectEventSource() {
     const logOutput = document.getElementById('log-output');
     if (!logOutput) {
@@ -602,18 +650,22 @@ function connectEventSource() {
                 activeLogSource = null;
             }
 
-            retryAttempt++;
-            const delay = Math.min(5000 * Math.pow(1.5, Math.min(retryAttempt - 1, 5)), 30000);
-            setTimeout(connectEventSource, delay);
+            if (logsEnabled) {
+                retryAttempt++;
+                const delay = Math.min(5000 * Math.pow(1.5, Math.min(retryAttempt - 1, 5)), 30000);
+                setTimeout(connectEventSource, delay);
+            }
         };
     } catch (e) {
         addLogLine(`--- Failed to establish log stream connection: ${e.message} ---`, 'error');
-        setTimeout(connectEventSource, 5000);
+        if (logsEnabled) {
+            setTimeout(connectEventSource, 5000);
+        }
     }
 
     if (eventSourceHealthCheck) clearInterval(eventSourceHealthCheck);
     eventSourceHealthCheck = setInterval(() => {
-        if (!activeLogSource || activeLogSource.readyState === EventSource.CLOSED) {
+        if (logsEnabled && (!activeLogSource || activeLogSource.readyState === EventSource.CLOSED)) {
             addLogLine("--- Health check: Log stream disconnected. Reconnecting... ---", 'status');
             connectEventSource();
         }
@@ -1354,8 +1406,9 @@ document.addEventListener('DOMContentLoaded', function() {
     updateCountdowns();
     setInterval(updateCountdowns, 30000);
 
+    // Set up opt-in log streaming controls
     if (document.getElementById('log-output')) {
-        connectEventSource();
+        setupLogControls();
     }
     
     if (document.getElementById('reconciliation-status')) {

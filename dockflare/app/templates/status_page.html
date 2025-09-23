@@ -304,11 +304,22 @@
 
     <section class="card bg-base-100 shadow-xl mb-8 sm:mb-12 transition-all duration-300 hover:shadow-2xl">
          <div class="card-body">
-             <h2 class="card-title text-2xl sm:text-3xl border-b border-base-300 pb-3 mb-4">
-                Real-time Activity Logs
-             </h2>
-            <div class="mockup-code text-xs max-h-96 overflow-y-hidden">
-                <pre id="log-output" aria-live="polite" class="h-full overflow-y-scroll p-4">Connecting to log stream...</pre>
+             <div class="collapse collapse-arrow border border-base-300 rounded-box">
+                <input type="checkbox" id="logs-toggle" />
+                <div class="collapse-title text-xl font-medium">
+                    Real-time Activity Logs
+                    <span class="text-sm font-normal opacity-70 ml-2">(Click to enable - may impact performance)</span>
+                </div>
+                <div class="collapse-content">
+                    <div class="mockup-code text-xs max-h-96 overflow-y-hidden mt-4">
+                        <pre id="log-output" aria-live="polite" class="h-full overflow-y-scroll p-4 hidden">Click "Enable Logs" to start streaming...</pre>
+                    </div>
+                    <div class="mt-4 flex gap-2">
+                        <button id="enable-logs-btn" class="btn btn-primary btn-sm">Enable Logs</button>
+                        <button id="disable-logs-btn" class="btn btn-error btn-sm hidden">Disable Logs</button>
+                        <button id="clear-logs-btn" class="btn btn-ghost btn-sm">Clear</button>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
