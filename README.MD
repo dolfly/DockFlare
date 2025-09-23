@@ -45,6 +45,7 @@ DockFlare 3.0 elevates the project from a single-node helper to a distributed fl
 - **Fleet Management UI**: A dedicated *Agents* page lets you enrol nodes with API keys, assign tunnels, monitor health, and trigger actions without touching the CLI.
 - **Security Hardening**: Master API calls now require an explicit master key that is revealed on demand, agent tokens are revocable, and sensitive setup routes stay locked after onboarding. The DockFlare Agent container now runs as the unprivileged `dockflare` user (UID/GID 65532) and the reference compose stack proxies Docker access through `tecnativa/docker-socket-proxy` for least-privilege isolation.
 - **Redis Backplane**: The master now uses Redis for caching, queue fan-out, and cross-process signalling—ready for future scaling.
+- **Full Backup & Restore**: Download a complete, timestamped archive of your DockFlare instance (including encrypted credentials and agent keys) and restore it via the UI to rebuild a master in minutes.
 - **Documentation Refresh**: New guides cover the master/agent architecture, configuration tips, and upgrade considerations.
 
 ## Getting Started & Documentation
