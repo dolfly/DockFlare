@@ -2,119 +2,6 @@
 
 {% block title %}Agent Management{% endblock %}
 
-{% block head %}
-<style>
-.fuse-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 80px;
-}
-
-.fuse-bar {
-  width: 60px;
-  height: 6px;
-  background-color: #e5e7eb;
-  border-radius: 3px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid #d1d5db;
-}
-
-.fuse-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-  position: relative;
-}
-
-.fuse-bar.healthy .fuse-fill {
-  background: linear-gradient(90deg, #10b981, #34d399);
-}
-
-.fuse-bar.warning .fuse-fill {
-  background: linear-gradient(90deg, #f59e0b, #fbbf24);
-}
-
-.fuse-bar.critical .fuse-fill {
-  background: linear-gradient(90deg, #ef4444, #f87171);
-  animation: pulse-critical 1s ease-in-out infinite alternate;
-}
-
-.fuse-bar.expired .fuse-fill {
-  background: #ef4444;
-  width: 0% !important;
-}
-
-.fuse-bar.offline {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-}
-
-.fuse-bar.offline .fuse-fill {
-  background: #9ca3af;
-}
-
-.fuse-spark {
-  position: absolute;
-  right: -2px;
-  top: -1px;
-  width: 4px;
-  height: 8px;
-  background: radial-gradient(circle, #fbbf24, transparent);
-  border-radius: 50%;
-  opacity: 0;
-  animation: spark 2s ease-in-out infinite;
-}
-
-.fuse-bar.healthy .fuse-spark {
-  animation: spark 3s ease-in-out infinite;
-  background: radial-gradient(circle, #34d399, transparent);
-}
-
-.fuse-bar.warning .fuse-spark {
-  animation: spark 1.5s ease-in-out infinite;
-  background: radial-gradient(circle, #fbbf24, transparent);
-}
-
-.fuse-bar.critical .fuse-spark {
-  animation: spark-critical 0.8s ease-in-out infinite;
-  background: radial-gradient(circle, #f87171, transparent);
-}
-
-.fuse-bar.expired .fuse-spark,
-.fuse-bar.offline .fuse-spark {
-  display: none;
-}
-
-.fuse-label {
-  font-weight: 500;
-  text-align: center;
-  min-width: 50px;
-}
-
-@keyframes pulse-critical {
-  0% { opacity: 1; }
-  100% { opacity: 0.6; }
-}
-
-@keyframes spark {
-  0%, 100% { opacity: 0; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
-}
-
-@keyframes spark-critical {
-  0%, 100% { opacity: 0; transform: scale(0.5); }
-  50% { opacity: 1; transform: scale(1.5); }
-}
-
-.fuse-container:hover .fuse-bar {
-  transform: scale(1.05);
-  transition: transform 0.2s ease;
-}
-</style>
-{% endblock %}
 
 {% block content %}
 
@@ -265,6 +152,132 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.led-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 80px;
+}
+
+.led-strip {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  background-color: #1f2937;
+  border-radius: 4px;
+  border: 1px solid #374151;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.led-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.led-dot.active {
+  box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+}
+
+.led-dot.inactive {
+  background-color: #374151;
+  opacity: 0.3;
+}
+
+/* LED Colors by State */
+.led-strip.healthy .led-dot.active {
+  background-color: #10b981;
+  color: #10b981;
+}
+
+.led-strip.warning .led-dot.active {
+  background-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.led-strip.critical .led-dot.active {
+  background-color: #ef4444;
+  color: #ef4444;
+  animation: led-pulse-critical 1s ease-in-out infinite alternate;
+}
+
+.led-strip.expired .led-dot {
+  background-color: #374151;
+  opacity: 0.2;
+}
+
+.led-strip.expired .led-warning {
+  display: block;
+}
+
+.led-strip.offline .led-dot {
+  background-color: #6b7280;
+  opacity: 0.4;
+}
+
+.led-warning {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 6px;
+  height: 6px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  display: none;
+  animation: led-warning-blink 1s ease-in-out infinite;
+}
+
+.led-label {
+  font-weight: 500;
+  text-align: center;
+  min-width: 60px;
+  font-size: 0.75rem;
+}
+
+/* Animations */
+@keyframes led-pulse-critical {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 4px currentColor, 0 0 8px currentColor;
+  }
+  100% {
+    opacity: 0.4;
+    box-shadow: 0 0 2px currentColor, 0 0 4px currentColor;
+  }
+}
+
+@keyframes led-warning-blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes led-sweep {
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+.led-container:hover .led-strip {
+  transform: scale(1.05);
+  transition: transform 0.2s ease;
+}
+
+/* Heartbeat reset animation */
+.led-strip.heartbeat-reset {
+  animation: led-reset-flash 0.5s ease-out;
+}
+
+@keyframes led-reset-flash {
+  0% { background-color: #1f2937; }
+  50% { background-color: #065f46; }
+  100% { background-color: #1f2937; }
+}
+</style>
+
 <script>
   
   async function apiCall(url, method = 'GET', body = null) {
@@ -297,14 +310,21 @@
     }
   }
 
-  function createFuseBar(agentId, lastSeen, isOnline) {
+  function createLedStrip(agentId, lastSeen, isOnline) {
+    const ledCount = 15; // 15 LEDs for 30 seconds (each LED = 2 seconds)
+
     if (!lastSeen || !isOnline) {
+      const offlineLeds = Array.from({ length: ledCount }, () =>
+        '<div class="led-dot inactive"></div>'
+      ).join('');
+
       return `
-        <div class="fuse-container" data-agent-id="${agentId}">
-          <div class="fuse-bar offline">
-            <div class="fuse-fill" style="width: 0%"></div>
+        <div class="led-container" data-agent-id="${agentId}">
+          <div class="led-strip offline">
+            ${offlineLeds}
+            <div class="led-warning"></div>
           </div>
-          <span class="fuse-label text-xs text-error">Offline</span>
+          <span class="led-label text-xs text-error">Offline</span>
         </div>
       `;
     }
@@ -314,36 +334,42 @@
     const secondsSinceLastSeen = Math.floor((now - lastSeenTime) / 1000);
     const maxAge = 30; // 30 seconds heartbeat interval
 
-    let fusePercentage = Math.max(0, Math.min(100, ((maxAge - secondsSinceLastSeen) / maxAge) * 100));
+    const activeLeds = Math.max(0, Math.ceil(((maxAge - secondsSinceLastSeen) / maxAge) * ledCount));
 
-    let fuseClass = 'healthy';
+    let stripClass = 'healthy';
     let labelText = 'Active';
     let labelClass = 'text-success';
 
-    if (fusePercentage < 30) {
-      fuseClass = 'critical';
+    const healthPercentage = (activeLeds / ledCount) * 100;
+
+    if (healthPercentage < 20) {
+      stripClass = 'critical';
       labelText = 'Critical';
       labelClass = 'text-error';
-    } else if (fusePercentage < 70) {
-      fuseClass = 'warning';
+    } else if (healthPercentage < 47) {
+      stripClass = 'warning';
       labelText = 'Warning';
       labelClass = 'text-warning';
     }
 
     if (secondsSinceLastSeen > maxAge) {
-      fuseClass = 'expired';
+      stripClass = 'expired';
       labelText = 'Lost';
       labelClass = 'text-error';
-      fusePercentage = 0;
     }
 
+    const leds = Array.from({ length: ledCount }, (_, index) => {
+      const isActive = index < activeLeds;
+      return `<div class="led-dot ${isActive ? 'active' : 'inactive'}"></div>`;
+    }).join('');
+
     return `
-      <div class="fuse-container" data-agent-id="${agentId}" data-last-seen="${lastSeen}">
-        <div class="fuse-bar ${fuseClass}">
-          <div class="fuse-fill" style="width: ${fusePercentage}%"></div>
-          <div class="fuse-spark"></div>
+      <div class="led-container" data-agent-id="${agentId}" data-last-seen="${lastSeen}">
+        <div class="led-strip ${stripClass}">
+          ${leds}
+          <div class="led-warning"></div>
         </div>
-        <span class="fuse-label text-xs ${labelClass}">${labelText}</span>
+        <span class="led-label text-xs ${labelClass}">${labelText}</span>
       </div>
     `;
   }
@@ -405,7 +431,7 @@
       const healthBadge = getStatusBadge(agent.health || (agent.online ? 'connected' : 'disconnected'));
       const statusHtml = `${enrollmentBadge} ${healthBadge}`;
 
-      const fuseBarHtml = createFuseBar(agentId, agent.last_seen, agent.online);
+      const ledStripHtml = createLedStrip(agentId, agent.last_seen, agent.online);
       const cloudflaredVersion = agent.tunnel_version || (agent.tunnel_status && agent.tunnel_status.version) || '<i>N/A</i>';
 
       const migrationStatus = agent.migration_status;
@@ -430,7 +456,7 @@
         <td class="p-3 whitespace-nowrap">${agent.display_name || '<i>N/A</i>'}</td>
         <td class="p-3 whitespace-nowrap">${agent.version || '<i>N/A</i>'}</td>
         <td class="p-3">${statusHtml}</td>
-        <td class="p-3 whitespace-nowrap">${fuseBarHtml}</td>
+        <td class="p-3 whitespace-nowrap">${ledStripHtml}</td>
         <td class="p-3 whitespace-nowrap">${agent.assigned_tunnel_name || '<i>None</i>'}</td>
         <td class="p-3">${migrationHtml}${migrationStatus && (migrationStatus.has_conflicts || migrationStatus.has_orphaned) ? `<button class="btn btn-xs btn-info ml-2 btn-migration-assistant" data-agent-id="${agentId}" title="Open Migration Assistant">Resolve</button>` : ''}</td>
         <td class="p-3 whitespace-nowrap">${cloudflaredVersion}</td>
@@ -544,9 +570,9 @@
     fetchData();
   };
 
-  const updateFuseBars = () => {
-    const fuseContainers = document.querySelectorAll('.fuse-container[data-last-seen]');
-    fuseContainers.forEach(container => {
+  const updateLedStrips = () => {
+    const ledContainers = document.querySelectorAll('.led-container[data-last-seen]');
+    ledContainers.forEach(container => {
       const lastSeen = container.getAttribute('data-last-seen');
       const agentId = container.getAttribute('data-agent-id');
 
@@ -556,46 +582,62 @@
       const lastSeenTime = new Date(lastSeen);
       const secondsSinceLastSeen = Math.floor((now - lastSeenTime) / 1000);
       const maxAge = 30;
+      const ledCount = 15;
 
-      let fusePercentage = Math.max(0, Math.min(100, ((maxAge - secondsSinceLastSeen) / maxAge) * 100));
+      const activeLeds = Math.max(0, Math.ceil(((maxAge - secondsSinceLastSeen) / maxAge) * ledCount));
 
-      const fuseBar = container.querySelector('.fuse-bar');
-      const fuseFill = container.querySelector('.fuse-fill');
-      const fuseLabel = container.querySelector('.fuse-label');
+      const ledStrip = container.querySelector('.led-strip');
+      const ledDots = container.querySelectorAll('.led-dot');
+      const ledLabel = container.querySelector('.led-label');
+      const ledWarning = container.querySelector('.led-warning');
 
-      let fuseClass = 'healthy';
+      let stripClass = 'healthy';
       let labelText = 'Active';
       let labelClass = 'text-success';
 
-      if (fusePercentage < 30) {
-        fuseClass = 'critical';
+      const healthPercentage = (activeLeds / ledCount) * 100;
+
+      if (healthPercentage < 20) {
+        stripClass = 'critical';
         labelText = 'Critical';
         labelClass = 'text-error';
-      } else if (fusePercentage < 70) {
-        fuseClass = 'warning';
+      } else if (healthPercentage < 47) {
+        stripClass = 'warning';
         labelText = 'Warning';
         labelClass = 'text-warning';
       }
 
       if (secondsSinceLastSeen > maxAge) {
-        fuseClass = 'expired';
+        stripClass = 'expired';
         labelText = 'Lost';
         labelClass = 'text-error';
-        fusePercentage = 0;
       }
 
-      // Update classes
-      fuseBar.className = `fuse-bar ${fuseClass}`;
-      fuseLabel.className = `fuse-label text-xs ${labelClass}`;
-      fuseLabel.textContent = labelText;
+      // Update strip class
+      ledStrip.className = `led-strip ${stripClass}`;
+      ledLabel.className = `led-label text-xs ${labelClass}`;
+      ledLabel.textContent = labelText;
 
-      // Update fill width
-      fuseFill.style.width = `${fusePercentage}%`;
+      // Update LED states
+      ledDots.forEach((dot, index) => {
+        if (index < activeLeds) {
+          dot.className = 'led-dot active';
+        } else {
+          dot.className = 'led-dot inactive';
+        }
+      });
+
+      // Show/hide warning indicator
+      if (stripClass === 'expired') {
+        ledWarning.style.display = 'block';
+      } else {
+        ledWarning.style.display = 'none';
+      }
     });
   };
 
   setInterval(refreshData, 5000);
-  setInterval(updateFuseBars, 1000); // Update fuse bars every second
+  setInterval(updateLedStrips, 1000); // Update LED strips every second
 
   const openRenameModal = (agentId) => {
     const data = window.lastFetchedData;
@@ -612,7 +654,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     fetchData();
-    updateFuseBars(); // Start fuse animations immediately
+    updateLedStrips(); // Start LED animations immediately
 
     document.getElementById('btn-generate-key').addEventListener('click', () => {
       document.getElementById('generated-key-container').classList.add('hidden');
