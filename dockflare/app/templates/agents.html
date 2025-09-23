@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto agents-table-container">
       <table class="table table-zebra table-sm w-full">
         <thead>
           <tr>
@@ -32,7 +32,7 @@
             <th class="p-3">Migration</th>
             <th class="p-3">Cloudflared Version</th>
             <th class="p-3">Tunnel Status</th>
-            <th class="p-3 text-right">Actions</th>
+            <th class="p-3 text-center">Actions</th>
           </tr>
         </thead>
         <tbody id="agents-table-body">
@@ -157,7 +157,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
   min-width: 80px;
 }
 
@@ -231,11 +230,22 @@
   animation: led-warning-blink 1s ease-in-out infinite;
 }
 
-.led-label {
-  font-weight: 500;
-  text-align: center;
-  min-width: 60px;
-  font-size: 0.75rem;
+/* Dropdown fix for table overflow */
+.dropdown-end .dropdown-content {
+  position: absolute !important;
+  right: 0 !important;
+  top: 100% !important;
+  transform: none !important;
+  z-index: 1000 !important;
+}
+
+/* Ensure dropdown container allows overflow */
+.agents-table-container {
+  overflow: visible !important;
+}
+
+.agents-table-container .table {
+  overflow: visible !important;
 }
 
 /* Animations */
@@ -324,7 +334,6 @@
             ${offlineLeds}
             <div class="led-warning"></div>
           </div>
-          <span class="led-label text-xs text-error">Offline</span>
         </div>
       `;
     }
@@ -369,7 +378,6 @@
           ${leds}
           <div class="led-warning"></div>
         </div>
-        <span class="led-label text-xs ${labelClass}">${labelText}</span>
       </div>
     `;
   }
@@ -588,35 +596,24 @@
 
       const ledStrip = container.querySelector('.led-strip');
       const ledDots = container.querySelectorAll('.led-dot');
-      const ledLabel = container.querySelector('.led-label');
       const ledWarning = container.querySelector('.led-warning');
 
       let stripClass = 'healthy';
-      let labelText = 'Active';
-      let labelClass = 'text-success';
 
       const healthPercentage = (activeLeds / ledCount) * 100;
 
       if (healthPercentage < 20) {
         stripClass = 'critical';
-        labelText = 'Critical';
-        labelClass = 'text-error';
       } else if (healthPercentage < 47) {
         stripClass = 'warning';
-        labelText = 'Warning';
-        labelClass = 'text-warning';
       }
 
       if (secondsSinceLastSeen > maxAge) {
         stripClass = 'expired';
-        labelText = 'Lost';
-        labelClass = 'text-error';
       }
 
       // Update strip class
       ledStrip.className = `led-strip ${stripClass}`;
-      ledLabel.className = `led-label text-xs ${labelClass}`;
-      ledLabel.textContent = labelText;
 
       // Update LED states
       ledDots.forEach((dot, index) => {
