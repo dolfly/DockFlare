@@ -13,7 +13,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
+#
+# dockflare/app/core/migration_service.py
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from app.core.cloudflare_api import get_tunnel_configuration, parse_tunnel_rules_for_migration
@@ -55,8 +56,11 @@ class TunnelMigrationService:
         container_lookup = {}
         for container in agent_containers:
             labels = container.get("labels", {})
-            if labels.get("dockflare.enable") == "true":
-                hostname = labels.get("dockflare.hostname")
+            
+            if (labels.get("dockflare.enable") == "true" or
+                labels.get("cloudflare.tunnel.enable") == "true"):
+                
+                hostname = labels.get("dockflare.hostname") or labels.get("cloudflare.tunnel.hostname")
                 if hostname:
                     container_lookup[hostname] = container
 
@@ -92,7 +96,8 @@ class TunnelMigrationService:
         new_containers = []
         for container in agent_containers:
             labels = container.get("labels", {})
-            hostname = labels.get("dockflare.hostname")
+            
+            hostname = labels.get("dockflare.hostname") or labels.get("cloudflare.tunnel.hostname")
             if hostname and hostname not in [r["hostname"] for r in tunnel_rules]:
                 new_containers.append(container)
 
@@ -111,15 +116,7 @@ class TunnelMigrationService:
 
     @staticmethod
     def execute_auto_import(migration_analysis: Dict[str, Any]) -> Tuple[int, List[str]]:
-        """
-        Execute the auto-import phase of migration.
 
-        Args:
-            migration_analysis: Results from analyze_tunnel_for_migration
-
-        Returns:
-            Tuple of (imported_count, error_messages)
-        """
         auto_import_rules = migration_analysis.get("auto_import", [])
         if not auto_import_rules:
             return 0, []
@@ -153,20 +150,18 @@ class TunnelMigrationService:
 
     @staticmethod
     def _extract_service_from_container(container: Dict) -> Optional[str]:
-        """Extract the service URL from a container's DockFlare labels."""
+        """Extract the service URL from a container's DockFlare labels (supports legacy labels)."""
         labels = container.get("labels", {})
-
-        # Check for explicit service label
-        service = labels.get("dockflare.service")
+        
+        service = labels.get("dockflare.service") or labels.get("cloudflare.tunnel.service")
         if service:
             return service
 
-        # Try to construct from individual components
-        port = labels.get("dockflare.port")
+        port = labels.get("dockflare.port") or labels.get("cloudflare.tunnel.port")
         if not port:
             return None
 
-        protocol = labels.get("dockflare.protocol", "http")
+        protocol = labels.get("dockflare.protocol") or labels.get("cloudflare.tunnel.protocol") or "http"
         container_name = container.get("name", "").lstrip("/")
 
         if container_name:
@@ -199,17 +194,7 @@ class TunnelMigrationService:
 
     @staticmethod
     def trigger_migration_analysis(agent_id: str, tunnel_id: str, agent_containers: List[Dict]) -> Dict:
-        """
-        Trigger migration analysis and auto-import for an agent.
 
-        Args:
-            agent_id: The agent ID
-            tunnel_id: The tunnel ID the agent is assigned to
-            agent_containers: List of containers from agent
-
-        Returns:
-            Migration results including what was auto-imported and any conflicts
-        """
         try:
             
             analysis = TunnelMigrationService.analyze_tunnel_for_migration(tunnel_id, agent_containers)

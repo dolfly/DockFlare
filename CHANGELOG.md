@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [v3.0.0] - 2025-09-25
+
+### Fixed (Hotfixes)
+
+#### **Agent Container Label Processing**
+- **Fixed access policy parsing** for Agent containers - containers with `dockflare.access.policy=authenticate` now display correct policy instead of "None (Public)"
+- **Added support for all documented labels** in Agent processing including `dockflare.no_tls_verify`, `dockflare.originsrvname`, `dockflare.httpHostHeader`
+- **Implemented indexed labels support** for Agent containers (e.g., `dockflare.0.hostname`, `dockflare.1.service`) for multiple domain configurations
+- **Enhanced backwards compatibility** - Agent containers now fully support legacy `cloudflare.tunnel.*` label formats
+
+#### **Migration Logic Improvements**
+- **Fixed tunnel migration analysis** - containers with legacy `cloudflare.tunnel.*` labels are now properly recognized during migration instead of showing as "orphaned"
+- **Enhanced migration service compatibility** with backwards compatible label checking across all migration functions
+- **Improved container matching logic** for more accurate auto-import and conflict detection
+
+#### **Dependencies Security Update**
+- **Updated Redis client** from 4.5.1 to 4.5.5 to address security vulnerabilities (CVE-2023-28859, CVE-2023-28858)
+
+---
 ## [v3.0.0] - 2025-09-23
 
 ### Added

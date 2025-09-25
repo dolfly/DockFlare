@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# app/core/access_manager.py
+# dockflare/app/core/access_manager.py
 import logging
 import json
 import hashlib

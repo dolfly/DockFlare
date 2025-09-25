@@ -14,8 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-# app/core/cache.py
-
+# dockflare/app/core/cache.py
 import logging
 import os
 import time
