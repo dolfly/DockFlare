@@ -13,7 +13,8 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-# /app/web/utils.py
+#
+# dockflare/app/web/utils.py
 from urllib.parse import urlparse, urljoin
 from flask import request
 from app import config

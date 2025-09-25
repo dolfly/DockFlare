@@ -53,7 +53,8 @@ from app.core.access_manager import (
     create_cloudflare_access_application,
     update_cloudflare_access_application,
     generate_access_app_config_hash,
-    find_cloudflare_access_application_by_hostname
+    find_cloudflare_access_application_by_hostname,
+    handle_access_policy_from_labels
 )
 from app.core.reconciler import reconcile_state_threaded
 from app.core.docker_handler import is_valid_hostname, is_valid_service
@@ -158,7 +159,6 @@ def get_overview_data():
 
     all_account_tunnels_list_api = get_all_account_cloudflare_tunnels()
     tunnel_names_map = {}
-    # Build quick lookup for tunnel status by ID from Cloudflare API
     tunnel_status_map = {}
     try:
         for t in all_account_tunnels_list_api or []:
@@ -266,7 +266,7 @@ def get_overview_data():
 
             processed["online"] = online
             processed["health"] = "connected" if online else "disconnected"
-            # Enrich with tunnel status from Cloudflare if available
+            
             try:
                 assigned_tid = processed.get("assigned_tunnel_id")
                 if assigned_tid:
@@ -606,6 +606,22 @@ def process_agent_container_start(payload, agent_id):
 
             default_path_label = get_label(labels, "path")
             default_originsrvname_label = get_label(labels, "originsrvname")
+            default_http_host_header_label = get_label(labels, "httpHostHeader")
+
+            default_access_groups = get_label(labels, "access.groups")
+            default_access_group = get_label(labels, "access.group") if not default_access_groups else None
+            if default_access_groups:
+                default_access_group = [gid.strip() for gid in default_access_groups.split(',')]
+            elif default_access_group:
+                default_access_group = [default_access_group.strip()]
+
+            default_access_policy_type_label = get_label(labels, "access.policy")
+            default_access_app_name_label = get_label(labels, "access.name")
+            default_access_session_duration_label = get_label(labels, "access.session_duration", "24h")
+            default_access_app_launcher_visible_label = get_label(labels, "access.app_launcher_visible", "false").lower() in ["true", "1", "t", "yes"]
+            default_access_allowed_idps_label_str = get_label(labels, "access.allowed_idps")
+            default_access_auto_redirect_label = get_label(labels, "access.auto_redirect_to_identity", "false").lower() in ["true", "1", "t", "yes"]
+            default_access_custom_rules_label_str = get_label(labels, "access.custom_rules")
 
             hostname_label = get_label(labels, "hostname")
             service_label = get_label(labels, "service")
@@ -621,8 +637,75 @@ def process_agent_container_start(payload, agent_id):
                         "path": default_path_label,
                         "no_tls_verify": no_tls_verify_label,
                         "origin_server_name": default_originsrvname_label.strip() if default_originsrvname_label else None,
+                        "http_host_header": default_http_host_header_label.strip() if default_http_host_header_label else None,
+                        "access_group": default_access_group,
+                        "access_policy_type": default_access_policy_type_label,
+                        "access_app_name": default_access_app_name_label,
+                        "access_session_duration": default_access_session_duration_label,
+                        "access_app_launcher_visible": default_access_app_launcher_visible_label,
+                        "access_allowed_idps_str": default_access_allowed_idps_label_str,
+                        "access_auto_redirect": default_access_auto_redirect_label,
+                        "access_custom_rules_str": default_access_custom_rules_label_str
                     })
-            
+
+            index = 0
+            while True:
+                hostname_indexed = get_label(labels, f"{index}.hostname")
+                if not hostname_indexed:
+                    break
+
+                service_indexed = get_label(labels, f"{index}.service", service_label)
+                if not service_indexed:
+                    logging.warning(f"AGENT_PROCESS: Indexed hostname {hostname_indexed} for {container_name} missing service, skipping index {index}.")
+                    index += 1
+                    continue
+
+                path_indexed = get_label(labels, f"{index}.path", default_path_label)
+                zone_name_indexed = get_label(labels, f"{index}.zonename", zone_name_label)
+                no_tls_verify_indexed_val = get_label(labels, f"{index}.no_tls_verify", str(no_tls_verify_label).lower())
+                no_tls_verify_indexed = no_tls_verify_indexed_val.lower() in ["true", "1", "t", "yes"]
+                originsrvname_indexed_val = get_label(labels, f"{index}.originsrvname", default_originsrvname_label)
+                http_host_header_indexed_val = get_label(labels, f"{index}.httpHostHeader", default_http_host_header_label)
+
+                access_groups_indexed = get_label(labels, f"{index}.access.groups")
+                access_group_indexed = get_label(labels, f"{index}.access.group") if not access_groups_indexed else None
+                if access_groups_indexed:
+                    access_group_indexed = [gid.strip() for gid in access_groups_indexed.split(',')]
+                elif access_group_indexed:
+                    access_group_indexed = [access_group_indexed.strip()]
+                else:
+                    access_group_indexed = default_access_group
+
+                access_policy_type_indexed = get_label(labels, f"{index}.access.policy", default_access_policy_type_label)
+                access_app_name_indexed = get_label(labels, f"{index}.access.name", default_access_app_name_label)
+                access_session_duration_indexed = get_label(labels, f"{index}.access.session_duration", default_access_session_duration_label)
+                acc_launcher_val_idx = get_label(labels, f"{index}.access.app_launcher_visible", str(default_access_app_launcher_visible_label).lower())
+                access_app_launcher_visible_indexed = acc_launcher_val_idx.lower() in ["true", "1", "t", "yes"]
+                access_allowed_idps_indexed_str = get_label(labels, f"{index}.access.allowed_idps", default_access_allowed_idps_label_str)
+                acc_redirect_val_idx = get_label(labels, f"{index}.access.auto_redirect_to_identity", str(default_access_auto_redirect_label).lower())
+                access_auto_redirect_indexed = acc_redirect_val_idx.lower() in ["true", "1", "t", "yes"]
+                access_custom_rules_indexed_str = get_label(labels, f"{index}.access.custom_rules", default_access_custom_rules_label_str)
+
+                if is_valid_hostname(hostname_indexed) and is_valid_service(service_indexed):
+                    hostnames_to_process.append({
+                        "hostname": hostname_indexed,
+                        "service": service_indexed,
+                        "zone_name": zone_name_indexed,
+                        "path": path_indexed,
+                        "no_tls_verify": no_tls_verify_indexed,
+                        "origin_server_name": originsrvname_indexed_val.strip() if originsrvname_indexed_val else None,
+                        "http_host_header": http_host_header_indexed_val.strip() if http_host_header_indexed_val else None,
+                        "access_group": access_group_indexed,
+                        "access_policy_type": access_policy_type_indexed,
+                        "access_app_name": access_app_name_indexed,
+                        "access_session_duration": access_session_duration_indexed,
+                        "access_app_launcher_visible": access_app_launcher_visible_indexed,
+                        "access_allowed_idps_str": access_allowed_idps_indexed_str,
+                        "access_auto_redirect": access_auto_redirect_indexed,
+                        "access_custom_rules_str": access_custom_rules_indexed_str
+                    })
+                index += 1
+
             if not hostnames_to_process:
                 logging.warning(f"AGENT_PROCESS: No valid hostname configs for {container_name} ({container_id[:12]}).")
                 return
@@ -689,6 +772,10 @@ def process_agent_container_start(payload, agent_id):
                         if existing_rule.get("origin_server_name") != origin_server_name_from_item:
                             existing_rule["origin_server_name"] = origin_server_name_from_item
                             rule_data_changed = True
+                        http_host_header_from_item = config_item.get("http_host_header")
+                        if existing_rule.get("http_host_header") != http_host_header_from_item:
+                            existing_rule["http_host_header"] = http_host_header_from_item
+                            rule_data_changed = True
                         if existing_rule.get("tunnel_name") != assigned_tunnel_name:
                             existing_rule["tunnel_name"] = assigned_tunnel_name
                             rule_data_changed = True
@@ -724,18 +811,27 @@ def process_agent_container_start(payload, agent_id):
                             "zone_name": zone_name_from_item,
                             "no_tls_verify": no_tls_verify_from_item,
                             "origin_server_name": origin_server_name_from_item,
+                            "http_host_header": config_item.get("http_host_header"),
                             "access_app_id": None,
                             "access_policy_type": None,
                             "access_app_config_hash": None,
                             "access_policy_ui_override": False,
                             "rule_ui_override": False,
                             "source": "agent",
+                            "access_group_id": None,
                             "agent_id": agent_id,
                             "tunnel_name": assigned_tunnel_name,
                             "tunnel_id": assigned_tunnel_id
                         }
                         state_changed_locally = True
                         needs_tunnel_config_update = True
+
+                    if existing_rule:
+                        if existing_rule.get("access_policy_ui_override", False):
+                            logging.info(f"AGENT_PROCESS: Access policy for {rule_key} is UI-managed. Skipping.")
+                        else:
+                            if handle_access_policy_from_labels(config_item, existing_rule, save_state):
+                                state_changed_locally = True
 
             if state_changed_locally:
                 save_state()
@@ -747,8 +843,7 @@ def process_agent_container_start(payload, agent_id):
                 agent_record = get_agent(agent_id)
                 if agent_record and agent_record.get("assigned_tunnel_id"):
                     agent_tunnel_id = agent_record.get("assigned_tunnel_id")
-                    
-                    # Create DNS records
+                                        
                     for config_item in hostnames_to_process:
                         hostname = config_item["hostname"]
                         zone_name_dns_item = config_item.get("zone_name")
@@ -931,8 +1026,7 @@ def agents_register():
     display_name = data.get('display_name') or data.get('hostname') or f"agent-{agent_id[:8]}"
     version = data.get('version')
     now = datetime.utcnow().replace(tzinfo=timezone.utc).isoformat()
-
-    # --- Start: DockFlare Agent State Preservation Fix ---
+    
     existing_agent_id = provided_agent_id or agent_id
     existing_agent = get_agent(existing_agent_id)
 
@@ -1011,7 +1105,6 @@ def agents_post_events(agent_id):
     """
     Agents POST events (container start/stop, tunnel status).
     Auth via API key.
-    For now we store the last_event in agent record for inspection. Later we'll process to create rules.
     """
     logging.info(f"AGENTS_EVENTS: Received request for agent {agent_id}")
     token, owner = _authenticate_agent_request()
@@ -1051,8 +1144,7 @@ def agents_post_events(agent_id):
         logging.info(f"AGENTS_EVENTS: Processing status_report from agent {agent_id}")
 
         containers = payload.get("containers") or (payload.get("container", {}) or {}).get("containers") or []
-
-        # Store container data in agent record for migration analysis
+        
         try:
             update_agent(agent_id, {"last_containers": containers})
         except Exception as e:
