@@ -715,14 +715,16 @@
 (function() {
   let authData = null;
 
+  // Helper to get CSRF token
+  function getCsrfToken() {
+      const csrfInput = document.querySelector('input[name="csrf_token"]');
+      return csrfInput ? csrfInput.value : '{{ csrf_token() }}';
+  }
+
   async function loadAuthSettings() {
     try {
-      const response = await fetch('/api/v2/auth/settings', {
-        headers: {
-          'Authorization': `Bearer ${window.masterApiKey || ''}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // No auth header needed, relies on session cookie
+      const response = await fetch('/api/v2/auth/settings');
 
       if (response.ok) {
         authData = await response.json();
@@ -730,6 +732,8 @@
         renderUsers();
       } else {
         console.error('Failed to load auth settings');
+        const providerList = document.getElementById('provider-list');
+        if(providerList) providerList.innerHTML = '<div class="text-center text-error py-8">Failed to load OAuth settings. Please check browser console for errors.</div>';
       }
     } catch (error) {
       console.error('Error loading auth settings:', error);
@@ -738,23 +742,37 @@
 
   function renderProviders() {
     const providerList = document.getElementById('provider-list');
+    if (!providerList) return;
     if (!authData || !authData.providers || authData.providers.length === 0) {
       providerList.innerHTML = '<div class="text-center text-sm opacity-60 py-8">No OAuth providers configured. Click "Add Provider" to get started.</div>';
       return;
     }
 
-    providerList.innerHTML = authData.providers.map(provider => `
+    providerList.innerHTML = authData.providers.map(provider => {
+      let callbackUrlHtml = '';
+      const publicHostname = '{{ DOCKFLARE_PUBLIC_HOSTNAME or "" }}';
+      if (publicHostname) {
+        const callbackUrl = `https://${publicHostname}/auth/${provider.id}/callback`;
+        callbackUrlHtml = `
+          <div class="text-xs opacity-80 mt-2 pt-2 border-t border-base-200">
+            <strong class="font-semibold">Callback URL:</strong>
+            <code class="bg-base-300 p-1 rounded text-xs select-all">${escapeHtml(callbackUrl)}</code>
+          </div>
+        `;
+      }
+
+      return `
       <div class="card bg-base-100 border">
         <div class="card-body p-4">
           <div class="flex justify-between items-center">
-            <div class="flex items-center space-x-3">
-              <div class="badge badge-${provider.enabled ? 'success' : 'warning'}">${provider.enabled ? 'Enabled' : 'Disabled'}</div>
-              <div>
-                <h5 class="font-semibold">${escapeHtml(provider.name)}</h5>
-                <p class="text-sm opacity-70">${escapeHtml(provider.type)} · ID: ${escapeHtml(provider.id)}</p>
+            <div class="flex-grow">
+              <div class="flex items-center space-x-3">
+                  <div class="badge badge-sm ${provider.enabled ? 'badge-success' : 'badge-warning'}">${provider.enabled ? 'Enabled' : 'Disabled'}</div>
+                  <h5 class="font-semibold">${escapeHtml(provider.name)}</h5>
               </div>
+              <p class="text-sm opacity-70 mt-1">${escapeHtml(provider.type)} · ID: ${escapeHtml(provider.id)}</p>
             </div>
-            <div class="flex space-x-2">
+            <div class="flex flex-shrink-0 space-x-2 ml-4">
               <button class="btn btn-sm btn-outline" onclick="editProvider('${escapeHtml(provider.id)}')">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -767,13 +785,15 @@
               </button>
             </div>
           </div>
+          ${callbackUrlHtml}
         </div>
       </div>
-    `).join('');
+    `}).join('');
   }
 
   function renderUsers() {
     const userList = document.getElementById('user-list');
+    if (!userList) return;
     if (!authData || !authData.users || authData.users.length === 0) {
       userList.innerHTML = '<div class="text-center text-sm opacity-60 py-8">No authorized users configured. Click "Add User" to authorize email addresses.</div>';
       return;
@@ -808,8 +828,121 @@
          .replace(/'/g, "&#039;");
   }
 
+  function handleProviderTypeChange(form, isEdit = false) {
+    const typeSelect = form.elements['provider_type'];
+    const issuerInput = form.elements['issuer_url'];
+    const issuerGroup = issuerInput.closest('.form-control');
+    const nameInput = form.elements['provider_name'];
+    const idInput = form.elements['provider_id'];
+
+    // Default state
+    issuerGroup.style.display = 'none';
+    issuerInput.required = false;
+
+    if (typeSelect.value === 'google') {
+        // Field is hidden, but we still set the value
+        issuerInput.value = 'https://accounts.google.com';
+        if (!nameInput.value) nameInput.value = 'Google';
+        if (!idInput.value && !isEdit) idInput.value = 'google';
+    } else if (typeSelect.value === 'oidc') {
+        // Show the field for generic OIDC
+        issuerGroup.style.display = '';
+        issuerInput.required = true;
+        if (!isEdit) {
+            issuerInput.value = '';
+            nameInput.value = '';
+            idInput.value = '';
+        }
+    } else if (typeSelect.value === 'github') {
+        // Field is hidden
+        if (!nameInput.value) nameInput.value = 'GitHub';
+        if (!idInput.value && !isEdit) idInput.value = 'github';
+    }
+  }
+
   window.showAddProviderModal = function() {
-    document.getElementById('addProviderModal').showModal();
+    const modal = document.getElementById('addProviderModal');
+    const form = modal.querySelector('form');
+    form.reset();
+    handleProviderTypeChange(form, false);
+    modal.showModal();
+  };
+
+  window.editProvider = function(providerId) {
+    const provider = authData.providers.find(p => p.id === providerId);
+    if (!provider) {
+      showToast('Provider not found.', 'error');
+      return;
+    }
+
+    const modal = document.getElementById('editProviderModal');
+    const form = document.getElementById('editProviderForm');
+    const issuerGroup = form.elements['issuer_url'].closest('.form-control');
+
+    // Handle visibility of issuer URL field based on the provider's type
+    if (provider.type === 'github' || provider.type === 'google') {
+        issuerGroup.style.display = 'none';
+        form.elements['issuer_url'].required = false;
+    } else { // oidc
+        issuerGroup.style.display = '';
+        form.elements['issuer_url'].required = true;
+    }
+
+    form.elements['provider_type'].value = provider.type || 'oidc';
+    form.elements['original_provider_id'].value = provider.id;
+    form.elements['issuer_url'].value = provider.issuer_url || (provider.type === 'google' ? 'https://accounts.google.com' : '');
+    form.elements['provider_id'].value = provider.id;
+    form.elements['provider_name'].value = provider.name;
+    form.elements['client_id'].value = provider.client_id || '';
+    form.elements['client_id'].placeholder = 'OAuth Client ID';
+    form.elements['enabled'].checked = provider.enabled;
+    
+    form.elements['client_secret'].value = '';
+
+    modal.showModal();
+  };
+
+  window.updateProvider = async function() {
+    const form = document.getElementById('editProviderForm');
+    const providerId = form.elements['original_provider_id'].value;
+    
+    const providerData = {
+      name: form.elements['provider_name'].value,
+      enabled: form.elements['enabled'].checked,
+      issuer_url: form.elements['issuer_url'].value
+    };
+
+    const clientId = form.elements['client_id'].value;
+    if (clientId) {
+      providerData.client_id = clientId;
+    }
+
+    const clientSecret = form.elements['client_secret'].value;
+    if (clientSecret) {
+      providerData.client_secret = clientSecret;
+    }
+
+    try {
+      const response = await fetch(`/api/v2/auth/providers/${providerId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
+        },
+        body: JSON.stringify(providerData)
+      });
+
+      if (response.ok) {
+        document.getElementById('editProviderModal').close();
+        await loadAuthSettings();
+        showToast('Provider updated successfully!', 'success');
+      } else {
+        const error = await response.json();
+        showToast(error.message || 'Failed to update provider', 'error');
+      }
+    } catch (error) {
+      showToast('Error updating provider', 'error');
+    }
   };
 
   window.showAddUserModal = function() {
@@ -833,8 +966,8 @@
       const response = await fetch('/api/v2/auth/providers', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${window.masterApiKey || ''}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
         },
         body: JSON.stringify(providerData)
       });
@@ -866,8 +999,8 @@
       const response = await fetch('/api/v2/auth/users', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${window.masterApiKey || ''}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
         },
         body: JSON.stringify(userData)
       });
@@ -893,8 +1026,8 @@
       const response = await fetch(`/api/v2/auth/providers/${providerId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${window.masterApiKey || ''}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
         }
       });
 
@@ -916,8 +1049,8 @@
       const response = await fetch(`/api/v2/auth/users/${encodeURIComponent(userEmail)}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${window.masterApiKey || ''}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken()
         }
       });
 
@@ -945,8 +1078,14 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    if (window.masterApiKey) {
-      loadAuthSettings();
+    loadAuthSettings();
+
+    const addForm = document.getElementById('addProviderForm');
+    if (addForm) {
+        const addTypeSelect = addForm.elements['provider_type'];
+        if (addTypeSelect) {
+            addTypeSelect.addEventListener('change', () => handleProviderTypeChange(addForm, false));
+        }
     }
   });
 })();
@@ -962,11 +1101,20 @@
           <span class="label-text">Provider Type</span>
         </label>
         <select name="provider_type" class="select select-bordered" required>
-          <option value="">Select Provider Type</option>
-          <option value="google">Google</option>
+          <option value="google" selected>Google</option>
           <option value="github">GitHub</option>
-          <option value="microsoft">Microsoft</option>
+          <option value="oidc">Generic OIDC / Authentik</option>
         </select>
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Issuer URL</span>
+        </label>
+        <input name="issuer_url" type="url" placeholder="https://authentik.example.com/application/o/dockflare/" class="input input-bordered" required />
+        <label class="label">
+            <span class="label-text-alt">The OIDC provider's issuer URL.</span>
+        </label>
       </div>
 
       <div class="form-control">
@@ -1013,6 +1161,75 @@
         <button class="btn">Cancel</button>
       </form>
       <button class="btn btn-primary" onclick="addProvider()">Add Provider</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Edit Provider Modal -->
+<dialog id="editProviderModal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">Edit OAuth Provider</h3>
+    <form id="editProviderForm" class="space-y-4 mt-4">
+      <input type="hidden" name="original_provider_id">
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Provider Type</span>
+        </label>
+        <select name="provider_type" class="select select-bordered" required disabled>
+          <option value="google">Google</option>
+          <option value="github">GitHub</option>
+          <option value="oidc">Generic OIDC / Authentik</option>
+        </select>
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Issuer URL</span>
+        </label>
+        <input name="issuer_url" type="url" placeholder="https://authentik.example.com/application/o/dockflare/" class="input input-bordered" required />
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Provider ID</span>
+        </label>
+        <input name="provider_id" type="text" placeholder="e.g. google" class="input input-bordered" required disabled />
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Display Name</span>
+        </label>
+        <input name="provider_name" type="text" placeholder="e.g. Google" class="input input-bordered" required />
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Client ID</span>
+        </label>
+        <input name="client_id" type="text" placeholder="OAuth Client ID" class="input input-bordered" required />
+      </div>
+
+      <div class="form-control">
+        <label class="label">
+          <span class="label-text">Client Secret</span>
+        </label>
+        <input name="client_secret" type="password" placeholder="Leave blank to keep existing secret" class="input input-bordered" />
+      </div>
+
+      <div class="form-control">
+        <label class="label cursor-pointer">
+          <span class="label-text">Enable Provider</span>
+          <input name="enabled" type="checkbox" class="toggle" />
+        </label>
+      </div>
+    </form>
+
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn">Cancel</button>
+      </form>
+      <button class="btn btn-primary" onclick="updateProvider()">Save Changes</button>
     </div>
   </div>
 </dialog>

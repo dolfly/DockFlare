@@ -69,6 +69,14 @@ _AGENT_ENDPOINT_ALLOWLIST = {
     'api_v2.agents_post_events',
 }
 
+_UI_ENDPOINT_ALLOWLIST = {
+    'api_v2.manage_auth_settings',
+    'api_v2.manage_auth_providers',
+    'api_v2.manage_auth_provider',
+    'api_v2.manage_auth_users',
+    'api_v2.manage_auth_user',
+}
+
 
 @api_v2_bp.before_request
 def _enforce_master_api_key():
@@ -78,11 +86,13 @@ def _enforce_master_api_key():
     if request.method == 'OPTIONS':
         return
 
-    # For agent endpoints in allowlist, skip all authentication (including Flask-Login)
     if endpoint in _AGENT_ENDPOINT_ALLOWLIST:
         return
 
-    # For all other API endpoints, ensure proper API authentication
+    # For UI endpoints, rely on Flask-Login's session auth
+    if endpoint in _UI_ENDPOINT_ALLOWLIST:
+        return
+
     expected_key = current_app.config.get('MASTER_API_KEY') or config.MASTER_API_KEY
     if not expected_key:
         logging.warning("MASTER_AUTH: Master API key not configured; rejecting %s", endpoint)
@@ -1991,8 +2001,11 @@ def manage_auth_settings():
         users = config_data.get('authorized_users', [])
 
         for p in providers:
-            p.pop('client_id', None)
             p.pop('client_secret', None)
+            try:
+                p['client_id'] = fernet.decrypt(p['client_id'].encode()).decode()
+            except Exception:
+                p['client_id'] = '(could not decrypt)'
 
         return jsonify({
             "settings": auth_settings,
@@ -2036,6 +2049,10 @@ def manage_auth_providers():
         if not all(field in data for field in required_fields):
             return jsonify({"error": "missing_required_fields"}), 400
 
+        provider_type = data.get('type')
+        if provider_type in ['oidc', 'google'] and not data.get('issuer_url'):
+            return jsonify({"error": "issuer_url_required_for_oidc"}), 400
+
         if not config_data.get('auth_providers'):
             config_data['auth_providers'] = []
 
@@ -2050,6 +2067,7 @@ def manage_auth_providers():
             'id': data['id'],
             'name': data['name'],
             'type': data['type'],
+            'issuer_url': data.get('issuer_url'),
             'client_id': encrypted_client_id,
             'client_secret': encrypted_client_secret,
             'enabled': data.get('enabled', True)
@@ -2088,6 +2106,8 @@ def manage_auth_provider(provider_id):
             provider['client_id'] = fernet.encrypt(data['client_id'].encode()).decode()
         if 'client_secret' in data:
             provider['client_secret'] = fernet.encrypt(data['client_secret'].encode()).decode()
+        if 'issuer_url' in data:
+            provider['issuer_url'] = data['issuer_url']
 
         if not _save_encrypted_config(config_data, fernet):
             return jsonify({"error": "failed_to_save_config"}), 500

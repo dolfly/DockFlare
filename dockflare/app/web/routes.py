@@ -187,9 +187,22 @@ def gating_logic():
 
 @bp.before_app_request
 def detect_protocol_bp():
-
     forwarded_proto = request.headers.get('X-Forwarded-Proto', '').lower()
-    current_app.config['PREFERRED_URL_SCHEME'] = 'https' if forwarded_proto == 'https' or request.is_secure else 'http'
+    if forwarded_proto == 'https':
+        current_app.config['PREFERRED_URL_SCHEME'] = 'https'
+        return
+
+    cf_visitor = request.headers.get('Cf-Visitor')
+    if cf_visitor:
+        try:
+            visitor_data = json.loads(cf_visitor)
+            if visitor_data.get('scheme') == 'https':
+                current_app.config['PREFERRED_URL_SCHEME'] = 'https'
+                return
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    current_app.config['PREFERRED_URL_SCHEME'] = 'https' if request.is_secure else 'http'
 
 @bp.after_app_request
 def add_security_headers_bp(response):
@@ -232,6 +245,8 @@ def inject_protocol_bp():
     if current_user.is_authenticated:
         master_key_value = current_app.config.get('MASTER_API_KEY')
 
+    public_hostname = current_app.config.get('DOCKFLARE_PUBLIC_HOSTNAME')
+
     return {
         'protocol': preferred_scheme,
         'is_https': preferred_scheme == 'https',
@@ -241,7 +256,8 @@ def inject_protocol_bp():
         'app_version': config.APP_VERSION,
         'master_api_key': master_key_value,
         'oauth_enabled': oauth_enabled,
-        'current_user_auth_method': getattr(current_user, 'auth_method', None) if current_user.is_authenticated else None
+        'current_user_auth_method': getattr(current_user, 'auth_method', None) if current_user.is_authenticated else None,
+        'DOCKFLARE_PUBLIC_HOSTNAME': public_hostname
     }
 
 @bp.route('/')
@@ -1863,7 +1879,13 @@ def login_provider(provider_id):
     session['oauth_state'] = state_token
 
     from app import oauth
-    callback_url = url_for('web.auth_callback', provider_id=provider_id, _external=True)
+    public_hostname = current_app.config.get('DOCKFLARE_PUBLIC_HOSTNAME')
+    if public_hostname:
+        path = url_for('web.auth_callback', provider_id=provider_id)
+        callback_url = f"https://{public_hostname}{path}"
+        logging.info(f"Constructed OAuth callback URL using public hostname: {callback_url}")
+    else:
+        callback_url = url_for('web.auth_callback', provider_id=provider_id, _external=True)
     return oauth.create_client(provider_id).authorize_redirect(callback_url, state=state_token)
 
 @bp.route('/auth/<provider_id>/callback')
@@ -1911,10 +1933,7 @@ def logout():
     auth_method = getattr(current_user, 'auth_method', 'password')
     logout_user()
 
-    if auth_method == 'oauth':
-        flash('You have been logged out of DockFlare. You may still be logged into your OAuth provider.', 'info')
-    else:
-        flash('You have been logged out.', 'success')
+    flash('You have been logged out.', 'success')
 
     if current_app.config.get('DISABLE_PASSWORD_LOGIN'):
         oauth_providers = current_app.config.get('OAUTH_PROVIDERS', [])

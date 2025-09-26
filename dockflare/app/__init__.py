@@ -89,7 +89,7 @@ try:
     logging.info("Successfully connected to Docker daemon.")
 except APIError as e:
     logging.error(f"FATAL: Docker API error during initial connection: {e}")
-    docker_client = None # Ensure it's None on APIError too
+    docker_client = None 
 except Exception as e:
     logging.error(f"FATAL: Failed to connect to Docker daemon: {e}")
     docker_client = None 
@@ -129,17 +129,20 @@ def create_app():
         elif oauth_providers:
             return redirect(url_for('web.login'))
         else:
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('web.login'))
 
     # Custom user loader that exempts API routes from authentication checks
     @login_manager.request_loader
     def load_user_from_request(request):
-        """Load user from request - bypass authentication for API endpoints"""
-        # For API v2 endpoints, don't require Flask-Login authentication
-        if request.endpoint and request.endpoint.startswith('api_v2.'):
-            # Create a dummy user to satisfy Flask-Login for API endpoints
+        """Load user from request - bypass session auth for designated API endpoints."""
+        
+        if request.path.startswith('/api/v2/auth/'):
+            return None
+
+        elif request.endpoint and request.endpoint.startswith('api_v2.'):
             from app.core.user import User
             return User('api_user')
+            
         return None
 
     @login_manager.user_loader
@@ -181,7 +184,7 @@ def create_app():
         logging.info("Web blueprint registered.")
 
         from .web.api_v2_routes import api_v2_bp
-        # Exclude the API blueprint from CSRF protection
+        
         csrf.exempt(api_v2_bp)
         app_instance.register_blueprint(api_v2_bp)
         logging.info("API v2 blueprint registered.")
@@ -191,9 +194,6 @@ def create_app():
         app_instance.register_blueprint(setup_bp)
         logging.info("Setup blueprint registered.")
 
-        from .web.auth_routes import auth_bp
-        app_instance.register_blueprint(auth_bp)
-        logging.info("Auth blueprint registered.")
 
         from .web.help_routes import help_bp
         app_instance.register_blueprint(help_bp)
