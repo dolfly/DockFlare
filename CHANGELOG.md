@@ -15,10 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Redesigned Login Page:** The login page has been updated with a modern design, provider logos, and a unified flow for both password and OAuth logins.
 - **Improved Usability:** The settings page now displays the required Callback URL for OAuth providers, and DockFlare can discover its public hostname from Docker labels.
-
-### Fixed
-- Resolved multiple issues with the new OAuth feature, including `redirect_uri_mismatch` errors, a broken "Edit" button, and several backend bugs.
-
+- 
 ### Security
 - **Login Rate Limiting:** Implemented rate limiting on the password login form (6 attempts per minute) to protect against brute-force attacks.
 
