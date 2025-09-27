@@ -22,7 +22,7 @@ Of course, my apologies for the misunderstanding. Here is the changelog with a n
 
 ### Fixed
 - **Tedious Manual Selection:** Resolved an issue where "Allow US Only" required manually selecting over 194 countries; it now requires only one click (resolves #240).
-- **IP Whitelist Access Policies:** Corrected a bug where IP-based access policies were not functioning as intended. The system now properly creates a `bypass` rule for whitelisted IPs.
+- **IP Whitelist Access Policies:** Corrected a bug where IP-based access policies were not functioning as intended. DockFlare now properly creates a `bypass` rule for whitelisted IPs.
 - **Access Policy Updates:** Addressed a failure where updating an Access Policy on an existing ingress rule would result in an "application already exists" error.
 - **API Error Logging:** The severity of the log message for a `403 Forbidden` error during user email fetches has been reduced, as this is expected behavior with a scoped API token (related to issues #216, #217 raised by @durzo).
 - **OAuth Provider Visibility:** Fixed the login screen to respect disabled providers immediately after changes through the API or UI, keeping password-disable overrides intact.
