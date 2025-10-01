@@ -7,13 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [v3.0.1] (Hotfixes) - 2025-09-27
+## [v3.0.2] - 2025-09-30
+
+### Added
+- **Enhanced API Key Management**
+    - **Revoked Key Visibility:** Revoked API keys are now displayed in a separate "Revoked Keys" section with full key visibility for verification and audit purposes.
+    - **Permanent Deletion:** Added "Delete Permanently" functionality for individual revoked keys and "Clear All" for bulk removal.
+    - **Auto-Cleanup System:** Implemented automatic cleanup of revoked keys after 30 days with manual trigger option.
+    - **Improved UX:** Revoked keys are visually distinguished (grayed out, full key shown) with countdown to auto-deletion.
+    - **Copy Functionality:** Users can copy full revoked API keys for record-keeping before permanent deletion.
 
 ### Fixed
-- **IP Whitelist Access Policies:** Corrected an issue where IP-based access policies were not working as expected. DockFlare now correctly creates a `bypass` rule for IP whitelists and a separate `allow` rule for email-based authentication, ensuring whitelisted IPs can access services without an additional authentication step.
-- **Access Policy Updates:** Fixed a bug where updating an existing ingress rule's Access Policy would fail with an "application already exists" error. DockFlare now correctly updates the existing Cloudflare Access application instead of trying to create a new one.
-- **API Error Logging:** Reduced the severity of the log message for a `403 Forbidden` error when fetching a user's email. This is an expected and non-critical error when using a scoped API token.
-(raised by @durzo issue tracker #216 #217)
+- **API Key Revocation Display Bug:** Fixed issue where revoked API keys remained visible in the frontend as if they were active, even though backend authentication correctly rejected them.
+
+---
+
+## [v3.0.1] (Hotfixes) - 2025-09-27
+
+### Added
+- **Enhanced Country Selection UX**
+    - **Bulk Selection Controls:** Added "Select All," "Select None," and "Invert Selection" buttons for more efficient country management.
+    - **Quick Templates:** Implemented one-click presets such as "Block All Except US," "Block All Except EU," and "Block High Risk Countries."
+    - **Regional Selection:** Users can now select entire continents (e.g., Africa, Asia, Europe) with a single click.
+    - **Visual Feedback:** A dynamic counter now shows "X of 245 countries selected" to provide immediate feedback.
+
+### Fixed
+- **Tedious Manual Selection:** Resolved an issue where "Allow US Only" required manually selecting over 194 countries; it now requires only one click (resolves #240).
+- **IP Whitelist Access Policies:** Corrected a bug where IP-based access policies were not functioning as intended. DockFlare now properly creates a `bypass` rule for whitelisted IPs.
+- **Access Policy Updates:** Addressed a failure where updating an Access Policy on an existing ingress rule would result in an "application already exists" error.
+- **API Error Logging:** The severity of the log message for a `403 Forbidden` error during user email fetches has been reduced, as this is expected behavior with a scoped API token (related to issues #216, #217 raised by @durzo).
+- **OAuth Provider Visibility:** Fixed the login screen to respect disabled providers immediately after changes through the API or UI, keeping password-disable overrides intact.
 
 ---
 ## [v3.0.1] - 2025-09-26
