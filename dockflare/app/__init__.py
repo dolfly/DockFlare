@@ -86,9 +86,22 @@ def publish_state_event(event_type, data=None):
         "data": data or {}
     })
     try:
+        from .core.cache import get_redis_client
+        redis_client = get_redis_client()
+        if redis_client:
+            try:
+                redis_client.publish('dockflare:state_updates', message)
+                logging.info(f"STATE_EVENT_PUBLISHED: {event_type} via Redis pub/sub")
+                return
+            except Exception as pub_err:
+                logging.error(f"Redis publish failed: {pub_err}, falling back to queue")
+
         state_update_queue.put_nowait(message)
+        logging.info(f"STATE_EVENT_PUBLISHED: {event_type} - Queue size: {state_update_queue.qsize()} (fallback)")
     except queue.Full:
         logging.warning("State event queue full. Dropping event: %s", event_type)
+    except Exception as e:
+        logging.error(f"Failed to publish state event {event_type}: {e}")
 
 
 docker_client = None

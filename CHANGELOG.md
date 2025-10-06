@@ -67,6 +67,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Agent Migration:** DockFlare Agent-reported containers also receive migration for consistent behavior across deployment modes
   - **Access Application Creation:** Containers with bypass labels now correctly create Access Applications with the system bypass reusable policy attached, enabling proper `*.tld` zone protection bypass
   - **State Persistence:** Migrated values are correctly persisted to state, preventing reconciler from reverting to old label values
+- **Real-Time Dashboard Updates:** Implemented Redis pub/sub broadcasting for instant dashboard updates when containers start or stop, eliminating the need for manual browser refresh.
+  - **Event Broadcasting:** Switched from queue-based (single consumer) to Redis pub/sub (broadcast to all clients) for state change notifications
+  - **Non-Blocking SSE:** SSE endpoint now uses `pubsub.get_message(timeout=30)` instead of blocking `pubsub.listen()` to prevent worker thread exhaustion
+  - **Automatic Refresh:** Dashboard automatically reloads when containers are created, started, or stopped without user interaction
+  - **Multi-Client Support:** All connected browser clients receive real-time updates simultaneously
 
 ---
 

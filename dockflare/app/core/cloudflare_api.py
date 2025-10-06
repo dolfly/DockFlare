@@ -484,21 +484,6 @@ def get_cloudflare_account_email():
     logging.info("Fetching Cloudflare account email from API.")
 
     try:
-        response_data = cf_api_request("GET", "/user")
-        if response_data and response_data.get("success"):
-            email = response_data.get("result", {}).get("email")
-            if email:
-                logging.info(f"Successfully fetched Cloudflare account email from /user endpoint: {email}")
-                with _cache_lock:
-                    _cached_account_email = email
-                    _cached_account_email_timestamp = current_time
-                return email
-    except requests.exceptions.RequestException as e:
-        logging.info(f"Failed to fetch email from /user endpoint (likely permission issue): {e}")
-    except Exception as e:
-        logging.warning(f"Unexpected error fetching email from /user endpoint: {e}")
-
-    try:
         account_id = current_app.config.get('CF_ACCOUNT_ID')
         if not account_id:
             logging.error("Cannot fetch account email: CF_ACCOUNT_ID not configured")

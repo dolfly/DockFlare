@@ -5,6 +5,8 @@ services:
     image: tecnativa/docker-socket-proxy:v0.4.1
     container_name: docker-socket-proxy
     restart: unless-stopped
+    logging:
+      driver: "none"  # Minimize the logs, remove for verbose
     environment:
       - DOCKER_HOST=unix:///var/run/docker.sock
       - CONTAINERS=1
@@ -78,6 +80,8 @@ services:
     container_name: dockflare-redis
     restart: unless-stopped
     command: ["redis-server", "--save", "", "--appendonly", "no"]
+    logging:
+      driver: "none"  # less logs, remove for verbose / more logs
     volumes:
       - dockflare_redis:/data
     networks:

@@ -112,3 +112,5 @@ AGENT_COMMAND_POLL_INTERVAL = int(os.getenv('AGENT_COMMAND_POLL_INTERVAL', 5))
 REDIS_DB_INDEX = int(os.getenv('REDIS_DB_INDEX', 0))
 
 USE_REUSABLE_POLICIES = os.getenv('USE_REUSABLE_POLICIES', 'true').lower() in ['true', '1', 't', 'yes']
+
+SYNC_ALL_CLOUDFLARE_POLICIES = os.getenv('SYNC_ALL_CLOUDFLARE_POLICIES', 'false').lower() in ['true', '1', 't', 'yes']

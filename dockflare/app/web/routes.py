@@ -1114,7 +1114,8 @@ def force_delete_rule_route(hostname):
     return redirect(url_for('web.status_page'))
 
 @bp.route('/stream-logs')
-def stream_logs_route(): 
+@login_required
+def stream_logs_route():
     client_id = f"client-{random.randint(1000, 9999)}"
     logging.info(f"Log stream client {client_id} connected.")
     def event_stream():
@@ -1148,19 +1149,44 @@ def stream_logs_route():
     return response
 
 @bp.route('/stream-state-updates')
+@login_required
 def stream_state_updates_route():
+    from app.core.cache import get_redis_client
+    import select
+    logging.info("SSE_CONNECT: Client connected to /stream-state-updates")
+
     def event_stream():
+        redis_client = get_redis_client()
+        if not redis_client:
+            logging.error("SSE: Redis client not available for pub/sub")
+            yield "data: {\"type\": \"error\", \"message\": \"Redis unavailable\"}\n\n"
+            return
+
+        pubsub = redis_client.pubsub()
         try:
+            pubsub.subscribe('dockflare:state_updates')
+            logging.info("SSE: Subscribed to Redis channel 'dockflare:state_updates'")
+            yield ": connected\n\n"
+
             while True:
-                try:
-                    data = state_update_queue.get(timeout=30)
-                    yield f"data: {data}\n\n"
-                except queue.Empty:
+                message = pubsub.get_message(timeout=30)
+                if message:
+                    if message['type'] == 'message':
+                        data = message['data'].decode('utf-8') if isinstance(message['data'], bytes) else message['data']
+                        logging.info(f"SSE_SEND: Sending event to client: {data[:100]}...")
+                        yield f"data: {data}\n\n"
+                else:
                     yield ": heartbeat\n\n"
         except GeneratorExit:
-            logging.info("State update stream client disconnected.")
-    
-    return Response(event_stream(), mimetype='text/event-stream')
+            logging.info("SSE_DISCONNECT: State update stream client disconnected.")
+        finally:
+            pubsub.unsubscribe('dockflare:state_updates')
+            pubsub.close()
+
+    response = Response(event_stream(), mimetype='text/event-stream')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['X-Accel-Buffering'] = 'no'
+    return response
 
 @bp.route('/ui/manual-rules/add', methods=['POST'])
 def ui_add_manual_rule_route():
@@ -2064,7 +2090,11 @@ def sync_access_groups_from_cloudflare():
 
     try:
         from app.core import reusable_policies
-        result = reusable_policies.import_cloudflare_reusable_policies()
+
+        # Get sync_all parameter from form (defaults to false for backward compatibility)
+        sync_all = request.form.get('sync_all', 'false').lower() in ['true', '1', 't', 'yes']
+
+        result = reusable_policies.import_cloudflare_reusable_policies(sync_all=sync_all)
 
         imported = result.get("imported", 0)
         updated = result.get("updated", 0)
@@ -2072,7 +2102,8 @@ def sync_access_groups_from_cloudflare():
 
         if imported > 0 or updated > 0:
             publish_state_event('snapshot_refresh')
-            flash(f"Success: Synced {imported} new and {updated} updated access groups from Cloudflare. {skipped} skipped.", "success")
+            mode_text = "all policies" if sync_all else "DockFlare- prefixed policies"
+            flash(f"Success: Synced {imported} new and {updated} updated access groups from Cloudflare ({mode_text}). {skipped} skipped.", "success")
         else:
             flash(f"No new access groups to import. {skipped} existing policies found.", "info")
 

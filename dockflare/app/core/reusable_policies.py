@@ -256,10 +256,15 @@ def sync_access_group_to_reusable_policy(group_id, group_definition):
     logging.error(f"Failed to sync access group '{group_id}' to reusable policy")
     return None
 
-def import_cloudflare_reusable_policies():
+def import_cloudflare_reusable_policies(sync_all=None):
     from app.core.state_manager import access_groups, save_state
+    from app import config
 
-    logging.info("Starting import of Cloudflare reusable policies")
+    # Use parameter if provided, otherwise fall back to config
+    if sync_all is None:
+        sync_all = config.SYNC_ALL_CLOUDFLARE_POLICIES
+
+    logging.info(f"Starting import of Cloudflare reusable policies (sync_all={sync_all})")
     policies = list_reusable_policies()
 
     imported_count = 0
@@ -270,12 +275,37 @@ def import_cloudflare_reusable_policies():
         policy_id = policy.get("id")
         policy_name = policy.get("name", "")
 
-        if not policy_name.startswith("DockFlare-AccessGroup-"):
-            logging.debug(f"Skipping non-DockFlare policy: {policy_name}")
+        is_dockflare_managed = policy_name.startswith("DockFlare-AccessGroup-") or policy_name.startswith("DockFlare-")
+
+        if not is_dockflare_managed and not sync_all:
+            logging.debug(f"Skipping external policy (sync_all=false): {policy_name}")
             skipped_count += 1
             continue
 
-        group_id = policy_name.replace("DockFlare-AccessGroup-", "")
+        # Detect system policies
+        is_system_policy = False
+        system_policy_mapping = {
+            "DockFlare-Default-Public-Access-Bypass": {
+                "id": "public-default-bypass",
+                "display_name": "Public Access (Bypass)"
+            },
+            "DockFlare-Default-Authenticated-Access": {
+                "id": "authenticated-default",
+                "display_name": "Authenticated Access"
+            }
+        }
+
+        if policy_name in system_policy_mapping:
+            is_system_policy = True
+            group_id = system_policy_mapping[policy_name]["id"]
+            display_name = system_policy_mapping[policy_name]["display_name"]
+            logging.info(f"Detected system policy '{policy_name}' -> group_id '{group_id}'")
+        elif is_dockflare_managed and policy_name.startswith("DockFlare-AccessGroup-"):
+            group_id = policy_name.replace("DockFlare-AccessGroup-", "")
+            display_name = group_id.replace("-", " ").title()
+        else:
+            group_id = policy_id
+            display_name = policy_name
 
         decision = policy.get("decision", "allow")
         include_rules = policy.get("include", [])
@@ -300,20 +330,33 @@ def import_cloudflare_reusable_policies():
                 continue
             else:
                 existing_group["cloudflare_policy_id"] = policy_id
+                if not is_dockflare_managed:
+                    existing_group["external_policy"] = True
+                # Update system_policy flag if this is a system policy
+                if is_system_policy:
+                    existing_group["system_policy"] = True
+                    existing_group["display_name"] = display_name
                 logging.info(f"Updated existing access group '{group_id}' with policy ID '{policy_id}'")
                 updated_count += 1
         else:
             new_group = {
                 "id": group_id,
-                "display_name": group_id.replace("-", " ").title(),
+                "display_name": display_name,
                 "session_duration": "24h",
                 "app_launcher_visible": False,
                 "auto_redirect_to_identity": False,
                 "policies": [policy_definition],
                 "cloudflare_policy_id": policy_id
             }
+            if not is_dockflare_managed:
+                new_group["external_policy"] = True
+            if is_system_policy:
+                new_group["system_policy"] = True
+                new_group["deletable"] = False
+                logging.info(f"Imported system policy '{group_id}' from Cloudflare policy '{policy_id}'")
+            else:
+                logging.info(f"Imported {'external' if not is_dockflare_managed else ''} access group '{group_id}' from Cloudflare policy '{policy_id}'")
             access_groups[group_id] = new_group
-            logging.info(f"Imported new access group '{group_id}' from Cloudflare policy '{policy_id}'")
             imported_count += 1
 
     if imported_count > 0 or updated_count > 0:

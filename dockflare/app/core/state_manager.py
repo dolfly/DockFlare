@@ -212,7 +212,6 @@ def ensure_default_bypass_policy(flask_app=None):
                 ],
                 "system_policy": True,
                 "deletable": False,
-                "hide_from_ui": True,
                 "cf_policy_id": cf_policy_id
             }
             save_state()
@@ -222,9 +221,10 @@ def ensure_default_bypass_policy(flask_app=None):
 
             existing_policy = access_groups[default_bypass_id]
 
-            if not existing_policy.get("hide_from_ui"):
-                logging.info(f"Migrating existing bypass policy to hide from UI")
-                existing_policy["hide_from_ui"] = True
+            # Remove hide_from_ui flag if it exists (migration)
+            if existing_policy.get("hide_from_ui"):
+                logging.info(f"Migrating existing bypass policy to show in UI (removing hide_from_ui flag)")
+                del existing_policy["hide_from_ui"]
                 save_state()
 
             cf_policy_id = existing_policy.get("cf_policy_id") or existing_policy.get("id")
@@ -329,7 +329,6 @@ def ensure_authenticated_default_policy(flask_app=None):
                 ],
                 "system_policy": True,
                 "deletable": False,
-                "hide_from_ui": True,
                 "cf_policy_id": cf_policy_id
             }
             save_state()
@@ -341,6 +340,12 @@ def ensure_authenticated_default_policy(flask_app=None):
 
             needs_state_update = False
             needs_cf_update = False
+
+            # Remove hide_from_ui flag if it exists (migration)
+            if existing_policy.get("hide_from_ui"):
+                logging.info(f"Migrating existing authenticated-default policy to show in UI (removing hide_from_ui flag)")
+                del existing_policy["hide_from_ui"]
+                needs_state_update = True
 
             if existing_policy.get("display_name") != "Authenticated Access":
                 logging.info(f"Updating authenticated-default display name to shorter version")

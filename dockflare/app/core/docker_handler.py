@@ -400,10 +400,10 @@ def process_container_start(container_obj):
                                 state_changed_locally_for_this_container = True
                                 logging.debug(f"DOCKER_HANDLER_ACCESS_MOD: Access policy for {rule_key} changed. state_changed: {state_changed_locally_for_this_container}.")
                 
-            logging.debug(f"DOCKER_HANDLER_END_CONTAINER_LOOP: For {container_name_val}. state_changed={state_changed_locally_for_this_container}, tunnel_update={needs_tunnel_config_update_for_this_container}.")
+            logging.info(f"DOCKER_HANDLER_END_CONTAINER_LOOP: For {container_name_val}. state_changed={state_changed_locally_for_this_container}, tunnel_update={needs_tunnel_config_update_for_this_container}.")
 
             if state_changed_locally_for_this_container:
-                logging.debug(f"DOCKER_HANDLER_PRE_SAVE: For container {container_name_val}.")
+                logging.info(f"DOCKER_HANDLER_PRE_SAVE: For container {container_name_val}. Publishing snapshot_refresh event.")
                 save_state()
                 publish_state_event('snapshot_refresh')
             else:
