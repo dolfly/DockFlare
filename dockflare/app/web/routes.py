@@ -282,36 +282,36 @@ def status_page():
     template_agents = {}
 
     with state_lock:
-        for hostname, rule in managed_rules.items():
-            rule_copy = copy.deepcopy(rule)
-            if rule_copy.get("delete_at") and isinstance(rule_copy["delete_at"], datetime):
-                rule_copy["delete_at"] = rule_copy["delete_at"].replace(tzinfo=timezone.utc) if rule_copy["delete_at"].tzinfo is None else rule_copy["delete_at"].astimezone(timezone.utc)
-            rules_for_template[hostname] = rule_copy
+        rules_snapshot = {hostname: copy.deepcopy(rule) for hostname, rule in managed_rules.items()}
         template_tunnel_state = tunnel_state.copy()
         template_agent_state = cloudflared_agent_state.copy()
         template_access_groups = copy.deepcopy(access_groups)
         from app.core.state_manager import list_agents
         template_agents = list_agents()
 
-        initialization_status = {
-            "complete": template_tunnel_state.get("id") is not None or config.EXTERNAL_TUNNEL_ID,
-            "in_progress": not (template_tunnel_state.get("id") or config.EXTERNAL_TUNNEL_ID) and \
-                           template_tunnel_state.get("status_message", "").lower().startswith("init")
-        }
+    for hostname, rule_copy in rules_snapshot.items():
+        if rule_copy.get("delete_at") and isinstance(rule_copy["delete_at"], datetime):
+            rule_copy["delete_at"] = rule_copy["delete_at"].replace(tzinfo=timezone.utc) if rule_copy["delete_at"].tzinfo is None else rule_copy["delete_at"].astimezone(timezone.utc)
+        rules_for_template[hostname] = rule_copy
 
-        cf_zone_id = current_app.config.get('CF_ZONE_ID')
-        if cf_zone_id and docker_client:
+    initialization_status = {
+        "complete": template_tunnel_state.get("id") is not None or config.EXTERNAL_TUNNEL_ID,
+        "in_progress": not (template_tunnel_state.get("id") or config.EXTERNAL_TUNNEL_ID) and \
+                       template_tunnel_state.get("status_message", "").lower().startswith("init")
+    }
 
-            zone_details = get_zone_details_by_id(cf_zone_id)
-            if zone_details and zone_details.get("name"):
-                relevant_zone_name_for_tld_policy_val = zone_details.get("name")
+    cf_zone_id = current_app.config.get('CF_ZONE_ID')
+    if cf_zone_id and docker_client:
+        zone_details = get_zone_details_by_id(cf_zone_id)
+        if zone_details and zone_details.get("name"):
+            relevant_zone_name_for_tld_policy_val = zone_details.get("name")
 
-            if relevant_zone_name_for_tld_policy_val:
-                tld_policy_exists_val = check_for_tld_access_policy(relevant_zone_name_for_tld_policy_val)
-                if not tld_policy_exists_val:
-                    account_email_for_tld_val = get_cloudflare_account_email()
-            else:
-                logging.info("Relevant zone name for TLD policy check (from CF_ZONE_ID) could not be determined.")
+        if relevant_zone_name_for_tld_policy_val:
+            tld_policy_exists_val = check_for_tld_access_policy(relevant_zone_name_for_tld_policy_val)
+            if not tld_policy_exists_val:
+                account_email_for_tld_val = get_cloudflare_account_email()
+        else:
+            logging.info("Relevant zone name for TLD policy check (from CF_ZONE_ID) could not be determined.")
 
     display_token_val = get_display_token_ui(template_tunnel_state.get("token"))
     cf_account_id = current_app.config.get('CF_ACCOUNT_ID')

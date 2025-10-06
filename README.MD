@@ -100,6 +100,8 @@ docker network create cloudflare-net
     services:
       docker-socket-proxy:
         image: tecnativa/docker-socket-proxy:v0.4.1
+        logging:
+          driver: "none"  # Minimize the logs, remove for verbose
         container_name: docker-socket-proxy
         restart: unless-stopped
         environment:
@@ -138,6 +140,7 @@ docker network create cloudflare-net
           - REDIS_URL=redis://redis:6379/0
           - REDIS_DB_INDEX=0  # Optional: specify Redis database index (0-15) for isolation from other containers
           - DOCKER_HOST=tcp://docker-socket-proxy:2375
+          - LOG_LEVEL=ERROR
         depends_on:
           docker-socket-proxy:
             condition: service_started

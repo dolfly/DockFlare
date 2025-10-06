@@ -205,59 +205,71 @@ def get_overview_data():
         logging.debug(f"Could not build zone lookup map: {zone_list_error}")
 
     with state_lock:
-        state_changed_during_serialization = False
-        for hostname_key, rule_value in managed_rules.items():
-            serialized_rule = serialize_rule(rule_value)
-            tunnel_id_value = serialized_rule.get("tunnel_id")
-            if not tunnel_id_value and rule_value.get("source") == "manual":
-                fallback_tunnel_id = get_effective_tunnel_id()
-                if fallback_tunnel_id:
-                    tunnel_id_value = fallback_tunnel_id
-                    serialized_rule["tunnel_id"] = fallback_tunnel_id
-                    rule_value["tunnel_id"] = fallback_tunnel_id
-                    state_changed_during_serialization = True
-            if tunnel_id_value and (not serialized_rule.get("tunnel_name") or serialized_rule.get("tunnel_name") in (None, "", "N/A")):
-                tunnel_name_lookup = tunnel_names_map.get(tunnel_id_value)
-                if tunnel_name_lookup:
-                    serialized_rule["tunnel_name"] = tunnel_name_lookup
-                elif tunnel_id_value == (tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID):
-                    fallback_name = tunnel_state.get("name")
-                    if fallback_name:
-                        serialized_rule["tunnel_name"] = fallback_name
-                if serialized_rule.get("tunnel_name") and rule_value.get("tunnel_name") != serialized_rule.get("tunnel_name"):
-                    rule_value["tunnel_name"] = serialized_rule["tunnel_name"]
-                    state_changed_during_serialization = True
-            zone_id_value = serialized_rule.get("zone_id")
-            if zone_id_value and not serialized_rule.get("zone_name"):
-                zone_name_lookup = zone_lookup_map.get(zone_id_value)
-                if zone_name_lookup:
-                    serialized_rule["zone_name"] = zone_name_lookup
-                    if rule_value.get("zone_name") != zone_name_lookup:
-                        rule_value["zone_name"] = zone_name_lookup
-                        state_changed_during_serialization = True
-            rules_for_api[hostname_key] = serialized_rule
-        
+        rules_snapshot = {hostname_key: rule_value.copy() for hostname_key, rule_value in managed_rules.items()}
         api_tunnel_state = tunnel_state.copy()
         api_agent_state = cloudflared_agent_state.copy()
 
-        initialization_status_api = {
-            "complete": api_tunnel_state.get("id") is not None or config.EXTERNAL_TUNNEL_ID,
-            "in_progress": not (api_tunnel_state.get("id") or config.EXTERNAL_TUNNEL_ID) and \
-                            api_tunnel_state.get("status_message", "").lower().startswith("init")
-        }
+    initialization_status_api = {
+        "complete": api_tunnel_state.get("id") is not None or config.EXTERNAL_TUNNEL_ID,
+        "in_progress": not (api_tunnel_state.get("id") or config.EXTERNAL_TUNNEL_ID) and \
+                        api_tunnel_state.get("status_message", "").lower().startswith("init")
+    }
 
-        cf_zone_id = current_app.config.get('CF_ZONE_ID')
-        if cf_zone_id and docker_client:
-            zone_details = get_zone_details_by_id(cf_zone_id)
-            if zone_details and zone_details.get("name"):
-                relevant_zone_name_for_tld_policy_api = zone_details.get("name")
-            
-            if relevant_zone_name_for_tld_policy_api:
-                tld_policy_exists_val_api = check_for_tld_access_policy(relevant_zone_name_for_tld_policy_api)
-                if not tld_policy_exists_val_api:
-                    account_email_for_tld_api = get_cloudflare_account_email()
-        if state_changed_during_serialization:
+    state_updates = {}
+    effective_tunnel_id_cache = None
+
+    for hostname_key, rule_snapshot in rules_snapshot.items():
+        serialized_rule = serialize_rule(rule_snapshot)
+        tunnel_id_value = serialized_rule.get("tunnel_id")
+        if not tunnel_id_value and rule_snapshot.get("source") == "manual":
+            if effective_tunnel_id_cache is None:
+                effective_tunnel_id_cache = get_effective_tunnel_id()
+            if effective_tunnel_id_cache:
+                tunnel_id_value = effective_tunnel_id_cache
+                serialized_rule["tunnel_id"] = effective_tunnel_id_cache
+                state_updates.setdefault(hostname_key, {})["tunnel_id"] = effective_tunnel_id_cache
+        if tunnel_id_value:
+            tunnel_name_value = serialized_rule.get("tunnel_name")
+            if not tunnel_name_value or tunnel_name_value in ("", "N/A"):
+                tunnel_name_lookup = tunnel_names_map.get(tunnel_id_value)
+                if not tunnel_name_lookup:
+                    master_tunnel_id = api_tunnel_state.get("id") if not config.USE_EXTERNAL_CLOUDFLARED else config.EXTERNAL_TUNNEL_ID
+                    if tunnel_id_value == master_tunnel_id:
+                        tunnel_name_lookup = api_tunnel_state.get("name")
+                if tunnel_name_lookup:
+                    serialized_rule["tunnel_name"] = tunnel_name_lookup
+                    state_updates.setdefault(hostname_key, {})["tunnel_name"] = tunnel_name_lookup
+        zone_id_value = serialized_rule.get("zone_id")
+        if zone_id_value and not serialized_rule.get("zone_name"):
+            zone_name_lookup = zone_lookup_map.get(zone_id_value)
+            if zone_name_lookup:
+                serialized_rule["zone_name"] = zone_name_lookup
+                state_updates.setdefault(hostname_key, {})["zone_name"] = zone_name_lookup
+        rules_for_api[hostname_key] = serialized_rule
+
+    if state_updates:
+        state_changed = False
+        with state_lock:
+            for hostname_key, updates in state_updates.items():
+                rule_ref = managed_rules.get(hostname_key)
+                if not rule_ref:
+                    continue
+                for field, value in updates.items():
+                    if rule_ref.get(field) != value:
+                        rule_ref[field] = value
+                        state_changed = True
+        if state_changed:
             save_state()
+
+    cf_zone_id = current_app.config.get('CF_ZONE_ID')
+    if cf_zone_id and docker_client:
+        zone_details = get_zone_details_by_id(cf_zone_id)
+        if zone_details and zone_details.get("name"):
+            relevant_zone_name_for_tld_policy_api = zone_details.get("name")
+        if relevant_zone_name_for_tld_policy_api:
+            tld_policy_exists_val_api = check_for_tld_access_policy(relevant_zone_name_for_tld_policy_api)
+            if not tld_policy_exists_val_api:
+                account_email_for_tld_api = get_cloudflare_account_email()
 
     agents_list_api = list_agents()
     agent_keys_list_api = list_agent_keys()
@@ -292,20 +304,6 @@ def get_overview_data():
                 assigned_tid = processed.get("assigned_tunnel_id")
                 if assigned_tid:
                     ts = tunnel_status_map.get(assigned_tid)
-                    if not ts:
-                        try:
-                            account_id = current_app.config.get('CF_ACCOUNT_ID')
-                            if account_id:
-                                detail = cf_api_request("GET", f"/accounts/{account_id}/cfd_tunnel/{assigned_tid}")
-                                if detail and detail.get("result"):
-                                    res = detail["result"]
-                                    ts = {
-                                        "status": res.get("status") or "unknown",
-                                        "name": res.get("name")
-                                    }
-                                    tunnel_status_map[assigned_tid] = ts
-                        except Exception as _fetch_e:
-                            logging.debug(f"Could not fetch tunnel detail for {assigned_tid}: {_fetch_e}")
                     if ts:
                         existing_ts = processed.get("tunnel_status") or {}
                         if existing_ts.get("version") and "version" not in ts:

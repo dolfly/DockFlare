@@ -19,6 +19,20 @@
 import os
 import logging 
 
+def _get_int_env(name, default, minimum=None):
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(raw_value)
+        if minimum is not None and parsed < minimum:
+            logging.warning(f"Environment variable {name} must be >= {minimum}. Using default {default}.")
+            return default
+        return parsed
+    except ValueError:
+        logging.warning(f"Environment variable {name} must be an integer. Using default {default}.")
+        return default
+
 # --- DockFlare Version ---
 APP_VERSION = "v3.0.3"
 # --- web: https://dockflare.app ---
@@ -79,6 +93,14 @@ RECONCILIATION_BATCH_SIZE = int(os.getenv('RECONCILIATION_BATCH_SIZE', 5))
 ACCOUNT_EMAIL_CACHE_TTL = 3600
 SCAN_ALL_NETWORKS = os.getenv('SCAN_ALL_NETWORKS', 'false').lower() in ['true', '1', 't', 'yes']
 
+# Waitress / web server tuning
+WAITRESS_HOST = os.getenv('WAITRESS_HOST', '0.0.0.0')
+WAITRESS_PORT = _get_int_env('WAITRESS_PORT', 5000, minimum=1)
+WAITRESS_THREADS = _get_int_env('WAITRESS_THREADS', 128, minimum=1)
+WAITRESS_CONNECTION_LIMIT = _get_int_env('WAITRESS_CONNECTION_LIMIT', 256, minimum=1)
+WAITRESS_BACKLOG = _get_int_env('WAITRESS_BACKLOG', 2048, minimum=1)
+WAITRESS_CHANNEL_TIMEOUT = _get_int_env('WAITRESS_CHANNEL_TIMEOUT', 360, minimum=1)
+
 # If set, enables the Prometheus metrics endpoint on the specified port.
 # The IP is hardcoded to 0.0.0.0 to be accessible within Docker networks.
 CLOUDFLARED_METRICS_PORT = os.getenv('CLOUDFLARED_METRICS_PORT')
@@ -112,7 +134,7 @@ AGENT_ENROLLMENT_REQUIRED = os.getenv('AGENT_ENROLLMENT_REQUIRED', 'true').lower
 AGENT_KEY_STORAGE_PATH = os.getenv('AGENT_KEY_STORAGE_PATH', None)
 
 # Polling interval (seconds) recommended for agents to poll the Master for commands
-AGENT_COMMAND_POLL_INTERVAL = int(os.getenv('AGENT_COMMAND_POLL_INTERVAL', 5))
+AGENT_COMMAND_POLL_INTERVAL = int(os.getenv('AGENT_COMMAND_POLL_INTERVAL', 10))
 
 REDIS_DB_INDEX = int(os.getenv('REDIS_DB_INDEX', 0))
 

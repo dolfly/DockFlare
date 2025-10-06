@@ -375,15 +375,29 @@ def main_application_entrypoint():
     flask_server_thread = None
     try:
         from waitress import serve
+        waitress_kwargs = {
+            'host': config.WAITRESS_HOST,
+            'port': config.WAITRESS_PORT,
+            'threads': config.WAITRESS_THREADS,
+            'expose_tracebacks': False
+        }
+
+        if config.WAITRESS_CONNECTION_LIMIT:
+            waitress_kwargs['connection_limit'] = config.WAITRESS_CONNECTION_LIMIT
+        if config.WAITRESS_BACKLOG:
+            waitress_kwargs['backlog'] = config.WAITRESS_BACKLOG
+        if config.WAITRESS_CHANNEL_TIMEOUT:
+            waitress_kwargs['channel_timeout'] = config.WAITRESS_CHANNEL_TIMEOUT
+
         flask_server_thread = threading.Thread(
             target=serve,
             args=(app,), 
-            kwargs={'host': '0.0.0.0', 'port': 5000, 'threads': 10, 'expose_tracebacks': False},
+            kwargs=waitress_kwargs,
             daemon=True,
             name="FlaskWaitressServer"
         )
         flask_server_thread.start()
-        logging.info("Flask server started using waitress on 0.0.0.0:5000.")
+        logging.info(f"Flask server started using waitress on {config.WAITRESS_HOST}:{config.WAITRESS_PORT} with {config.WAITRESS_THREADS} threads.")
         
         while not stop_event.is_set():
             if flask_server_thread and not flask_server_thread.is_alive():
@@ -412,7 +426,7 @@ def main_application_entrypoint():
 
     except ImportError:
         logging.warning("Waitress not found. Using Flask development server (NOT FOR PRODUCTION).")
-        app.run(host='0.0.0.0', port=5000, threaded=True, debug=False) 
+        app.run(host=config.WAITRESS_HOST, port=config.WAITRESS_PORT, threaded=True, debug=False) 
     except KeyboardInterrupt:
         logging.info("KeyboardInterrupt received. Shutting down...")
     except Exception as server_startup_err:
