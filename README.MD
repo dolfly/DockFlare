@@ -76,10 +76,9 @@ Before you begin, ensure you have the following:
 - The **Zone ID** for the domain you wish to use.
 - A **Cloudflare API Token** with the following permissions:
     - `Account:Cloudflare Tunnel:Edit`
+    - `Account:Access: Organizations, Identity Providers, and Groups:Edit`
     - `Account:Account Settings:Read`
     - `Account:Access: Apps and Policies:Edit`
-    - `Account:Access: Organizations, Identity Providers, and Groups:Edit`
-    - `Account:Access:Read`
     - `Zone:Zone:Read`
     - `Zone:DNS:Edit`
 
