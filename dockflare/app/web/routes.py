@@ -1572,6 +1572,12 @@ def ui_edit_manual_rule_route():
         return redirect(url_for('web.status_page'))
 
     processed_path = f"/{path_input.lstrip('/')}" if path_input else None
+    normalized_path_for_app = normalize_path_value(processed_path)
+    application_domain = full_hostname if not normalized_path_for_app else f"{full_hostname}{normalized_path_for_app}"
+    path_identifier = ""
+    if normalized_path_for_app:
+        path_identifier = normalized_path_for_app.lstrip('/') or "root"
+        path_identifier = path_identifier.replace('/', '-').replace(' ', '-')
 
     processed_service_for_cf = ""
     if service_type_input in ["http", "https"]:
