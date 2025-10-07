@@ -469,21 +469,26 @@ def access_policies_page():
 
     with state_lock:
         for rule in managed_rules.values():
-            
-            if rule.get('source') in ['docker', 'agent']:
-                hostname = rule.get('hostname', 'Unknown')
-                group_id_val = rule.get('access_group_id')
-                if isinstance(group_id_val, list):
-                    for gid in group_id_val:
-                        used_group_ids.add(gid)
-                        if gid not in group_usage:
-                            group_usage[gid] = []
-                        group_usage[gid].append(hostname)
-                elif group_id_val:
-                    used_group_ids.add(group_id_val)
-                    if group_id_val not in group_usage:
-                        group_usage[group_id_val] = []
-                    group_usage[group_id_val].append(hostname)
+            group_id_val = rule.get('access_group_id')
+            if not group_id_val:
+                continue
+
+            hostname = rule.get('hostname', 'Unknown')
+            path = rule.get('path')
+            display_name = hostname
+            if path:
+                path_str = str(path).strip()
+                if path_str and path_str != "None":
+                    normalized_path = path_str if path_str.startswith('/') else f"/{path_str}"
+                    display_name = f"{hostname}{normalized_path}"
+
+            group_ids = group_id_val if isinstance(group_id_val, list) else [group_id_val]
+            for gid in group_ids:
+                if not gid:
+                    continue
+                used_group_ids.add(gid)
+                group_usage.setdefault(gid, set()).add(display_name)
+
         groups_for_template_raw = copy.deepcopy(access_groups)
         groups_for_template = {
             gid: group for gid, group in groups_for_template_raw.items()
@@ -503,7 +508,7 @@ def access_policies_page():
         'access_policies.html',
         access_groups=groups_for_template,
         used_group_ids=used_group_ids,
-        group_usage=group_usage,
+        group_usage={gid: sorted(list(hosts)) for gid, hosts in group_usage.items()},
         countries=countries,
         ACCOUNT_ID_FOR_DISPLAY=cf_account_id if cf_account_id else "Not Configured"
     )
