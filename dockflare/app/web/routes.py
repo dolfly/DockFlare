@@ -1163,7 +1163,7 @@ def stream_state_updates_route():
     def event_stream():
         redis_client = get_redis_client()
         if not redis_client:
-            logging.error("SSE: Redis client not available for pub/sub")
+            logging.warning("SSE: Redis client not available for pub/sub (real-time updates disabled)")
             yield "data: {\"type\": \"error\", \"message\": \"Redis unavailable\"}\n\n"
             return
 

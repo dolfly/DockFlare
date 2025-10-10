@@ -508,14 +508,25 @@ def handle_access_policy_from_labels(rule_key, hostname_config_item):
                 local_state_changed_by_access_policy = True
 
         app_result = None
+        app_update_failed = False
         if effective_app_id:
             logging.info(f"Updating Access App {effective_app_id} for {application_domain}.")
-            app_result = update_cloudflare_access_application(
-                effective_app_id, application_domain, desired_app_name, desired_session_duration,
-                desired_app_launcher_visible, [application_domain], cf_access_policies_or_ids,
-                desired_allowed_idps, desired_auto_redirect, use_reusable
-            )
-        else:
+            try:
+                app_result = update_cloudflare_access_application(
+                    effective_app_id, application_domain, desired_app_name, desired_session_duration,
+                    desired_app_launcher_visible, [application_domain], cf_access_policies_or_ids,
+                    desired_allowed_idps, desired_auto_redirect, use_reusable
+                )
+            except Exception as update_error:
+                error_text = str(update_error)
+                if "access.api.error.unknown_application" in error_text or "404" in error_text:
+                    logging.info(f"Existing Access App {effective_app_id} not found in Cloudflare (404); will recreate for {application_domain}.")
+                    app_update_failed = True
+                else:
+                    logging.error(f"Error updating access app during reconciliation: {update_error}", exc_info=True)
+                    raise
+
+        if not effective_app_id or app_update_failed or not app_result:
             logging.info(f"Creating new Access App for {application_domain}.")
             app_result = create_cloudflare_access_application(
                 application_domain, desired_app_name, desired_session_duration,
