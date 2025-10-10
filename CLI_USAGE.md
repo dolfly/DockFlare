@@ -41,9 +41,10 @@ This will:
 2. **Groups policies by name** to identify duplicates
 3. **Sorts by creation date** - keeps the oldest policy for each name
 4. **Checks Access Applications** - identifies which applications are using duplicate policies
-5. **Updates Access Applications** - replaces duplicate policy IDs with the kept policy ID
-6. **Deletes newer duplicates** (only when using `--apply`)
-7. **Updates state.json** - ensures all access groups reference the correct (kept) policy ID
+5. **Updates & Deletes** - for each duplicate:
+   - Updates affected applications to use the kept policy ID
+   - Then deletes the duplicate policy
+6. **Updates state.json** - ensures all access groups reference the correct (kept) policy ID
 
 ### Example Output
 
@@ -83,16 +84,13 @@ Processing: 'DockFlare-AccessGroup-idp-blocker'
       Using policy: mno345
     - App: 'DockFlare-app2.example.com' (domain: app2.example.com)
       Using policy: pqr678
+  📝 Updating applications to use kept policy ID jkl012...
+    ✓ Updated app 'DockFlare-app1.example.com': mno345 → jkl012
+    ✓ Updated app 'DockFlare-app2.example.com': pqr678 → jkl012
   ✗ Would delete: ID=mno345 (created: 2025-01-02T10:00:00Z)
   ✗ Would delete: ID=pqr678 (created: 2025-01-03T11:00:00Z)
 
-Step 6: Updating Access Applications to use kept policy IDs...
-
-Updating applications for policy 'DockFlare-AccessGroup-idp-blocker' to use ID jkl012:
-  Would update app 'DockFlare-app1.example.com': mno345 → jkl012
-  Would update app 'DockFlare-app2.example.com': pqr678 → jkl012
-
-Step 7: Updating state.json with correct policy IDs...
+Step 6: Updating state.json with correct policy IDs...
 DRY RUN: Would update state.json with the following changes:
   Group 'public-default-bypass': def456 → abc123 (policy: DockFlare-Default-Public-Access-Bypass)
   Group 'idp-blocker': mno345 → jkl012 (policy: DockFlare-AccessGroup-idp-blocker)
@@ -126,6 +124,7 @@ Policies that would be kept: 2
 
 - The utility requires DockFlare to be configured with valid Cloudflare credentials
 - It operates on **all reusable policies** in your account, not just DockFlare-managed ones
-- **Automatically handles Access Applications** - The utility will update any applications using duplicate policies before deletion, ensuring no applications are left without access control
+- **Automatically handles Access Applications** - The utility detects apps using duplicate policies, updates them to use the kept policy, then safely deletes duplicates
+- **Safe execution order** - Applications are updated BEFORE policies are deleted, preventing any downtime or access control gaps
 - Always run with `--dry-run` first to preview changes
 - Deletion is permanent and cannot be undone (except by recreating policies manually)

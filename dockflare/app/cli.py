@@ -118,8 +118,22 @@ def cleanup_duplicate_policies(dry_run=True):
 
             for app in all_apps:
                 app_policies = app.get("policies", [])
+
                 for policy_id in policy_ids_to_delete:
-                    if policy_id in app_policies:
+                    found = False
+
+                    if isinstance(app_policies, list):
+                        for policy in app_policies:
+                            if isinstance(policy, str):
+                                if policy == policy_id:
+                                    found = True
+                                    break
+                            elif isinstance(policy, dict):
+                                if policy.get("id") == policy_id:
+                                    found = True
+                                    break
+
+                    if found:
                         apps_using_duplicates.append({
                             "app_id": app.get("id"),
                             "app_name": app.get("name"),
@@ -135,53 +149,28 @@ def cleanup_duplicate_policies(dry_run=True):
                     logging.info(f"    - App: '{app_info['app_name']}' (domain: {app_info['app_domain']})")
                     logging.info(f"      Using policy: {app_info['old_policy_id']}")
 
-            for policy in policies_to_delete:
-                policy_id = policy.get("id")
-                policy_created = policy.get("created_at", "N/A")
+                if not dry_run:
+                    logging.info(f"  📝 Updating applications to use kept policy ID {kept_id}...")
+                    from app.core import access_manager
+                    for app_info in apps_using_duplicates:
+                        app_id = app_info["app_id"]
+                        app_name = app_info["app_name"]
+                        old_policy_id = app_info["old_policy_id"]
+                        all_policies = app_info["all_policies"]
 
-                if dry_run:
-                    logging.info(f"  ✗ Would delete: ID={policy_id} (created: {policy_created})")
-                else:
-                    logging.info(f"  ✗ Deleting: ID={policy_id} (created: {policy_created})")
-                    success = reusable_policies.delete_reusable_policy(policy_id)
-                    if success:
-                        logging.info(f"    → Successfully deleted policy {policy_id}")
-                        deleted_count += 1
-                    else:
-                        logging.error(f"    → Failed to delete policy {policy_id}")
+                        updated_policies = []
+                        for policy in all_policies:
+                            if isinstance(policy, str):
+                                updated_policies.append(kept_id if policy == old_policy_id else policy)
+                            elif isinstance(policy, dict):
+                                if policy.get("id") == old_policy_id:
+                                    updated_policies.append(kept_id)
+                                else:
+                                    updated_policies.append(policy.get("id") if policy.get("id") else policy)
+                            else:
+                                updated_policies.append(policy)
 
-            state_updates[name] = kept_id
-            if apps_using_duplicates:
-                app_updates_needed[name] = {
-                    "kept_id": kept_id,
-                    "apps": apps_using_duplicates
-                }
-
-            logging.info("")
-
-        if app_updates_needed:
-            logging.info("Step 6: Updating Access Applications to use kept policy IDs...")
-            logging.info("")
-
-            for policy_name, update_info in app_updates_needed.items():
-                kept_id = update_info["kept_id"]
-                apps = update_info["apps"]
-
-                logging.info(f"Updating applications for policy '{policy_name}' to use ID {kept_id}:")
-
-                for app_info in apps:
-                    app_id = app_info["app_id"]
-                    app_name = app_info["app_name"]
-                    old_policy_id = app_info["old_policy_id"]
-                    all_policies = app_info["all_policies"]
-
-                    updated_policies = [kept_id if pid == old_policy_id else pid for pid in all_policies]
-
-                    if dry_run:
-                        logging.info(f"  Would update app '{app_name}': {old_policy_id} → {kept_id}")
-                    else:
                         try:
-                            from app.core import access_manager
                             app_details = access_manager.get_cloudflare_access_application(app_id)
                             if app_details:
                                 success = access_manager.update_cloudflare_access_application(
@@ -197,20 +186,48 @@ def cleanup_duplicate_policies(dry_run=True):
                                     use_reusable=True
                                 )
                                 if success:
-                                    logging.info(f"  ✓ Updated app '{app_name}': {old_policy_id} → {kept_id}")
+                                    logging.info(f"    ✓ Updated app '{app_name}': {old_policy_id} → {kept_id}")
                                 else:
-                                    logging.error(f"  ✗ Failed to update app '{app_name}'")
+                                    logging.error(f"    ✗ Failed to update app '{app_name}'")
                             else:
-                                logging.error(f"  ✗ Could not fetch details for app '{app_name}'")
+                                logging.error(f"    ✗ Could not fetch details for app '{app_name}'")
                         except Exception as e:
-                            logging.error(f"  ✗ Error updating app '{app_name}': {e}")
+                            logging.error(f"    ✗ Error updating app '{app_name}': {e}")
+                    logging.info("")
 
-                logging.info("")
-        else:
-            logging.info("Step 6: No Access Applications need updating")
+            for policy in policies_to_delete:
+                policy_id = policy.get("id")
+                policy_created = policy.get("created_at", "N/A")
+
+                if dry_run:
+                    logging.info(f"  ✗ Would delete: ID={policy_id} (created: {policy_created})")
+                else:
+                    logging.info(f"  ✗ Deleting: ID={policy_id} (created: {policy_created})")
+                    try:
+                        success = reusable_policies.delete_reusable_policy(policy_id)
+                        if success:
+                            logging.info(f"    → Successfully deleted policy {policy_id}")
+                            deleted_count += 1
+                        else:
+                            logging.error(f"    → Failed to delete policy {policy_id}")
+                    except Exception as e:
+                        error_msg = str(e)
+                        if "409" in error_msg or "conflict" in error_msg.lower():
+                            logging.error(f"    → Policy {policy_id} is still in use by applications")
+                            logging.error(f"    → Detection may have missed some apps - please check Cloudflare dashboard")
+                        else:
+                            logging.error(f"    → Failed to delete policy {policy_id}: {e}")
+
+            state_updates[name] = kept_id
+            if apps_using_duplicates:
+                app_updates_needed[name] = {
+                    "kept_id": kept_id,
+                    "apps": apps_using_duplicates
+                }
+
             logging.info("")
 
-        logging.info("Step 7: Updating state.json with correct policy IDs...")
+        logging.info("Step 6: Updating state.json with correct policy IDs...")
 
         if dry_run:
             logging.info("DRY RUN: Would update state.json with the following changes:")
