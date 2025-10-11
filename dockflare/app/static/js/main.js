@@ -161,7 +161,7 @@ function initializeEditRuleModal() {
     }
 
     editButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', async function() {
             try {
                 const ruleKey = this.dataset.ruleKey;
                 const details = JSON.parse(this.dataset.ruleDetails);

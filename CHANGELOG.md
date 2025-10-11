@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **State synchronization:** Automatically updates `state.json` with correct policy IDs after cleanup
   - **Comprehensive reporting:** Detailed output showing policies scanned, duplicates found, and actions taken
   - **Use case:** Resolves duplicate policies created during multi-instance development or state drift scenarios
-- **Styled Web UI Modals:** Replaced all 53 native browser popup dialogs with custom DaisyUI-themed modals for a consistent, professional user experience.
+- **Styled Web UI Modals:** Replaced all 53 native browser popup dialogs with custom DaisyUI-themed modals for a consistent user experience.
   - **26 alert modals (dfAlert):** Success confirmations, error messages, and informational notifications
   - **27 confirm modals (dfConfirm):** Destructive action confirmations (delete, revoke, revert operations)
   - **Pages updated:** Agents (32 modals), Dashboard (3 modals), Access Policies (4 modals), Settings (6 modals), Identity Providers (10 modals)
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Access Policy Sort Option:** Added "Access Policy" sort option to Dashboard Filter & Sort controls, allowing users to group and view ingress rules by their assigned access policies for easier policy auditing and management.
 - **Agents Page UI Enhancements:** Modernized API Keys management interface to match Access Policies page styling.
   - **Column alignment:** Implemented fixed-width column layout with CSS custom properties for consistent vertical alignment across Active and Revoked API Keys tables
-  - **Dropdown action menus:** Replaced plain action buttons with professional 3-dot dropdown menus featuring contextual icons
+  - **Dropdown action menus:** Replaced plain action buttons with 3-dot dropdown menus featuring contextual icons
   - **Overflow protection:** Added overflow visibility CSS to prevent dropdown menus from being cut off by section boundaries
   - **Consistent padding:** Applied uniform `px-4 py-3` padding throughout tables for visual consistency
 

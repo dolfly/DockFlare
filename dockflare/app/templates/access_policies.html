@@ -855,7 +855,7 @@
 
         const accessGroupForm = document.getElementById('access_group_form');
         if (accessGroupForm) {
-            accessGroupForm.addEventListener('submit', function(e) {
+            accessGroupForm.addEventListener('submit', async function(e) {
                 // Sync tom-select values to underlying select elements before form submission
                 if (window.enhancedCountrySelector && window.enhancedCountrySelector.tomSelect) {
                     window.enhancedCountrySelector.tomSelect.sync();
