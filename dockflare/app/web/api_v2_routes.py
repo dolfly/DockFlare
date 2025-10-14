@@ -562,6 +562,7 @@ def create_manual_rule_api():
                 "no_tls_verify": False,
                 "origin_server_name": None,
                 "http_host_header": None,
+                "http2_origin": False,
                 "access_app_id": None,
                 "access_policy_type": None,
                 "access_app_config_hash": None,
@@ -812,6 +813,7 @@ def process_agent_container_start(payload, agent_id):
             service_label = get_label(labels, "service")
             zone_name_label = get_label(labels, "zonename")
             no_tls_verify_label = get_label(labels, "no_tls_verify", "false").lower() in ["true", "1", "t", "yes"]
+            http2_origin_label = get_label(labels, "http2_origin", "false").lower() in ["true", "1", "t", "yes"]
 
             if hostname_label and service_label:
                 if is_valid_hostname(hostname_label) and is_valid_service(service_label):
@@ -823,6 +825,7 @@ def process_agent_container_start(payload, agent_id):
                         "no_tls_verify": no_tls_verify_label,
                         "origin_server_name": default_originsrvname_label.strip() if default_originsrvname_label else None,
                         "http_host_header": default_http_host_header_label.strip() if default_http_host_header_label else None,
+                        "http2_origin": http2_origin_label,
                         "access_group": default_access_group,
                         "access_policy_type": default_access_policy_type_label,
                         "access_app_name": default_access_app_name_label,
@@ -851,6 +854,8 @@ def process_agent_container_start(payload, agent_id):
                 no_tls_verify_indexed = no_tls_verify_indexed_val.lower() in ["true", "1", "t", "yes"]
                 originsrvname_indexed_val = get_label(labels, f"{index}.originsrvname", default_originsrvname_label)
                 http_host_header_indexed_val = get_label(labels, f"{index}.httpHostHeader", default_http_host_header_label)
+                http2_origin_indexed_val = get_label(labels, f"{index}.http2_origin", str(http2_origin_label).lower())
+                http2_origin_indexed = http2_origin_indexed_val.lower() in ["true", "1", "t", "yes"]
 
                 access_groups_indexed = get_label(labels, f"{index}.access.groups")
                 raw_access_group_indexed = get_label(labels, f"{index}.access.group") if not access_groups_indexed else None
@@ -903,6 +908,7 @@ def process_agent_container_start(payload, agent_id):
                         "no_tls_verify": no_tls_verify_indexed,
                         "origin_server_name": originsrvname_indexed_val.strip() if originsrvname_indexed_val else None,
                         "http_host_header": http_host_header_indexed_val.strip() if http_host_header_indexed_val else None,
+                        "http2_origin": http2_origin_indexed,
                         "access_group": access_group_indexed,
                         "access_policy_type": access_policy_type_indexed,
                         "access_app_name": access_app_name_indexed,
@@ -940,6 +946,7 @@ def process_agent_container_start(payload, agent_id):
                 zone_name_from_item = config_item["zone_name"]
                 no_tls_verify_from_item = config_item["no_tls_verify"]
                 origin_server_name_from_item = config_item.get("origin_server_name")
+                http2_origin_from_item = config_item.get("http2_origin", False)
 
                 target_zone_id = None
                 if zone_name_from_item:
@@ -986,6 +993,9 @@ def process_agent_container_start(payload, agent_id):
                         if existing_rule.get("http_host_header") != http_host_header_from_item:
                             existing_rule["http_host_header"] = http_host_header_from_item
                             rule_data_changed = True
+                        if existing_rule.get("http2_origin") != http2_origin_from_item:
+                            existing_rule["http2_origin"] = http2_origin_from_item
+                            rule_data_changed = True
                         if existing_rule.get("tunnel_name") != assigned_tunnel_name:
                             existing_rule["tunnel_name"] = assigned_tunnel_name
                             rule_data_changed = True
@@ -1022,6 +1032,7 @@ def process_agent_container_start(payload, agent_id):
                             "no_tls_verify": no_tls_verify_from_item,
                             "origin_server_name": origin_server_name_from_item,
                             "http_host_header": config_item.get("http_host_header"),
+                            "http2_origin": http2_origin_from_item,
                             "access_app_id": None,
                             "access_policy_type": None,
                             "access_app_config_hash": None,

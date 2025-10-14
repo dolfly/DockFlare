@@ -229,6 +229,9 @@ function initializeEditRuleModal() {
                 const httpHostHeaderField = modal.querySelector('#edit_manual_http_host_header');
                 if (httpHostHeaderField) httpHostHeaderField.value = details.http_host_header || '';
 
+                const http2OriginField = modal.querySelector('#edit_http2_origin');
+                if (http2OriginField) http2OriginField.checked = details.http2_origin || false;
+
                 const tunnelDisplay = modal.querySelector('#edit_rule_tunnel_value');
                 const zoneDisplay = modal.querySelector('#edit_rule_zone_value');
                 const agentHint = modal.querySelector('#edit_rule_agent_hint');
