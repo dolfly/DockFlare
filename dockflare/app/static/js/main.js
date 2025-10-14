@@ -53,8 +53,7 @@ function initializeAllTomSelects() {
             direction: 'asc'
         }
     };
-
-    // Initialize selects on the Dashboard page (Add/Edit Rule modals)
+    
     const addGroupSelect = document.getElementById('manual_access_group');
     if (addGroupSelect) {
         new TomSelect(addGroupSelect, multiCheckboxOptions);
@@ -69,7 +68,6 @@ function initializeAllTomSelects() {
         manualTunnelTomSelect = new TomSelect(manualTunnelSelect, singleSelectOptions);
     }
 
-    // Note: country selector is now initialized in access_policies.html with enhanced features
 }
 
 const themeManager = (function() {
@@ -519,8 +517,7 @@ function connectStateUpdateSource() {
     eventSource.onerror = function(err) {
         console.error("State update stream connection error. It will be retried automatically by the browser.", err);
         eventSource.close();
-        // The browser will automatically try to reconnect. If we want to implement a custom backoff, we can do it here.
-        // For now, we'll rely on the default behavior.
+                
         setTimeout(connectStateUpdateSource, 5000); // Reconnect after 5 seconds
     };
 }
@@ -702,24 +699,61 @@ function updateCountdowns() {
         try {
             const targetDate = new Date(deleteAtISO);
             if (isNaN(targetDate.getTime())) throw new Error("Invalid date");
-            const options = {
+
+            const now = new Date();
+            const diffMs = targetDate - now;
+            const diffSeconds = Math.floor(diffMs / 1000);
+            
+            if (diffMs < 0) {
+                
+                absoluteTimeSpan.textContent = "Expired";
+                countdownSpan.textContent = "";
+                absoluteTimeSpan.className = 'absolute-time-display text-error font-bold';
+            } else if (diffSeconds < 3600) {
+                
+                const minutes = Math.floor(diffSeconds / 60);
+                const seconds = diffSeconds % 60;
+                const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                absoluteTimeSpan.textContent = `Expires in ${timeStr}`;
+                countdownSpan.textContent = "";
+                
+                if (diffSeconds <= 10) {
+                    absoluteTimeSpan.className = 'absolute-time-display text-error font-bold animate-pulse';
+                } else if (diffSeconds <= 30) {
+                    absoluteTimeSpan.className = 'absolute-time-display text-error font-semibold';
+                } else if (diffSeconds <= 120) {
+                    absoluteTimeSpan.className = 'absolute-time-display text-warning font-semibold';
+                } else {
+                    absoluteTimeSpan.className = 'absolute-time-display text-success';
+                }
+            } else {
+
+                const hours = Math.floor(diffSeconds / 3600);
+                const minutes = Math.floor((diffSeconds % 3600) / 60);
+
+                let timeStr = '';
+                if (hours > 0) {
+                    timeStr = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+                } else {
+                    timeStr = `${minutes}m`;
+                }
+
+                absoluteTimeSpan.textContent = `Expires in ${timeStr}`;
+                countdownSpan.textContent = "";
+                absoluteTimeSpan.className = 'absolute-time-display text-base-content opacity-70';
+            }
+
+            const fullTimestamp = targetDate.toLocaleString(undefined, {
                 hour: '2-digit',
                 minute: '2-digit',
+                second: '2-digit',
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric'
-            };
-            absoluteTimeSpan.textContent = targetDate.toLocaleString(undefined, options);
-            const now = new Date();
-            const diff = targetDate - now;
-            countdownSpan.textContent = `(${formatTimeDifference(diff)})`;
-            if (diff < 0) {
-                countdownSpan.classList.add('text-error');
-                absoluteTimeSpan.classList.add('text-error');
-            } else {
-                countdownSpan.classList.remove('text-error');
-                absoluteTimeSpan.classList.remove('text-error');
-            }
+            });
+            div.setAttribute('title', `Exact time: ${fullTimestamp}`);
+
         } catch (e) {
             absoluteTimeSpan.textContent = "(Invalid Date)";
             countdownSpan.textContent = "";
@@ -1245,8 +1279,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fixResourcesAndBase();
     themeManager.initialize();
     initializeAllTomSelects();
-    
-    // Setup for Manual Rule Modal (only if on Dashboard Page)
+      
     const manualServiceTypeSelect = document.getElementById('manual_service_type');
     if (manualServiceTypeSelect) {
         manualServiceTypeSelect.addEventListener('change', updateManualRuleServiceFields);
@@ -1298,8 +1331,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    // Logic for new Access Group dropdown in ADD Manual Rule Modal
+    
     const manualAccessGroupSelect = document.getElementById('manual_access_group');
     const manualPolicyOptionsWrapper = document.getElementById('manual_policy_options_wrapper');
     if (manualAccessGroupSelect && manualPolicyOptionsWrapper) {
@@ -1312,8 +1344,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         manualAccessGroupSelect.dispatchEvent(new Event('change'));
     }
-
-    // Logic for new Access Group dropdown in EDIT Manual Rule Modal
+    
     const editManualAccessGroupSelect = document.getElementById('edit_manual_access_group');
     const editManualPolicyOptionsWrapper = document.getElementById('edit_manual_policy_options_wrapper');
     if (editManualAccessGroupSelect && editManualPolicyOptionsWrapper) {
@@ -1325,8 +1356,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     }
-
-    // Universal handler for all policy type dropdowns to show/hide the email auth field
+  
     document.querySelectorAll('.policy-type-select').forEach(select => {
 
 
@@ -1338,7 +1368,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const emailField = container.querySelector('.auth-email-field');
         if (!emailField) {
-            // This is expected for some policy selectors that don't have an email field.
+            
             return;
         }
 
@@ -1363,8 +1393,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         };
-
-        // Add the event listener for user interactions
+        
         select.addEventListener('change', () => {
             toggleEmailField();
             clearAccessGroupOnPolicyChange();
@@ -1435,8 +1464,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
-
-    // Setup for Access Group Modal (only if on Access Groups Page)
+    
     document.querySelectorAll('.edit-access-group-btn').forEach(button => {
         button.addEventListener('click', function() {
             const groupId = this.dataset.groupId;
@@ -1451,8 +1479,7 @@ document.addEventListener('DOMContentLoaded', function() {
             openCreateAccessGroupModal();
         });
     }
-
-    // Universal Form/Link Protocol Correction
+    
     document.querySelectorAll('form.protocol-aware-form').forEach(form => {
         if (form.getAttribute('action')) {
             try {
@@ -1462,11 +1489,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Universal Page Timers and Connections
+    
     updateCountdowns();
-    setInterval(updateCountdowns, 30000);
+    setInterval(updateCountdowns, 1000); 
 
-    // Set up opt-in log streaming controls
+    
     if (document.getElementById('log-output')) {
         setupLogControls();
     }
@@ -1493,8 +1520,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('idp-form')?.addEventListener('submit', handleIdPFormSubmit);
         document.getElementById('idp-type')?.addEventListener('change', updateIdPFormFields);
     }
-
-    // Universal Cleanup
+    
     window.addEventListener('beforeunload', function() {
         if (activeLogSource) activeLogSource.close();
         if (eventSourceHealthCheck) clearInterval(eventSourceHealthCheck);
