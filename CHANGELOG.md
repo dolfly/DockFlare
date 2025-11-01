@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [v3.0.6] - 2025-11-01
+
+### Fixed
+- **Docker Event Listener Efficiency:** Significantly reduced log spam and improved resource utilization by implementing filtered Docker event listeners. DockFlare now only processes container events (start/stop) for containers explicitly opted-in via `dockflare.enable` or the legacy `cloudflare.tunnel.enable` labels, preventing unnecessary inspection of unmanaged containers. Raised by issue #296
+
+---
+
 ## [v3.0.5] - 2025-10-14
 
 ### Added
