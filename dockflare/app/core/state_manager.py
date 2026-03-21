@@ -29,6 +29,7 @@ managed_rules = {}
 access_groups = {}
 agents = {}
 identity_providers = {}
+agent_cf_token = {}
 state_lock = threading.RLock()
 logging.info(
     "STATE_MANAGER_INIT: managed_rules ID: %s, access_groups ID: %s, agents ID: %s, identity_providers ID: %s",
@@ -59,6 +60,7 @@ def load_state():
         managed_rules.clear()
         access_groups.clear()
         identity_providers.clear()
+        agent_cf_token.clear()
         logging.info(
             "LOAD_STATE: After .clear(), managed_rules ID: %s, len: %s",
             id(managed_rules),
@@ -91,15 +93,18 @@ def load_state():
                 groups_to_load = loaded_data.get("access_groups", {})
                 agents_to_load = loaded_data.get("agents", {})
                 idps_to_load = loaded_data.get("identity_providers", {})
+                cf_token_to_load = loaded_data.get("agent_cf_token", {})
             else:
                 logging.info("Loading state from old format (rules only). Will migrate on next save.")
                 rules_to_load = loaded_data
                 agents_to_load = {}
                 idps_to_load = {}
+                cf_token_to_load = {}
 
             access_groups.update(groups_to_load)
             agents.update(agents_to_load)
             identity_providers.update(idps_to_load)
+            agent_cf_token.update(cf_token_to_load)
             key_count = len(agent_key_store.list_keys())
             logging.info(
                 "LOAD_STATE: Loaded %s access groups, %s agents and %s agent keys (encrypted backing store).",
@@ -475,6 +480,7 @@ def save_state():
         groups_to_iterate = dict(access_groups)
         agents_to_iterate = dict(agents)
         idps_to_iterate = dict(identity_providers)
+        cf_token_to_iterate = dict(agent_cf_token)
 
         for rule_key, rule in rules_to_iterate:
             try:
@@ -515,7 +521,8 @@ def save_state():
             "managed_rules": serializable_rules,
             "access_groups": groups_to_iterate,
             "agents": agents_to_iterate,
-            "identity_providers": idps_to_iterate
+            "identity_providers": idps_to_iterate,
+            "agent_cf_token": cf_token_to_iterate
         }
 
         try:
@@ -873,3 +880,21 @@ def queue_agent_command(agent_id: str, command: dict) -> bool:
         logging.info(f"Queued command '{command.get('action')}' for agent {agent_id}")
         save_state()
         return True
+
+
+def get_agent_cf_token():
+    with state_lock:
+        return dict(agent_cf_token) if agent_cf_token else None
+
+
+def set_agent_cf_token(data):
+    with state_lock:
+        agent_cf_token.clear()
+        agent_cf_token.update(data)
+        save_state()
+
+
+def clear_agent_cf_token():
+    with state_lock:
+        agent_cf_token.clear()
+        save_state()

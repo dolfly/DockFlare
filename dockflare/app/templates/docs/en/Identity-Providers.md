@@ -65,7 +65,7 @@ After creating an IdP, you can test it:
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>You can find your team name in <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
+   <small>You can find your team name in <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
 7. Copy the **Client ID** and **Client Secret**
 
 **Step 2: Configure in DockFlare**
@@ -97,7 +97,7 @@ If specified, only users with `@example.com` email addresses can authenticate.
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>You can find your team name in <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
+   <small>You can find your team name in <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
 6. Click **Register**
 7. Copy the **Application (client) ID**
 8. Copy the **Directory (tenant) ID**
@@ -125,7 +125,7 @@ If specified, only users with `@example.com` email addresses can authenticate.
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>You can find your team name in <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
+     <small>You can find your team name in <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
 4. Click **Register application**
 5. Copy the **Client ID**
 6. Click **Generate a new client secret** and copy it
@@ -150,7 +150,7 @@ If specified, only users with `@example.com` email addresses can authenticate.
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>You can find your team name in <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
+     <small>You can find your team name in <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
 6. Click **Save**
 7. Copy the **Client ID** and **Client Secret**
 8. Note your **Okta domain** (e.g., `https://dev-12345.okta.com`)
@@ -276,7 +276,7 @@ This configuration allows access to users who:
 ```
 https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
-<small>You can find your team name in <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
+<small>You can find your team name in <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> by going to Settings > Custom Pages.</small>
 
 Replace `<your-team>` with your Cloudflare Zero Trust team name.
 

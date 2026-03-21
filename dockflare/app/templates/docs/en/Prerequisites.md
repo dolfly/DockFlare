@@ -11,7 +11,8 @@ Before you begin, ensure you have the following:
     *   `Account:Account Settings:Read`
     *   `Account:Access: Apps and Policies:Edit`
     *   `Account:Access: Organizations, Identity Providers, and Groups:Edit`
+    *   `Account:Access: Service Tokens:Edit`
     *   `Zone:Zone:Read`
-    *   `Zone:DNS:Edit`  
+    *   `Zone:DNS:Edit`
 
 ![Cloudflare API Permissions](../static/images/cf.png)

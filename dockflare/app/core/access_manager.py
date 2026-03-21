@@ -89,10 +89,10 @@ def check_for_tld_access_policy(zone_name):
 
         if existing_app and existing_app.get("id"):
             logging.info(f"Found existing Access Application ID '{existing_app.get('id')}' for TLD '{tld_hostname}'.")
-            result = True
+            result = existing_app.get("id")
         else:
             logging.info(f"No specific Access Application found for TLD '{tld_hostname}'.")
-            result = False
+            result = None
         
         if redis_client:
             try:

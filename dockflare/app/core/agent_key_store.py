@@ -127,7 +127,7 @@ def _ensure_loaded() -> None:
 def list_keys() -> Dict[str, Dict]:
     _ensure_loaded()
     with _store_lock:
-        return {token: dict(meta) for token, meta in _cached_keys.items()}
+        return {token: dict(meta) for token, meta in _cached_keys.items() if not token.startswith('__')}
 
 
 def get_key(token: str) -> Optional[Dict]:
@@ -180,8 +180,36 @@ def clear_store() -> None:
 
 
 def reload_store() -> None:
-    """Force a reload from disk, discarding any cached state."""
     global _initialized
     with _store_lock:
         _initialized = False
     _ensure_loaded()
+
+
+_CF_SERVICE_TOKEN_KEY = "__cf_service_token__"
+
+
+def get_service_token_secret() -> Optional[str]:
+    _ensure_loaded()
+    with _store_lock:
+        entry = _cached_keys.get(_CF_SERVICE_TOKEN_KEY)
+        if isinstance(entry, dict):
+            return entry.get("secret")
+        return None
+
+
+def store_service_token_secret(secret: str) -> None:
+    if not secret:
+        raise ValueError("secret is required")
+    _ensure_loaded()
+    with _store_lock:
+        _cached_keys[_CF_SERVICE_TOKEN_KEY] = {"secret": secret}
+        _persist_locked()
+
+
+def clear_service_token_secret() -> None:
+    _ensure_loaded()
+    with _store_lock:
+        if _CF_SERVICE_TOKEN_KEY in _cached_keys:
+            del _cached_keys[_CF_SERVICE_TOKEN_KEY]
+            _persist_locked()

@@ -19,20 +19,34 @@
         </div>
     </div>
 
-    <div class="overflow-x-auto agents-table-container">
-      <table class="table table-zebra table-sm w-full">
+    <div class="overflow-x-auto min-w-0 agents-table-container">
+      <table class="table table-zebra w-full">
+        <colgroup>
+          <col style="width:10%">
+          <col style="width:13%">
+          <col style="width:6%">
+          <col style="width:13%">
+          <col style="width:11%">
+          <col style="width:10%">
+          <col style="width:9%">
+          <col style="width:11%">
+          <col style="width:9%">
+          <col style="width:6%">
+          <col style="width:2%">
+        </colgroup>
         <thead>
-          <tr>
-            <th class="p-3">{{ t('agents.agent_id') }}</th>
-            <th class="p-3">{{ t('agents.display_name') }}</th>
-            <th class="p-3">{{ t('agents.version') }}</th>
-            <th class="p-3">{{ t('agents.status') }}</th>
-            <th class="p-3 text-center">{{ t('agents.heart_beat') }}</th>
-            <th class="p-3">{{ t('agents.assigned_tunnel') }}</th>
-            <th class="p-3">{{ t('agents.migration') }}</th>
-            <th class="p-3">{{ t('agents.cloudflared_version') }}</th>
-            <th class="p-3">{{ t('agents.tunnel_status') }}</th>
-            <th class="p-3 text-center">{{ t('common.actions') }}</th>
+          <tr class="border-b border-base-300">
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.agent_id') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.display_name') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.version') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.status') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{{ t('agents.heart_beat') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.assigned_tunnel') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.migration') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.cloudflared_version') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.origin_ip') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50">{{ t('agents.tunnel_status') }}</th>
+            <th class="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-base-content/50 text-center">{{ t('common.actions') }}</th>
           </tr>
         </thead>
         <tbody id="agents-table-body">
@@ -43,6 +57,24 @@
   </div>
 </section>
 
+
+<!-- CF Service Token Panel -->
+<section class="card bg-base-100 shadow-xl mb-8 sm:mb-12 transition-all duration-300 hover:shadow-2xl">
+  <div class="card-body">
+    <div class="flex flex-col sm:flex-row items-center justify-between border-b border-base-300 pb-3 mb-4">
+      <div>
+        <h2 class="card-title text-xl">{{ t('agents.cf_zero_trust_title') }}</h2>
+        <p class="text-sm text-base-content/60 mt-1">{{ t('agents.cf_zero_trust_desc') }}</p>
+      </div>
+      <div class="flex items-center gap-2 mt-4 sm:mt-0">
+        <span id="cf-token-badge" class="badge badge-ghost badge-md hidden"></span>
+        <button id="btn-cf-token-setup" class="btn btn-primary btn-sm hidden">{{ t('agents.cf_zero_trust_setup_btn') }}</button>
+        <button id="btn-cf-token-remove" class="btn btn-error btn-outline btn-sm hidden">{{ t('agents.cf_zero_trust_remove_btn') }}</button>
+      </div>
+    </div>
+    <div id="cf-token-status-area" class="text-sm text-base-content/60">{{ t('agents.cf_zero_trust_checking') }}</div>
+  </div>
+</section>
 
 <!-- Active API Keys Section -->
 <section class="card bg-base-100 shadow-xl mb-8 sm:mb-12 transition-all duration-300 hover:shadow-2xl">
@@ -126,6 +158,10 @@
     </div>
   </div>
 </section>
+
+<div id="agent-floating-menu" class="fixed z-[999] hidden shadow-lg bg-base-100 border border-base-300 rounded-box" style="min-width:13rem">
+  <ul class="menu menu-sm p-2" id="agent-floating-menu-list"></ul>
+</div>
 {% endblock %}
 
 {% block modals %}
@@ -208,6 +244,34 @@
         <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-rename-agent').close()">{{ t('common.cancel') }}</button>
       </div>
     </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>{{ t('common.close') }}</button></form>
+</dialog>
+
+<dialog id="modal-deploy-agent" class="modal">
+  <div class="modal-box w-11/12 max-w-3xl">
+    <h3 class="font-bold text-lg">{{ t('agents.deploy_agent') }}</h3>
+    <div class="tabs tabs-boxed mt-4 mb-4">
+      <a class="tab tab-active" id="tab-quick-deploy" onclick="switchDeployTab('quick')">{{ t('agents.deploy_quick') }}</a>
+      <a class="tab" id="tab-compose-snippet" onclick="switchDeployTab('compose')">{{ t('agents.deploy_compose_snippet') }}</a>
+    </div>
+    <div id="deploy-tab-quick">
+      <p class="text-sm text-base-content/60 mb-2">{{ t('agents.deploy_quick_desc') }}</p>
+      <div class="relative bg-base-200 p-3 rounded-md">
+        <pre class="font-mono text-xs break-all whitespace-pre-wrap" id="deploy-script-content"></pre>
+        <button class="btn btn-ghost btn-sm absolute top-1 right-1" id="btn-copy-script">{{ t('common.copy') }}</button>
+      </div>
+    </div>
+    <div id="deploy-tab-compose" class="hidden">
+      <p class="text-sm text-base-content/60 mb-2">{{ t('agents.deploy_compose_desc') }}</p>
+      <div class="relative bg-base-200 p-3 rounded-md">
+        <pre class="font-mono text-xs break-all whitespace-pre-wrap" id="deploy-compose-content"></pre>
+        <button class="btn btn-ghost btn-sm absolute top-1 right-1" id="btn-copy-compose">{{ t('common.copy') }}</button>
+      </div>
+    </div>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('modal-deploy-agent').close()">{{ t('common.close') }}</button>
+    </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>{{ t('common.close') }}</button></form>
 </dialog>
@@ -319,14 +383,12 @@
   z-index: 1000 !important;
 }
 
-/* Ensure dropdown container allows overflow */
-.agents-table-container,
+/* Ensure dropdown container allows overflow for keys tables */
 .active-keys-table-container,
 .revoked-keys-table-container {
   overflow: visible !important;
 }
 
-.agents-table-container .table,
 .active-keys-table-container .table,
 .revoked-keys-table-container .table {
   overflow: visible !important;
@@ -416,6 +478,49 @@
 
 <script>
   
+  function switchDeployTab(tab) {
+    const quickEl = document.getElementById('deploy-tab-quick');
+    const composeEl = document.getElementById('deploy-tab-compose');
+    const tabQuick = document.getElementById('tab-quick-deploy');
+    const tabCompose = document.getElementById('tab-compose-snippet');
+    if (tab === 'quick') {
+      quickEl.classList.remove('hidden');
+      composeEl.classList.add('hidden');
+      tabQuick.classList.add('tab-active');
+      tabCompose.classList.remove('tab-active');
+    } else {
+      quickEl.classList.add('hidden');
+      composeEl.classList.remove('hidden');
+      tabQuick.classList.remove('tab-active');
+      tabCompose.classList.add('tab-active');
+    }
+  }
+
+  async function loadCfTokenStatus() {
+    const badge = document.getElementById('cf-token-badge');
+    const setupBtn = document.getElementById('btn-cf-token-setup');
+    const removeBtn = document.getElementById('btn-cf-token-remove');
+    const statusArea = document.getElementById('cf-token-status-area');
+
+    const result = await apiCall('/api/v2/agents/cf-service-token/status');
+    if (!result) return;
+
+    badge.classList.remove('hidden');
+    if (result.configured) {
+      badge.textContent = t('js.text.cf_configured');
+      badge.className = 'badge badge-success badge-md';
+      setupBtn.classList.add('hidden');
+      removeBtn.classList.remove('hidden');
+      statusArea.innerHTML = t('js.text.cf_active', {client_id: `<code class="font-mono text-xs">${result.client_id}</code>`});
+    } else {
+      badge.textContent = t('js.text.cf_not_configured');
+      badge.className = 'badge badge-warning badge-md';
+      setupBtn.classList.remove('hidden');
+      removeBtn.classList.add('hidden');
+      statusArea.innerHTML = t('js.text.cf_setup_required', {settings_url: '/settings#general-settings'});
+    }
+  }
+
   async function apiCall(url, method = 'GET', body = null) {
     const options = {
       method: method,
@@ -569,9 +674,15 @@
       const statusHtml = `${enrollmentBadge} ${healthBadge}`;
 
       const ledStripHtml = createLedStrip(agentId, agent.last_seen, agent.online);
-      // TODO: Cloudflared version detection not working - followup needed for bugfix
-      // Currently hardcoded to 2025.9.0 for release
-      const cloudflaredVersion = '2025.9.0'; // agent.tunnel_version || (agent.tunnel_status && agent.tunnel_status.version) || '<i>N/A</i>';
+      const na = '<span class="text-base-content/30">—</span>';
+      const connectorVersion = agent.connector_version || null;
+      const connectorPlatform = agent.connector_platform || null;
+      const cloudflaredVersion = connectorVersion
+        ? `<span class="text-sm font-medium">${connectorVersion}</span>${connectorPlatform ? `<br><span class="text-xs text-base-content/40 font-normal">${connectorPlatform}</span>` : ''}`
+        : na;
+      const originIp = agent.connector_origin_ip
+        ? `<span class="font-mono text-sm">${agent.connector_origin_ip}</span>`
+        : na;
 
       const migrationStatus = agent.migration_status;
       let migrationHtml = '<span class="badge badge-ghost badge-sm">None</span>';
@@ -589,77 +700,35 @@
       }
 
       tr.innerHTML = `
-        <td class="p-3 whitespace-nowrap">
-          <span class="font-mono text-sm cursor-help" title="${agentId}">${agentId.substring(0, 8)}...</span>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span class="font-mono text-xs text-base-content/50 cursor-help" title="${agentId}">${agentId.substring(0, 8)}…</span>
         </td>
-        <td class="p-3 whitespace-nowrap">${agent.display_name || '<i>N/A</i>'}</td>
-        <td class="p-3 whitespace-nowrap">${agent.version || '<i>N/A</i>'}</td>
-        <td class="p-3">${statusHtml}</td>
-        <td class="p-3 whitespace-nowrap">${ledStripHtml}</td>
-        <td class="p-3 whitespace-nowrap">${agent.assigned_tunnel_name || '<i>None</i>'}</td>
-        <td class="p-3">${migrationHtml}${migrationStatus && (migrationStatus.has_conflicts || migrationStatus.has_orphaned) ? `<button class="btn btn-xs btn-info ml-2 btn-migration-assistant" data-agent-id="${agentId}" title="Open Migration Assistant">Resolve</button>` : ''}</td>
-        <td class="p-3 whitespace-nowrap">${cloudflaredVersion}</td>
-        <td class="p-3">${getTunnelStatusBadge(agent.tunnel_status)}</td>
-        <td class="p-3 text-center">
-          <div class="dropdown dropdown-end">
-            <label tabindex="0" class="btn btn-ghost btn-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
-              </svg>
-            </label>
-            <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
-              <li ${agent.status === 'enrolled' && agent.assigned_tunnel_name ? 'class="disabled"' : ''}>
-                <a class="btn-enroll" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 009.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
-                  </svg>
-                  Enroll Agent
-                </a>
-              </li>
-              <li>
-                <a class="btn-rename-agent" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                  </svg>
-                  Rename Agent
-                </a>
-              </li>
-              <div class="divider my-1"></div>
-              <li ${!agent.assigned_tunnel_name ? 'class="disabled"' : ''}>
-                <a class="btn-trigger-migration" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                  </svg>
-                  Trigger Migration
-                </a>
-              </li>
-              <li ${agent.status !== 'enrolled' ? 'class="disabled"' : ''}>
-                <a class="btn-redeploy-tunnel" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                  </svg>
-                  Redeploy Tunnel
-                </a>
-              </li>
-              <li ${agent.status !== 'enrolled' ? 'class="disabled"' : ''}>
-                <a class="btn-roll-key" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v-2.25L15.188 8.43c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-                  </svg>
-                  Roll API Key
-                </a>
-              </li>
-              <div class="divider my-1"></div>
-              <li>
-                <a class="btn-remove text-error" data-agent-id="${agentId}">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                  </svg>
-                  Remove Agent
-                </a>
-              </li>
-            </ul>
-          </div>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span class="text-sm font-medium">${agent.display_name || na}</span>
+        </td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span class="text-sm text-base-content/60">${agent.version || na}</span>
+        </td>
+        <td class="px-4 py-3">
+          <div class="flex flex-wrap gap-1">${statusHtml}</div>
+        </td>
+        <td class="px-4 py-3 text-center">${ledStripHtml}</td>
+        <td class="px-4 py-3 whitespace-nowrap">
+          <span class="text-sm">${agent.assigned_tunnel_name || na}</span>
+        </td>
+        <td class="px-4 py-3">${migrationHtml}${migrationStatus && (migrationStatus.has_conflicts || migrationStatus.has_orphaned) ? `<button class="btn btn-xs btn-info ml-2 btn-migration-assistant" data-agent-id="${agentId}" title="Open Migration Assistant">Resolve</button>` : ''}</td>
+        <td class="px-4 py-3 whitespace-nowrap">${cloudflaredVersion}</td>
+        <td class="px-4 py-3 whitespace-nowrap">${originIp}</td>
+        <td class="px-4 py-3">${getTunnelStatusBadge(agent.tunnel_status)}</td>
+        <td class="px-4 py-3 text-center">
+          <button class="btn btn-ghost btn-sm agent-action-trigger"
+            data-agent-id="${agentId}"
+            data-enrolled="${agent.status === 'enrolled'}"
+            data-has-tunnel="${!!agent.assigned_tunnel_name}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 12.75a.75.75 0 110-1.5.75.75 0 010 1.5zM12 18.75a.75.75 0 110-1.5.75.75 0 010 1.5z" />
+            </svg>
+          </button>
         </td>
       `;
 
@@ -727,6 +796,14 @@
               </svg>
             </label>
             <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+              <li>
+                <a class="btn-deploy-agent" data-key-id="${keyId}">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z" />
+                  </svg>
+                  Deploy Agent
+                </a>
+              </li>
               <li>
                 <a class="text-error btn-revoke-key" data-key-id="${keyId}">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -906,7 +983,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     fetchData();
-    updateLedStrips(); // Start LED animations immediately
+    loadCfTokenStatus();
+    updateLedStrips();
 
     document.getElementById('btn-generate-key').addEventListener('click', () => {
       document.getElementById('generated-key-container').classList.add('hidden');
@@ -951,7 +1029,94 @@
       }
     });
 
-    agentsTableBody.addEventListener('click', async (e) => {
+    const agentFloatingMenu = document.getElementById('agent-floating-menu');
+    const agentFloatingMenuList = document.getElementById('agent-floating-menu-list');
+
+    const hideAgentMenu = () => {
+      agentFloatingMenu.classList.add('hidden');
+      agentFloatingMenu._trigger = null;
+    };
+
+    const showAgentMenu = (btn) => {
+      const agentId = btn.dataset.agentId;
+      const isEnrolled = btn.dataset.enrolled === 'true';
+      const hasTunnel = btn.dataset.hasTunnel === 'true';
+
+      agentFloatingMenuList.innerHTML = `
+        <li ${isEnrolled && hasTunnel ? 'class="disabled"' : ''}>
+          <a class="btn-enroll" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM3 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 009.374 21c-2.331 0-4.512-.645-6.374-1.766z" /></svg>
+            Enroll Agent
+          </a>
+        </li>
+        <li>
+          <a class="btn-rename-agent" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+            Rename Agent
+          </a>
+        </li>
+        <li class="pointer-events-none"><div class="divider my-1"></div></li>
+        <li ${!hasTunnel ? 'class="disabled"' : ''}>
+          <a class="btn-trigger-migration" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" /></svg>
+            Trigger Migration
+          </a>
+        </li>
+        <li ${!isEnrolled ? 'class="disabled"' : ''}>
+          <a class="btn-redeploy-tunnel" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+            Redeploy Tunnel
+          </a>
+        </li>
+        <li ${!isEnrolled ? 'class="disabled"' : ''}>
+          <a class="btn-roll-key" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v-2.25L15.188 8.43c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>
+            Roll API Key
+          </a>
+        </li>
+        <li class="pointer-events-none"><div class="divider my-1"></div></li>
+        <li>
+          <a class="btn-remove text-error" data-agent-id="${agentId}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+            Remove Agent
+          </a>
+        </li>
+      `;
+
+      agentFloatingMenu.classList.remove('hidden');
+      const rect = btn.getBoundingClientRect();
+      const menuH = agentFloatingMenu.offsetHeight;
+      const menuW = agentFloatingMenu.offsetWidth;
+      const top = (window.innerHeight - rect.bottom >= menuH) ? rect.bottom + 4 : rect.top - menuH - 4;
+      const left = Math.max(4, rect.right - menuW);
+      agentFloatingMenu.style.top = top + 'px';
+      agentFloatingMenu.style.left = left + 'px';
+      agentFloatingMenu._trigger = btn;
+    };
+
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('.agent-action-trigger');
+      if (trigger) {
+        e.stopPropagation();
+        if (agentFloatingMenu._trigger === trigger) {
+          hideAgentMenu();
+        } else {
+          showAgentMenu(trigger);
+        }
+        return;
+      }
+      if (!e.target.closest('#agent-floating-menu')) {
+        hideAgentMenu();
+      }
+    });
+
+    document.addEventListener('scroll', hideAgentMenu, true);
+    window.addEventListener('resize', hideAgentMenu);
+
+    document.addEventListener('click', async (e) => {
+      if (!e.target.closest('#agents-table-body') && !e.target.closest('#agent-floating-menu')) return;
+      if (e.target.closest('.agent-action-trigger')) return;
+      hideAgentMenu();
       if (e.target.closest('.btn-enroll')) {
         const agentId = e.target.closest('.btn-enroll').getAttribute('data-agent-id');
         document.getElementById('enroll-agent-id').value = agentId;
@@ -1129,6 +1294,54 @@
           }
         } catch (error) {
           await dfAlert('Auto-cleanup failed. Please try again.', 'Error');
+        }
+      }
+    });
+
+    activeKeysTableBody.addEventListener('click', async (e) => {
+      const deployBtn = e.target.closest('.btn-deploy-agent');
+      if (deployBtn) {
+        const keyId = deployBtn.getAttribute('data-key-id');
+        const info = await apiCall(`/api/v2/agents/deploy-info/${keyId}`);
+        if (info) {
+          document.getElementById('deploy-script-content').textContent = info.script_content;
+          document.getElementById('deploy-compose-content').textContent = info.compose_content;
+          switchDeployTab('quick');
+          document.getElementById('modal-deploy-agent').showModal();
+        }
+      }
+    }, true);
+
+    document.getElementById('btn-copy-script').addEventListener('click', (e) => {
+      const text = document.getElementById('deploy-script-content').textContent;
+      copyToClipboard(text, e.target);
+    });
+
+    document.getElementById('btn-copy-compose').addEventListener('click', (e) => {
+      const text = document.getElementById('deploy-compose-content').textContent;
+      copyToClipboard(text, e.target);
+    });
+
+    document.getElementById('btn-cf-token-setup').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-cf-token-setup');
+      btn.classList.add('loading');
+      btn.disabled = true;
+      const result = await apiCall('/api/v2/agents/cf-service-token/setup', 'POST');
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      if (result && result.status === 'success') {
+        await dfAlert(t('js.alert.cf_setup_success'), t('js.alert.cf_setup_success_title'));
+        loadCfTokenStatus();
+      }
+    });
+
+    document.getElementById('btn-cf-token-remove').addEventListener('click', async () => {
+      const confirmed = await dfConfirm(t('js.confirm.cf_remove'), t('js.confirm.cf_remove_title'));
+      if (confirmed) {
+        const result = await apiCall('/api/v2/agents/cf-service-token', 'DELETE');
+        if (result && result.status === 'success') {
+          await dfAlert(t('js.alert.cf_removed'), t('js.alert.cf_removed_title'));
+          loadCfTokenStatus();
         }
       }
     });

@@ -65,7 +65,7 @@ Nach em Erstelle vo mene IdP chasch ne grad teste:
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Dr Teamname isch i <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
+   <small>Dr Teamname isch i <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
 7. Kopier **Client ID** u **Client Secret**.
 
 **Schritt 2: I DockFlare iiträge**
@@ -97,7 +97,7 @@ Wänn das Fäld gsetzt isch, chöi sech nume Benutzer mit `@example.com`-Adresse
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Dr Teamname isch i <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
+   <small>Dr Teamname isch i <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
 6. Klick uf **Register**.
 7. Kopier d **Application (client) ID**.
 8. Kopier d **Directory (tenant) ID**.
@@ -125,7 +125,7 @@ Wänn das Fäld gsetzt isch, chöi sech nume Benutzer mit `@example.com`-Adresse
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>Dr Teamname isch i <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
+     <small>Dr Teamname isch i <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
 4. Klick uf **Register application**.
 5. Kopier d **Client ID**.
 6. Klick uf **Generate a new client secret** u kopier s Secret.
@@ -149,7 +149,7 @@ Wänn das Fäld gsetzt isch, chöi sech nume Benutzer mit `@example.com`-Adresse
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Dr Teamname isch i <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
+   <small>Dr Teamname isch i <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> under Settings > Custom Pages z finde.</small>
 6. Klick uf **Save**.
 7. Kopier **Client ID** u **Client Secret**.
 8. Notier dini **Okta-Domain**, zum Bispil `https://dev-12345.okta.com`.

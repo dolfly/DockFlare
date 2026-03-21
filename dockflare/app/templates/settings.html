@@ -96,7 +96,17 @@
                             <span class="label-text-alt">{{ t('settings.keep_existing_fields') }}</span>
                         </label>
                     </div>
-                    
+
+                    <div class="form-control w-full">
+                        <label class="label" for="dockflare_public_url">
+                            <span class="label-text">{{ t('settings.dockflare_public_url_label') }}</span>
+                        </label>
+                        {{ settings_form.dockflare_public_url(class="input input-bordered w-full", placeholder="https://dockflare.example.com", **{'id': 'dockflare_public_url'}) }}
+                        <label class="label">
+                            <span class="label-text-alt">{{ t('settings.dockflare_public_url_help') }}</span>
+                        </label>
+                    </div>
+
                     <div class="card-actions pt-4">
                         {{ settings_form.submit_settings(class="btn btn-primary", value=t('form.settings.save_general')) }}
                     </div>

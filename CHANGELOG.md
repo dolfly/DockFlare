@@ -2,8 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [v3.0.9] - 2026-03-21
+ 
+### Added
+- **Cloudflare Zero Trust — Secure Agent Communication:** DockFlare Master can now automatically provision a Cloudflare Service Token and a scoped Access Application for the agent API (`/api/v2/agents/`). Once configured, all agent traffic is authenticated at the Cloudflare edge before reaching the server, eliminating the need for a separate private network (Tailscale, VPN, etc.).
+  - One-click setup and removal from the Agents page — no Cloudflare dashboard visit required.
+  - Service token credentials are stored encrypted; the client ID is displayed in the UI for reference.
+  - A bypass policy is automatically created alongside the service token policy so that admin browser sessions are never blocked.
+  - Existing agents without service token credentials continue to work without any changes required (backward compatible).
+- **One-Liner Agent Deployment:** Each agent API key now has a **Deploy** button on the Agents page that generates a fully pre-filled deploy command. A tabbed modal offers a *Quick Deploy* one-liner (`curl | bash`) and a *Compose Snippet* for transparent review — all credentials (Master URL, API key, CF Access client ID/secret) are embedded automatically.
+- **Live Cloudflared Version & Origin IP:** The Agents table now displays the live cloudflared connector version and origin IP, fetched directly from the Cloudflare API and cached for 60 seconds. No changes to the DockFlare Agent are required.
+- **DockFlare Public URL Setting:** Added a *DockFlare Public URL* field to General Settings. The value is stored in the encrypted config store and used when constructing the Cloudflare Access Application scope and deploy commands.
+- **Origin IP Column:** Added an *Origin IP* column to the Agents management table showing the public IP of the cloudflared connector for each enrolled agent.
+- **i18n — 23 New Translation Keys:** All new Cloudflare Zero Trust panel strings, deploy modal strings, and the DockFlare Public URL setting label are fully translated across all 10 supported languages (EN, DE, FR, ES, IT, PL, ID, ZH, JA, CH-Bärndütsch).
+- **API Token Permission:** Added `Account: Access: Service Tokens: Edit` to the required Cloudflare API token permissions (documented in Prerequisites and README).
+ 
+### Changed
+- **Agents Table — Responsive Layout:** The agents table now scrolls horizontally on narrow viewports, consistent with the Active API Keys table. The actions menu has been rebuilt as a floating overlay to avoid overflow clipping at narrow widths.
+- **Agents Table — Visual Polish:** Refreshed header style (uppercase, muted, semibold), consistent cell padding, and a muted `—` dash for missing values.
+- **Cloudflared Version Display:** The Cloudflared Version column now shows live data (version + platform sub-line) instead of a hardcoded fallback value.
+- **Multi-Server-Agent.md:** Updated the agent deployment guide — `cloudflared` image tag changed from pinned `2025.9.0` to `latest`; one-liner deploy is clearly marked as opt-in; Option A (one-liner) and Option B (manual compose) are presented as distinct paths; removed stale pre-publication note.
+ 
+### Fixed
+- **Agent `thread_health_status` NameError:** Fixed a crash in the DockFlare Agent where `thread_health_status` and `last_successful_master_contact` were referenced before being declared at module level.
+
+### Hotfix
+- **Cloudflare Dashboard Deep Links:** Updated all Cloudflare dashboard links to reflect Cloudflare's new URL structure. The domain `one.dash.cloudflare.com` has been replaced with `dash.cloudflare.com` and paths now include the `/one/` prefix. Affected areas: Access Policies page (apps list, policy edit, IdP settings), Status Page (tunnel route and access app links), and all 10 language versions of the Identity Providers help guide.
 
 ---
 

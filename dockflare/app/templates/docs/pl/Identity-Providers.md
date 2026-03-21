@@ -65,7 +65,7 @@ Po utworzeniu IdP możesz go przetestować:
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Nazwę swojego zespołu znajdziesz w <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
+   <small>Nazwę swojego zespołu znajdziesz w <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
 7. Skopiuj **ID klienta** i **sekret klienta**.
 
 **Krok 2: skonfiguruj w DockFlare**
@@ -97,7 +97,7 @@ Jeśli pole zostanie ustawione, uwierzytelniać będą mogli się tylko użytkow
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Nazwę swojego zespołu znajdziesz w <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
+   <small>Nazwę swojego zespołu znajdziesz w <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
 6. Kliknij **Zarejestruj**.
 7. Skopiuj **ID aplikacji (klienta)**.
 8. Skopiuj **ID katalogu (dzierżawy)**.
@@ -125,7 +125,7 @@ Jeśli pole zostanie ustawione, uwierzytelniać będą mogli się tylko użytkow
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>Nazwę swojego zespołu znajdziesz w <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
+     <small>Nazwę swojego zespołu znajdziesz w <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
 4. Kliknij **Zarejestruj aplikację**.
 5. Skopiuj **ID klienta**.
 6. Kliknij **Wygeneruj nowy sekret klienta** i skopiuj go.
@@ -150,7 +150,7 @@ Jeśli pole zostanie ustawione, uwierzytelniać będą mogli się tylko użytkow
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>Nazwę swojego zespołu znajdziesz w <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
+     <small>Nazwę swojego zespołu znajdziesz w <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
 6. Kliknij **Zapisz**.
 7. Skopiuj **ID klienta** i **sekret klienta**.
 8. Zanotuj swoją **domenę Okta**, na przykład `https://dev-12345.okta.com`.
@@ -276,7 +276,7 @@ Ta konfiguracja daje dostęp użytkownikom, którzy:
 ```
 https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
-<small>Nazwę swojego zespołu znajdziesz w <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
+<small>Nazwę swojego zespołu znajdziesz w <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, przechodząc do Ustawienia > Strony niestandardowe.</small>
 
 Zastąp `<your-team>` nazwą zespołu Cloudflare Zero Trust.
 

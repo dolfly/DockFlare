@@ -65,7 +65,7 @@ Après avoir créé un IdP, vous pouvez le tester :
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Vous trouverez le nom de votre équipe dans <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
+   <small>Vous trouverez le nom de votre équipe dans <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
 7. Copiez l'**ID client** et le **secret client**.
 
 **Étape 2 : configurer dans DockFlare**
@@ -97,7 +97,7 @@ Si ce champ est renseigné, seuls les utilisateurs possédant une adresse e-mail
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>Vous trouverez le nom de votre équipe dans <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
+   <small>Vous trouverez le nom de votre équipe dans <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
 6. Cliquez sur **S'inscrire**.
 7. Copiez l'**ID d'application (client)**.
 8. Copiez l'**ID du répertoire (locataire)**.
@@ -125,7 +125,7 @@ Si ce champ est renseigné, seuls les utilisateurs possédant une adresse e-mail
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>Vous trouverez le nom de votre équipe dans <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
+     <small>Vous trouverez le nom de votre équipe dans <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
 4. Cliquez sur **Enregistrer l'application**.
 5. Copiez l'**ID client**.
 6. Cliquez sur **Générer un nouveau secret client** et copiez-le.
@@ -150,7 +150,7 @@ Si ce champ est renseigné, seuls les utilisateurs possédant une adresse e-mail
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>Vous trouverez le nom de votre équipe dans <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
+     <small>Vous trouverez le nom de votre équipe dans <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
 6. Cliquez sur **Enregistrer**.
 7. Copiez l'**ID client** et le **secret client**.
 8. Notez votre **domaine Okta**, par exemple `https://dev-12345.okta.com`.
@@ -276,7 +276,7 @@ Cette configuration autorise l'accès aux utilisateurs qui :
 ```
 https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
-<small>Vous trouverez le nom de votre équipe dans <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
+<small>Vous trouverez le nom de votre équipe dans <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a>, sous Paramètres > Pages personnalisées.</small>
 
 Remplacez `<your-team>` par le nom de votre équipe Cloudflare Zero Trust.
 

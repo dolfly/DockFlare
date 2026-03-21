@@ -556,6 +556,7 @@ def settings_page():
                 config_data['tunnel_dns_scan_zone_names'] = settings_form.tunnel_dns_scan_zone_names.data
                 config_data['grace_period_seconds'] = settings_form.grace_period_seconds.data
                 config_data['preserve_unmanaged_cf_ingress_fields'] = bool(settings_form.preserve_unmanaged_cf_ingress_fields.data)
+                config_data['dockflare_public_url'] = settings_form.dockflare_public_url.data or ''
 
                 encrypted_payload = fernet.encrypt(json.dumps(config_data).encode('utf-8'))
                 with open(config_file, 'wb') as f:
@@ -575,6 +576,9 @@ def settings_page():
                 config_module.GRACE_PERIOD_SECONDS = current_app.config['GRACE_PERIOD_SECONDS']
                 current_app.config['PRESERVE_UNMANAGED_CF_INGRESS_FIELDS'] = bool(config_data.get('preserve_unmanaged_cf_ingress_fields', False))
                 config_module.PRESERVE_UNMANAGED_CF_INGRESS_FIELDS = current_app.config['PRESERVE_UNMANAGED_CF_INGRESS_FIELDS']
+                effective_public_url = os.getenv('DOCKFLARE_PUBLIC_URL', '') or config_data.get('dockflare_public_url', '')
+                current_app.config['DOCKFLARE_PUBLIC_URL'] = effective_public_url
+                config_module.DOCKFLARE_PUBLIC_URL = effective_public_url
 
                 flash(_t('flash.general_settings_updated'), 'success')
 
@@ -675,6 +679,7 @@ def settings_page():
         settings_form.tunnel_dns_scan_zone_names.data = ','.join(current_app.config.get('TUNNEL_DNS_SCAN_ZONE_NAMES', []))
         settings_form.grace_period_seconds.data = current_app.config.get('GRACE_PERIOD_SECONDS')
         settings_form.preserve_unmanaged_cf_ingress_fields.data = current_app.config.get('PRESERVE_UNMANAGED_CF_INGRESS_FIELDS', False)
+        settings_form.dockflare_public_url.data = current_app.config.get('DOCKFLARE_PUBLIC_URL', '')
         security_settings_form.disable_password_login.data = current_app.config.get('DISABLE_PASSWORD_LOGIN', False)
 
     template_tunnel_state = {}

@@ -65,7 +65,7 @@ IdP を作成したあとで、すぐにテストできます。
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>チーム名は <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
+   <small>チーム名は <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
 7. **Client ID** と **Client Secret** をコピーします。
 
 **ステップ 2: DockFlare で設定する**
@@ -97,7 +97,7 @@ IdP を作成したあとで、すぐにテストできます。
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>チーム名は <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
+   <small>チーム名は <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
 6. **Register** をクリックします。
 7. **Application (client) ID** をコピーします。
 8. **Directory (tenant) ID** をコピーします。
@@ -125,7 +125,7 @@ IdP を作成したあとで、すぐにテストできます。
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>チーム名は <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
+     <small>チーム名は <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
 4. **Register application** をクリックします。
 5. **Client ID** をコピーします。
 6. **Generate a new client secret** をクリックしてシークレットをコピーします。
@@ -150,7 +150,7 @@ IdP を作成したあとで、すぐにテストできます。
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>チーム名は <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
+     <small>チーム名は <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
 6. **Save** をクリックします。
 7. **Client ID** と **Client Secret** をコピーします。
 8. **Okta domain**（例: `https://dev-12345.okta.com`）を控えておきます。
@@ -276,7 +276,7 @@ services:
 ```
 https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
-<small>チーム名は <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
+<small>チーム名は <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> の Settings > Custom Pages で確認できます。</small>
 
 `<your-team>` を Cloudflare Zero Trust のチーム名に置き換えてください。
 
