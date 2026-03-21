@@ -38,7 +38,7 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
-    labels: # -- Cloudflare Tunnel Configuration (via DockFlare) OPTIONAL --
+    #labels: # -- Cloudflare Tunnel Configuration (via DockFlare) OPTIONAL --
       # Main DockFlare with access policy
       #- dockflare.enable=true
       #- dockflare.hostname=dockflare.example.tld
