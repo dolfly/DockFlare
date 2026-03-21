@@ -783,6 +783,47 @@ def delete_tunnel_via_api(tunnel_id):
         logging.error(f"Unexpected error deleting tunnel {tunnel_id}: {e}", exc_info=True)
         return False
 
+_CONNECTOR_INFO_CACHE_TIMEOUT = 60
+
+def get_tunnel_connector_info(tunnel_id):
+    if not tunnel_id or not config.CF_ACCOUNT_ID:
+        return None
+
+    cache_key = f"connector_info:{tunnel_id}"
+    if CACHE_ENABLED:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+    try:
+        resp = cf_api_request(
+            "GET",
+            f"/accounts/{config.CF_ACCOUNT_ID}/cfd_tunnel/{tunnel_id}/connections"
+        )
+        connectors = resp.get("result") or []
+        if not connectors:
+            return None
+
+        first = connectors[0]
+        conns = first.get("conns") or []
+        colos = sorted({c.get("colo_name") for c in conns if c.get("colo_name")})
+        first_conn = conns[0] if conns else {}
+        info = {
+            "version": first.get("version"),
+            "origin_ip": first_conn.get("origin_ip"),
+            "platform": first.get("arch"),
+            "colos": colos,
+        }
+
+        if CACHE_ENABLED:
+            cache.set(cache_key, info, timeout=_CONNECTOR_INFO_CACHE_TIMEOUT)
+
+        return info
+    except Exception as e:
+        logging.warning("Could not fetch connector info for tunnel %s: %s", tunnel_id, e)
+        return None
+
+
 def get_dns_records_for_tunnel(zone_id, tunnel_id):
     """
     Get all DNS records for a specific tunnel in a zone.

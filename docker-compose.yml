@@ -44,7 +44,6 @@ services:
       #- dockflare.hostname=dockflare.example.tld
       #- dockflare.service=http://dockflare:5000
       #- dockflare.access.group=YOUR-ACCESS-GROUP-ID  # your custom access policy
-
       # -- OAuth Callback Path (Bypass Access Policy) OPTIONAL --
       # Required if using OAuth authentication with access policies on main interface
       #- dockflare.0.hostname=dockflare.example.tld

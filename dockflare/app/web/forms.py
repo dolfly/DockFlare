@@ -41,6 +41,10 @@ class SettingsForm(FlaskForm):
     preserve_unmanaged_cf_ingress_fields = BooleanField(
         'Preserve Unmanaged Cloudflare Ingress Fields'
     )
+    dockflare_public_url = StringField(
+        'DockFlare Public URL',
+        validators=[Optional()]
+    )
     submit_settings = SubmitField('Save General Settings')
 
 class SecuritySettingsForm(FlaskForm):

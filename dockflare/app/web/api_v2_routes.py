@@ -312,6 +312,20 @@ def get_overview_data():
                         processed["tunnel_status"] = ts
             except Exception as _te:
                 logging.debug(f"Unable to enrich agent {a_id} with tunnel_status: {_te}")
+
+            try:
+                from app.core.cloudflare_api import get_tunnel_connector_info
+                tunnel_id = processed.get("assigned_tunnel_id")
+                if tunnel_id:
+                    connector = get_tunnel_connector_info(tunnel_id)
+                    if connector:
+                        processed["connector_version"] = connector.get("version")
+                        processed["connector_origin_ip"] = connector.get("origin_ip")
+                        processed["connector_platform"] = connector.get("platform")
+                        processed["connector_colos"] = connector.get("colos")
+            except Exception as _ce:
+                logging.warning("Could not enrich agent %s with connector info: %s", a_id, _ce)
+
             processed_agents[a_id] = processed
         agents_list_api = processed_agents
     except Exception as e:
@@ -384,11 +398,12 @@ def get_zone_policies_api():
         for zone in zones or []:
             zone_name = zone.get('name')
             if zone_name:
-                has_policy = check_for_tld_access_policy(zone_name)
+                cf_app_id = check_for_tld_access_policy(zone_name)
                 zone_policies.append({
                     'zone_name': zone_name,
                     'zone_id': zone.get('id'),
-                    'has_default_policy': has_policy
+                    'has_default_policy': bool(cf_app_id),
+                    'cf_app_id': cf_app_id or None
                 })
 
         response_data = {"success": True, "zone_policies": zone_policies}
@@ -1307,6 +1322,103 @@ def trigger_key_cleanup():
         logging.error(f"Manual cleanup failed: {e}", exc_info=True)
         return jsonify({"status": "error", "message": f"Cleanup failed: {str(e)}"}), 500
 
+@api_v2_bp.route('/agents/cf-service-token/setup', methods=['POST'])
+def agents_cf_service_token_setup():
+    from app.core.service_token_manager import ensure_agent_service_token
+    public_url = config.DOCKFLARE_PUBLIC_URL
+    if not public_url:
+        return jsonify({"status": "error", "message": "DOCKFLARE_PUBLIC_URL is not configured"}), 400
+    try:
+        result = ensure_agent_service_token(public_url)
+        return jsonify({
+            "status": "success",
+            "client_id": result["client_id"],
+            "app_uuid": result["app_uuid"],
+            "policy_id": result["policy_id"],
+        }), 200
+    except Exception as e:
+        logging.error("CF service token setup failed: %s", e, exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v2_bp.route('/agents/cf-service-token/status', methods=['GET'])
+def agents_cf_service_token_status():
+    from app.core.service_token_manager import get_agent_service_token
+    token = get_agent_service_token()
+    if token:
+        return jsonify({
+            "status": "success",
+            "configured": True,
+            "client_id": token["client_id"],
+            "app_uuid": token["app_uuid"],
+            "policy_id": token.get("policy_id"),
+        }), 200
+    return jsonify({"status": "success", "configured": False}), 200
+
+
+@api_v2_bp.route('/agents/cf-service-token', methods=['DELETE'])
+def agents_cf_service_token_delete():
+    from app.core.service_token_manager import delete_agent_service_token
+    try:
+        delete_agent_service_token()
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        logging.error("CF service token delete failed: %s", e, exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v2_bp.route('/agents/deploy-info/<key_id>', methods=['GET'])
+def agents_deploy_info(key_id):
+    from app.core.service_token_manager import generate_compose_content, generate_deploy_script
+    key_info = get_agent_key_info(key_id)
+    if not key_info:
+        return jsonify({"status": "error", "message": "Key not found"}), 404
+    if key_info.get("status") != "active":
+        return jsonify({"status": "error", "message": "Key is not active"}), 400
+
+    public_url = config.DOCKFLARE_PUBLIC_URL
+    if not public_url:
+        return jsonify({"status": "error", "message": "DOCKFLARE_PUBLIC_URL is not configured"}), 400
+
+    try:
+        script_content = generate_deploy_script(key_id, public_url)
+        compose_content = generate_compose_content(key_id, public_url)
+        return jsonify({
+            "status": "success",
+            "script_content": script_content,
+            "compose_content": compose_content,
+        }), 200
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except Exception as e:
+        logging.error("Deploy info generation failed: %s", e, exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_v2_bp.route('/agents/deploy-script/<key_id>', methods=['GET'])
+def agents_deploy_script(key_id):
+    from app.core.service_token_manager import generate_deploy_script
+    key_info = get_agent_key_info(key_id)
+    if not key_info:
+        return jsonify({"status": "error", "message": "Key not found"}), 404
+    if key_info.get("status") != "active":
+        return jsonify({"status": "error", "message": "Key is not active"}), 400
+
+    public_url = config.DOCKFLARE_PUBLIC_URL
+    if not public_url:
+        return jsonify({"status": "error", "message": "DOCKFLARE_PUBLIC_URL is not configured"}), 400
+
+    try:
+        script = generate_deploy_script(key_id, public_url)
+        from flask import Response
+        return Response(script, mimetype="text/x-shellscript")
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except Exception as e:
+        logging.error("Deploy script generation failed: %s", e, exc_info=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @api_v2_bp.route('/agents', methods=['GET'])
 def agents_list_api():
     """
@@ -1345,6 +1457,20 @@ def agents_list_api():
         agents_map = processed_agents
     except Exception as e:
         logging.error(f"Error while computing agent health fields in agents_list_api: {e}", exc_info=True)
+
+    try:
+        from app.core.cloudflare_api import get_tunnel_connector_info
+        for a_id, a in agents_map.items():
+            tunnel_id = a.get("assigned_tunnel_id")
+            if tunnel_id:
+                connector = get_tunnel_connector_info(tunnel_id)
+                if connector:
+                    a["connector_version"] = connector.get("version")
+                    a["connector_origin_ip"] = connector.get("origin_ip")
+                    a["connector_platform"] = connector.get("platform")
+                    a["connector_colos"] = connector.get("colos")
+    except Exception as e:
+        logging.warning("Could not enrich agents with connector info: %s", e)
 
     return jsonify({"agents": agents_map, "agent_keys": keys_map}), 200
 

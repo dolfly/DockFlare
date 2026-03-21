@@ -113,6 +113,11 @@ def apply_config_to_app(flask_app, config_data: Dict) -> None:
     flask_app.config['OAUTH_SESSION_TIMEOUT'] = oauth_settings.get('session_timeout', 86400)
     flask_app.config['OAUTH_MAX_LOGIN_ATTEMPTS'] = oauth_settings.get('max_login_attempts', 5)
 
+    public_url_stored = config_data.get('dockflare_public_url', '')
+    public_url_env = os.getenv('DOCKFLARE_PUBLIC_URL', '')
+    effective_public_url = public_url_env or public_url_stored
+    flask_app.config['DOCKFLARE_PUBLIC_URL'] = effective_public_url
+
     config.CF_API_TOKEN = flask_app.config['CF_API_TOKEN']
     config.CF_ACCOUNT_ID = flask_app.config['CF_ACCOUNT_ID']
     config.CF_ZONE_ID = flask_app.config['CF_ZONE_ID']
@@ -121,6 +126,7 @@ def apply_config_to_app(flask_app, config_data: Dict) -> None:
     config.GRACE_PERIOD_SECONDS = flask_app.config['GRACE_PERIOD_SECONDS']
     config.PRESERVE_UNMANAGED_CF_INGRESS_FIELDS = flask_app.config['PRESERVE_UNMANAGED_CF_INGRESS_FIELDS']
     config.MASTER_API_KEY = effective_master_key
+    config.DOCKFLARE_PUBLIC_URL = effective_public_url
 
     if flask_app.config['CF_API_TOKEN']:
         config.CF_HEADERS['Authorization'] = f"Bearer {flask_app.config['CF_API_TOKEN']}"

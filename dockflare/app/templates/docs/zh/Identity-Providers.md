@@ -65,7 +65,7 @@ DockFlare 支持以下身份提供商：
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>您可以在 <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
+   <small>您可以在 <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
 7. 复制 **客户端 ID** 和 **客户端密钥**。
 
 **步骤 2：在 DockFlare 中配置**
@@ -97,7 +97,7 @@ DockFlare 支持以下身份提供商：
    ```
    https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
    ```
-   <small>您可以在 <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
+   <small>您可以在 <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
 6. 点击 **注册**。
 7. 复制 **应用程序（客户端）ID**。
 8. 复制 **目录（租户）ID**。
@@ -125,7 +125,7 @@ DockFlare 支持以下身份提供商：
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>您可以在 <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
+     <small>您可以在 <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
 4. 点击 **Register application**。
 5. 复制 **客户端 ID**。
 6. 点击 **Generate a new client secret** 并复制它。
@@ -150,7 +150,7 @@ DockFlare 支持以下身份提供商：
      ```
      https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
      ```
-     <small>您可以在 <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
+     <small>您可以在 <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
 6. 点击 **Save**。
 7. 复制 **客户端 ID** 和 **客户端密钥**。
 8. 记下您的 **Okta 域名**，例如 `https://dev-12345.okta.com`。
@@ -276,7 +276,7 @@ services:
 ```
 https://<your-team>.cloudflareaccess.com/cdn-cgi/access/callback
 ```
-<small>您可以在 <a href="https://one.dash.cloudflare.com/{{ACCOUNT_ID}}/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
+<small>您可以在 <a href="https://dash.cloudflare.com/{{ACCOUNT_ID}}/one/settings/custom_pages" target="_blank">Zero Trust</a> 的 设置 > 自定义页面 中找到团队名称。</small>
 
 请将 `<your-team>` 替换为您的 Cloudflare Zero Trust 团队名称。
 

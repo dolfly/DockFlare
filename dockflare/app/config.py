@@ -35,7 +35,7 @@ def _get_int_env(name, default, minimum=None):
         return default
 
 # --- DockFlare Version ---
-APP_VERSION = "v3.0.8"
+APP_VERSION = "v3.0.9"
 # --- web: https://dockflare.app ---
 # --- github: https://github.com/ChrispyBacon-dev/DockFlare ---
 
@@ -143,3 +143,5 @@ USE_REUSABLE_POLICIES = os.getenv('USE_REUSABLE_POLICIES', 'true').lower() in ['
 
 SYNC_ALL_CLOUDFLARE_POLICIES = os.getenv('SYNC_ALL_CLOUDFLARE_POLICIES', 'false').lower() in ['true', '1', 't', 'yes']
 PRESERVE_UNMANAGED_CF_INGRESS_FIELDS = False
+
+DOCKFLARE_PUBLIC_URL = os.getenv('DOCKFLARE_PUBLIC_URL', '')
