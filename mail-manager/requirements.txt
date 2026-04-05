@@ -1,0 +1,9 @@
+flask
+flask-limiter
+waitress
+boto3
+PyJWT[crypto]
+cryptography
+python-dateutil
+bleach
+requests

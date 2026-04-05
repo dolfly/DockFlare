@@ -1903,3 +1903,143 @@ async function deleteIdP(friendlyName) {
         await dfAlert(t('js.alert.delete_error_generic'), t('js.alert.error_title'));
     }
 }
+
+async function emailCheckPermissions() {
+    try {
+        const response = await fetch('/email/check-permissions', {
+            method: 'POST',
+            headers: buildApiHeaders()
+        });
+        const data = await response.json();
+        if (data.success) {
+            const p = data.permissions;
+            document.getElementById('permEmailRouting').innerText = p.email_routing ? '✅' : '❌';
+            document.getElementById('permWorkers').innerText = p.workers ? '✅' : '❌';
+            const r2Label = p.r2 ? '✅' : (p.r2_note ? '❌ ' + p.r2_note : '❌');
+            document.getElementById('permR2').innerText = r2Label;
+            const allGranted = p.email_routing && p.workers && p.r2;
+            const banner = document.getElementById('emailPermissionsBanner');
+            if (banner) {
+                banner.classList.toggle('hidden', allGranted);
+            }
+            const setupBtn = document.getElementById('emailSetupBtn');
+            if (setupBtn) {
+                setupBtn.disabled = !allGranted;
+            }
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailSetupDomain() {
+    const select = document.getElementById('emailZoneSelect');
+    if (!select || !select.value) return;
+    const zoneId = select.value;
+    const zoneName = select.options[select.selectedIndex].text;
+    try {
+        const response = await fetch('/email/setup-domain', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ zone_id: zoneId, zone_name: zoneName })
+        });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        } else {
+            await dfAlert(data.error || 'Error', 'Error');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailTeardownDomain(domain) {
+    if (!await dfConfirm('Are you sure you want to remove this domain?', 'Teardown')) return;
+    try {
+        const response = await fetch('/email/teardown-domain', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ zone_name: domain })
+        });
+        const data = await response.json();
+        if (data.success) location.reload();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailCreateMailbox() {
+    const address = document.getElementById('newMailboxAddress').value;
+    const domain = document.getElementById('newMailboxDomain').value;
+    const name = document.getElementById('newMailboxName').value;
+    if (!address || !domain) return;
+    try {
+        const response = await fetch('/email/mailbox/create', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ address: address + '@' + domain, domain: domain, display_name: name })
+        });
+        const data = await response.json();
+        if (data.success) location.reload();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailDeleteMailbox(address, domain) {
+    if (!await dfConfirm('Delete mailbox?', 'Delete')) return;
+    try {
+        const response = await fetch('/email/mailbox/delete', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ address: address, domain: domain })
+        });
+        const data = await response.json();
+        if (data.success) location.reload();
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailVerifyDns(domain) {
+    try {
+        const response = await fetch('/email/verify-dns', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ zone_name: domain })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await dfAlert(JSON.stringify(data.status), 'DNS Status');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function emailUpdateR2(domain) {
+    const accessKeyId = prompt('R2 Access Key ID (from CF Dashboard → R2 → Manage R2 API Tokens):');
+    if (!accessKeyId) return;
+    const secretAccessKey = prompt('R2 Secret Access Key:');
+    if (!secretAccessKey) return;
+    try {
+        const response = await fetch('/email/update-r2-credentials', {
+            method: 'POST',
+            headers: buildApiHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({ zone_name: domain, r2_access_key_id: accessKeyId, r2_secret_access_key: secretAccessKey })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await dfAlert('R2 credentials updated and mail-manager restarted.', 'Success');
+        } else {
+            await dfAlert('Error: ' + (data.error || 'Unknown'), 'Failed');
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function emailOpenWebmail() {
+    window.location.href = '/email/sso/callback';
+}

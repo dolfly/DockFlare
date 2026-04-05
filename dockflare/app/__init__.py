@@ -251,6 +251,11 @@ def create_app():
         app_instance.register_blueprint(help_bp)
         logging.info("Help blueprint registered.")
 
+        from .web.email_routes import email_bp
+        csrf.exempt(email_bp)
+        app_instance.register_blueprint(email_bp)
+        logging.info("Email blueprint registered.")
+
     return app_instance
 
 app = create_app()

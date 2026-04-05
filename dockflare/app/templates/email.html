@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">{{ t('email.title') }}</h1>
+        {% if email_enabled %}
+        <button class="btn btn-primary" onclick="emailOpenWebmail()">{{ t('email.webmail_link') }}</button>
+        {% endif %}
+    </div>
+
+    <div id="emailPermissionsBanner" class="alert alert-warning shadow-lg mb-8 hidden">
+        <div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current flex-shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <span>
+                <h3 class="font-bold">{{ t('email.permissions_title') }}</h3>
+                <div class="text-sm">
+                    <span id="permEmailRouting"></span> {{ t('email.permission_email_routing') }}<br>
+                    <span id="permWorkers"></span> {{ t('email.permission_workers') }}<br>
+                    <span id="permR2"></span> {{ t('email.permission_r2') }}
+                </div>
+            </span>
+        </div>
+        <div class="flex-none">
+            <button class="btn btn-sm btn-ghost" onclick="emailCheckPermissions()">{{ t('email.recheck_permissions') }}</button>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">{{ t('email.domain_setup') }}</h2>
+            <div class="form-control w-full max-w-xs mb-4">
+                <label class="label"><span class="label-text">{{ t('email.select_zone') }}</span></label>
+                <select id="emailZoneSelect" class="select select-bordered">
+                    <option disabled selected>{{ t('email.choose_domain') }}</option>
+                    {% for zone in zones %}
+                    <option value="{{ zone.id }}">{{ zone.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button id="emailSetupBtn" class="btn btn-primary max-w-xs" onclick="emailSetupDomain()" disabled>{{ t('email.setup_email') }}</button>
+
+            <div class="overflow-x-auto mt-6">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th>{{ t('email.domain') }}</th>
+                            <th>{{ t('email.status') }}</th>
+                            <th>{{ t('email.actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if email_config.domains %}
+                        {% for domain, cfg in email_config.domains.items() %}
+                        <tr>
+                            <td>{{ domain }}</td>
+                            <td><div class="badge badge-success">{{ t('email.setup_complete') }}</div></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline" onclick="emailVerifyDns('{{ domain }}')">{{ t('email.dns_verify') }}</button>
+                                <button class="btn btn-sm btn-warning" onclick="emailUpdateR2('{{ domain }}')">R2 Credentials</button>
+                                <button class="btn btn-sm btn-error" onclick="emailTeardownDomain('{{ domain }}')">{{ t('email.teardown') }}</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% else %}
+                        <tr><td colspan="3" class="text-center">{{ t('email.no_domains') }}</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">{{ t('email.mailbox_management') }}</h2>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="newMailboxAddress" placeholder="address" class="input input-bordered w-full max-w-xs" />
+                <span class="self-center">@</span>
+                <select id="newMailboxDomain" class="select select-bordered">
+                    {% if email_config and email_config.domains %}
+                    {% for domain in email_config.domains %}
+                    <option value="{{ domain }}">{{ domain }}</option>
+                    {% endfor %}
+                    {% endif %}
+                </select>
+                <input type="text" id="newMailboxName" placeholder="Display Name" class="input input-bordered w-full max-w-xs" />
+                <button class="btn btn-primary" onclick="emailCreateMailbox()">{{ t('email.add_mailbox') }}</button>
+            </div>
+
+            <div class="overflow-x-auto mt-4">
+                <table class="table w-full">
+                    <thead>
+                        <tr>
+                            <th>{{ t('email.address') }}</th>
+                            <th>{{ t('email.display_name') }}</th>
+                            <th>{{ t('email.domain') }}</th>
+                            <th>{{ t('email.actions') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if email_config and email_config.domains %}
+                        {% for domain, cfg in email_config.domains.items() %}
+                        {% for addr, mb in cfg.mailboxes.items() %}
+                        <tr>
+                            <td>{{ addr }}</td>
+                            <td>{{ mb.display_name }}</td>
+                            <td>{{ domain }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-error" onclick="emailDeleteMailbox('{{ addr }}', '{{ domain }}')">{{ t('email.delete') }}</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">{{ t('email.dns_records') }}</h2>
+            <div id="dnsRecordsContainer">
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">{{ t('email.statistics') }}</h2>
+            <div class="stats shadow">
+                <div class="stat">
+                    <div class="stat-title">{{ t('email.stats_received') }}</div>
+                    <div class="stat-value" id="statReceived">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">{{ t('email.stats_sent') }}</div>
+                    <div class="stat-value" id="statSent">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">{{ t('email.stats_storage') }}</div>
+                    <div class="stat-value" id="statStorage">-</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">{{ t('email.stats_mailboxes') }}</div>
+                    <div class="stat-value" id="statMailboxes">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title">{{ t('email.container_status') }}</h2>
+            <div class="alert alert-info">
+                <div>
+                    <span>{{ t('email.container_stopped') }}</span><br>
+                    <code class="text-sm mt-2 block">docker compose --profile email up -d</code>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% block scripts %}
+<script>document.addEventListener('DOMContentLoaded', emailCheckPermissions);</script>
+{% endblock %}
+{% endblock %}

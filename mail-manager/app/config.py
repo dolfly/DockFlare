@@ -1,0 +1,16 @@
+import os
+
+JWT_PUBLIC_KEY = os.environ.get('JWT_PUBLIC_KEY', '')
+JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'EdDSA')
+JWT_ISSUER = os.environ.get('JWT_ISSUER', 'dockflare-master')
+JWT_AUDIENCE = os.environ.get('JWT_AUDIENCE', 'dockflare-mail')
+WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
+R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL', '')
+R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '')
+R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
+R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', '')
+MAIL_DATA_PATH = os.environ.get('MAIL_DATA_PATH', '/data')
+OUTBOUND_WORKER_URL = os.environ.get('OUTBOUND_WORKER_URL', '')
+OUTBOUND_AUTH_SECRET = os.environ.get('OUTBOUND_AUTH_SECRET', '')
+DB_PATH = os.path.join(MAIL_DATA_PATH, 'db', 'mail.db')
+ATTACHMENTS_PATH = os.path.join(MAIL_DATA_PATH, 'attachments')

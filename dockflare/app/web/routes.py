@@ -149,7 +149,7 @@ def gating_logic():
 
     if not is_configured:
 
-        if request.endpoint and not request.endpoint.startswith('setup.') and request.endpoint != 'static' and not request.endpoint.startswith('api_v2.'):
+        if request.endpoint and not request.endpoint.startswith('setup.') and request.endpoint != 'static' and not request.endpoint.startswith('api_v2.') and request.endpoint != 'email.internal_mail_config':
             try:
                 if getattr(current_app, 'import_from_env', False):
 
@@ -188,7 +188,7 @@ def gating_logic():
             return
 
         if not current_user.is_authenticated:
-            exempt_endpoints = ['static', 'web.ping', 'web.cloudflare_ping_route', 'setup.step_import_env']
+            exempt_endpoints = ['static', 'web.ping', 'web.cloudflare_ping_route', 'setup.step_import_env', 'email.internal_mail_config']
             oauth_endpoints = ['web.login_provider', 'web.auth_callback', 'web.login']
             if request.endpoint and not request.endpoint.startswith('auth.') and request.endpoint not in exempt_endpoints and request.endpoint not in oauth_endpoints:
                 try:
@@ -2316,7 +2316,9 @@ def login():
         title="Login",
         form=form,
         password_login_enabled=password_login_enabled,
-        oauth_providers=oauth_providers
+        oauth_providers=oauth_providers,
+        email_enabled=current_app.config.get('EMAIL_ENABLED', False),
+        webmail_url=url_for('email.sso_callback')
     )
 
 @bp.route('/login/<provider_id>')
