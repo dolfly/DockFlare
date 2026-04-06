@@ -1,16 +1,70 @@
 import os
 
-JWT_PUBLIC_KEY = os.environ.get('JWT_PUBLIC_KEY', '')
-JWT_ALGORITHM = os.environ.get('JWT_ALGORITHM', 'EdDSA')
-JWT_ISSUER = os.environ.get('JWT_ISSUER', 'dockflare-master')
-JWT_AUDIENCE = os.environ.get('JWT_AUDIENCE', 'dockflare-mail')
-WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
-R2_ENDPOINT_URL = os.environ.get('R2_ENDPOINT_URL', '')
-R2_ACCESS_KEY_ID = os.environ.get('R2_ACCESS_KEY_ID', '')
-R2_SECRET_ACCESS_KEY = os.environ.get('R2_SECRET_ACCESS_KEY', '')
-R2_BUCKET_NAME = os.environ.get('R2_BUCKET_NAME', '')
-MAIL_DATA_PATH = os.environ.get('MAIL_DATA_PATH', '/data')
-OUTBOUND_WORKER_URL = os.environ.get('OUTBOUND_WORKER_URL', '')
-OUTBOUND_AUTH_SECRET = os.environ.get('OUTBOUND_AUTH_SECRET', '')
-DB_PATH = os.path.join(MAIL_DATA_PATH, 'db', 'mail.db')
-ATTACHMENTS_PATH = os.path.join(MAIL_DATA_PATH, 'attachments')
+
+def _env(key, default=''):
+    return os.environ.get(key, default)
+
+
+class _Config:
+    @property
+    def JWT_PUBLIC_KEY(self):
+        return _env('JWT_PUBLIC_KEY')
+
+    @property
+    def JWT_ALGORITHM(self):
+        return _env('JWT_ALGORITHM', 'EdDSA')
+
+    @property
+    def JWT_ISSUER(self):
+        return _env('JWT_ISSUER', 'dockflare-master')
+
+    @property
+    def JWT_AUDIENCE(self):
+        return _env('JWT_AUDIENCE', 'dockflare-mail')
+
+    @property
+    def WEBHOOK_SECRET(self):
+        return _env('WEBHOOK_SECRET')
+
+    @property
+    def R2_ENDPOINT_URL(self):
+        return _env('R2_ENDPOINT_URL')
+
+    @property
+    def R2_ACCESS_KEY_ID(self):
+        return _env('R2_ACCESS_KEY_ID')
+
+    @property
+    def R2_SECRET_ACCESS_KEY(self):
+        return _env('R2_SECRET_ACCESS_KEY')
+
+    @property
+    def R2_BUCKET_NAME(self):
+        return _env('R2_BUCKET_NAME')
+
+    @property
+    def MAIL_DATA_PATH(self):
+        return _env('MAIL_DATA_PATH', '/data')
+
+    @property
+    def OUTBOUND_WORKER_URL(self):
+        return _env('OUTBOUND_WORKER_URL')
+
+    @property
+    def OUTBOUND_AUTH_SECRET(self):
+        return _env('OUTBOUND_AUTH_SECRET')
+
+    @property
+    def DB_PATH(self):
+        return os.path.join(self.MAIL_DATA_PATH, 'db', 'mail.db')
+
+    @property
+    def ATTACHMENTS_PATH(self):
+        return os.path.join(self.MAIL_DATA_PATH, 'attachments')
+
+    @property
+    def APP_VERSION(self):
+        return '3.1.0'
+
+
+config = _Config()

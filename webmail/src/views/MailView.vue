@@ -27,7 +27,8 @@ watch(() => [store.currentMailbox, store.currentFolder], async ([addr, folder]) 
   if (!addr || !folder) return
   try {
     const mRes = await mailApi.getMessages(addr as string, { folder })
-    store.messages = mRes.data
+    const payload = mRes.data
+    store.messages = Array.isArray(payload) ? payload : payload.items || []
     store.currentMessage = null
   } catch (e) {
     console.error('Failed to load messages', e)

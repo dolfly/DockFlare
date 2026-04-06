@@ -38,22 +38,18 @@ const close = () => {
 
 const send = async () => {
   if (!store.currentMailbox) return
-  console.log('[ComposeDialog] send() called, body.value=', JSON.stringify(body.value), 'to=', to.value, 'subject=', subject.value)
   sending.value = true
   error.value = ''
   try {
-    const payload = {
+    await mailApi.sendMessage(store.currentMailbox, {
       to: to.value,
       subject: subject.value,
       html: body.value,
       text: body.value.replace(/<[^>]*>?/gm, '').trim()
-    }
-    console.log('[ComposeDialog] posting payload=', JSON.stringify(payload))
-    await mailApi.sendMessage(store.currentMailbox, payload)
+    })
     close()
   } catch (e: any) {
     error.value = e?.response?.data?.error || 'Failed to send. Please try again.'
-    console.error(e)
   } finally {
     sending.value = false
   }
@@ -70,7 +66,6 @@ const send = async () => {
         v-model="body"
         placeholder="Write your message..."
         class="border rounded-md p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary min-h-[160px]"
-        @input="(e) => console.log('[ComposeDialog] textarea input, value=', JSON.stringify((e.target as HTMLTextAreaElement).value))"
       />
       <div v-if="error" class="text-sm text-red-500">{{ error }}</div>
       <div class="flex justify-end gap-2">

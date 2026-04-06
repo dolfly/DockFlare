@@ -1,15 +1,17 @@
 import jwt
-from app.config import JWT_PUBLIC_KEY, JWT_ALGORITHM, JWT_ISSUER, JWT_AUDIENCE
+from app.config import config
+
 
 def verify_jwt(token):
+    if not config.JWT_PUBLIC_KEY:
+        return None
     try:
-        decoded = jwt.decode(
+        return jwt.decode(
             token,
-            JWT_PUBLIC_KEY,
-            algorithms=[JWT_ALGORITHM],
-            issuer=JWT_ISSUER,
-            audience=JWT_AUDIENCE
+            config.JWT_PUBLIC_KEY,
+            algorithms=[config.JWT_ALGORITHM],
+            issuer=config.JWT_ISSUER,
+            audience=config.JWT_AUDIENCE,
         )
-        return decoded
     except Exception:
         return None
