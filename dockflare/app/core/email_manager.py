@@ -192,6 +192,24 @@ def deploy_worker(script_name, script_content, bindings):
         logging.warning(f"Could not enable workers.dev for {script_name}: {e}")
     return result
 
+def set_worker_cron(script_name, cron_expressions):
+    """Set cron triggers for a worker via the Schedules API.
+    cron_expressions: list of cron strings, e.g. ['*/5 * * * *']
+    Passing an empty list removes all cron triggers.
+    """
+    schedules = [{"cron": c} for c in cron_expressions]
+    try:
+        result = cf_api_request(
+            'PUT',
+            f'/accounts/{config.CF_ACCOUNT_ID}/workers/scripts/{script_name}/schedules',
+            json_data=schedules
+        )
+        logging.info(f"Cron triggers set for worker {script_name}: {cron_expressions}")
+        return result
+    except Exception as e:
+        logging.error(f"Failed to set cron triggers for {script_name}: {e}")
+        raise
+
 def delete_worker(script_name):
     return cf_api_request('DELETE', f'/accounts/{config.CF_ACCOUNT_ID}/workers/scripts/{script_name}')
 

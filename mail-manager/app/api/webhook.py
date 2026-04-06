@@ -2,6 +2,7 @@ import hmac
 import hashlib
 import json
 import os
+import sqlite3
 import logging
 from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
@@ -120,6 +121,17 @@ def inbound():
         log.info("Inbound delivered: message=%s to=%s db_id=%s",
                  msg_uuid, to_address, msg_id)
         return jsonify({"status": "success"})
+
+    except sqlite3.IntegrityError:
+        # Duplicate message_id — already delivered (e.g. cron retried a message
+        # that was actually processed successfully). Clean up R2 and return 200
+        # so the cron does not keep retrying this email.
+        log.info("Inbound duplicate (already delivered): message=%s — cleaning R2", msg_uuid)
+        try:
+            delete_from_r2(r2_key)
+        except Exception:
+            pass
+        return jsonify({"status": "already_delivered"}), 200
 
     except Exception as e:
         log.exception("Inbound webhook failed: message=%s", msg_uuid)
