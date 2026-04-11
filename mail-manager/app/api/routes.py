@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -152,6 +153,12 @@ def get_messages(address):
     per_page = min(100, max(1, int(request.args.get('per_page', 50))))
     offset = (page - 1) * per_page
 
+    _SORT_COLS = {'received_at', 'sent_at', 'subject', 'from_address'}
+    sort_col = request.args.get('sort', 'received_at')
+    if sort_col not in _SORT_COLS:
+        sort_col = 'received_at'
+    order = 'ASC' if request.args.get('order', 'desc').lower() == 'asc' else 'DESC'
+
     db = get_db()
     cur = db.execute(
         "SELECT id FROM folders WHERE mailbox_address=? AND name=?",
@@ -169,7 +176,7 @@ def get_messages(address):
     total = cur.fetchone()[0]
 
     cur = db.execute(
-        "SELECT * FROM messages WHERE folder_id=? ORDER BY received_at DESC LIMIT ? OFFSET ?",
+        f"SELECT * FROM messages WHERE folder_id=? ORDER BY {sort_col} {order} LIMIT ? OFFSET ?",
         (folder_id, per_page, offset),
     )
     msgs = [dict(row) for row in cur.fetchall()]
@@ -311,7 +318,7 @@ def get_folders(address):
 
     db = get_db()
     cur = db.execute(
-        "SELECT id, name, system_folder FROM folders WHERE mailbox_address=?",
+        "SELECT id, name, system_folder, color FROM folders WHERE mailbox_address=?",
         (address,),
     )
     folders = [dict(row) for row in cur.fetchall()]
@@ -334,19 +341,62 @@ def create_folder(address):
     name = (data.get('name') or '').strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
+    color = (data.get('color') or '').strip() or None
 
     now = datetime.now(timezone.utc).isoformat()
     db = get_db()
     try:
         db.execute(
-            "INSERT INTO folders (mailbox_address, name, system_folder, created_at) VALUES (?, ?, 0, ?)",
-            (address, name, now),
+            "INSERT INTO folders (mailbox_address, name, system_folder, color, created_at) VALUES (?, ?, 0, ?, ?)",
+            (address, name, color, now),
         )
         db.commit()
     except Exception as e:
         db.rollback()
         return jsonify({"error": str(e)}), 400
     return jsonify({"status": "created"}), 201
+
+
+@api_bp.route('/mailboxes/<address>/folders/<int:fid>', methods=['PATCH'])
+@jwt_required
+def patch_folder(address, fid):
+    if not _check_mailbox_access(address):
+        return jsonify({"error": "forbidden"}), 403
+
+    db = get_db()
+    cur = db.execute(
+        "SELECT system_folder FROM folders WHERE id=? AND mailbox_address=?",
+        (fid, address),
+    )
+    row = cur.fetchone()
+    if not row:
+        return jsonify({"error": "not found"}), 404
+    if row['system_folder'] == 1:
+        return jsonify({"error": "cannot modify system folder"}), 400
+
+    data = request.json or {}
+    fields, values = [], []
+    if 'name' in data:
+        name = (data['name'] or '').strip()
+        if not name:
+            return jsonify({"error": "name cannot be empty"}), 400
+        fields.append("name=?")
+        values.append(name)
+    if 'color' in data:
+        color = (data['color'] or '').strip() or None
+        fields.append("color=?")
+        values.append(color)
+    if not fields:
+        return jsonify({"error": "nothing to update"}), 400
+
+    values.extend([fid, address])
+    try:
+        db.execute(f"UPDATE folders SET {', '.join(fields)} WHERE id=? AND mailbox_address=?", values)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"status": "updated"})
 
 
 @api_bp.route('/mailboxes/<address>/folders/<int:fid>', methods=['DELETE'])
@@ -449,6 +499,12 @@ def _dispatch_send(address, data):
     if len(text) > _MAX_BODY_LEN or len(html) > _MAX_BODY_LEN:
         return jsonify({"error": "message body too large"}), 413
 
+    attachments = data.get('attachments') or []
+    _MAX_ATTACH_BYTES = 10 * 1024 * 1024
+    total_attach = sum(a.get('size_bytes', 0) for a in attachments)
+    if total_attach > _MAX_ATTACH_BYTES:
+        return jsonify({"error": "attachments exceed 10 MB limit"}), 413
+
     now = datetime.now(timezone.utc).isoformat()
     msg_id = f"<{uuid.uuid4()}@{address.split('@')[1]}>"
 
@@ -464,6 +520,7 @@ def _dispatch_send(address, data):
         "inReplyTo": data.get('in_reply_to') or data.get('inReplyTo'),
         "references": data.get('references'),
         "messageId": msg_id,
+        "attachments": attachments,
     }
 
     status = 'sent'
@@ -504,7 +561,7 @@ def _dispatch_send(address, data):
         )
         sent_folder = cur.fetchone()
         if sent_folder:
-            db.execute("""
+            cur2 = db.execute("""
                 INSERT INTO messages (
                     message_id, mailbox_address, folder_id, from_address,
                     to_addresses, cc_addresses, subject, text_body, html_body,
@@ -518,6 +575,12 @@ def _dispatch_send(address, data):
                 data.get('in_reply_to') or data.get('inReplyTo', ''),
                 data.get('references', ''), now,
             ))
+            sent_msg_id = cur2.lastrowid
+            for att in attachments:
+                db.execute(
+                    "INSERT INTO attachments (message_id, filename, content_type, size_bytes, storage_path, is_inline, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)",
+                    (sent_msg_id, att['filename'], att['content_type'], att.get('size_bytes', 0), None, now),
+                )
 
     db.commit()
 
@@ -533,7 +596,25 @@ def _dispatch_send(address, data):
 def send_email(address):
     if not _check_mailbox_access(address):
         return jsonify({"error": "forbidden"}), 403
-    data = request.json or {}
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        data = dict(request.form)
+        # Flatten single-value lists produced by request.form
+        data = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in data.items()}
+        files = request.files.getlist('attachments')
+        log.debug("send_email multipart: form_keys=%s file_count=%d", list(data.keys()), len(files))
+        attachments = []
+        for f in files:
+            raw = f.read()
+            log.debug("send_email attachment: filename=%s content_type=%s size=%d", f.filename, f.content_type, len(raw))
+            attachments.append({
+                'filename': f.filename,
+                'content_type': f.content_type or 'application/octet-stream',
+                'data_b64': base64.b64encode(raw).decode('ascii'),
+                'size_bytes': len(raw),
+            })
+        data['attachments'] = attachments
+    else:
+        data = request.json or {}
     return _dispatch_send(address, data)
 
 

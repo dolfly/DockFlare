@@ -151,6 +151,14 @@ def teardown_domain():
         _restart_mail_container()
     return jsonify({'success': True})
 
+def _redeploy_outbound_worker(email_cfg, domain):
+    d = email_cfg['domains'][domain]
+    outbound_bindings = [
+        {"type": "send_email", "name": "SEND_EMAIL"},
+        {"type": "secret_text", "name": "AUTH_SECRET", "text": d['outbound_auth_secret']}
+    ]
+    email_manager.deploy_worker(d['outbound_worker_name'], _read_worker_template('outbound_worker.js'), outbound_bindings)
+
 def _redeploy_inbound_worker(email_cfg, domain):
     d = email_cfg['domains'][domain]
     all_addresses = list(d['mailboxes'].keys())
@@ -218,6 +226,22 @@ def delete_mailbox():
             _redeploy_inbound_worker(email_cfg, domain)
             _restart_mail_container()
     return jsonify({'success': True})
+
+@email_bp.route('/redeploy-workers', methods=['POST'])
+@login_required
+def redeploy_workers():
+    email_cfg = config.EMAIL_CONFIG.copy()
+    domains = email_cfg.get('domains', {})
+    for domain in domains:
+        try:
+            _redeploy_inbound_worker(email_cfg, domain)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Inbound redeploy failed for {domain}: {e}'}), 500
+        try:
+            _redeploy_outbound_worker(email_cfg, domain)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Outbound redeploy failed for {domain}: {e}'}), 500
+    return jsonify({'success': True, 'domains': list(domains.keys())})
 
 @email_bp.route('/update-r2-credentials', methods=['POST'])
 @login_required

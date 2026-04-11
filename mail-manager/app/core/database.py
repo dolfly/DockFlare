@@ -16,6 +16,7 @@ _SCHEMA = """
         mailbox_address TEXT,
         name TEXT,
         system_folder INTEGER,
+        color TEXT,
         created_at TEXT,
         UNIQUE(mailbox_address, name),
         FOREIGN KEY(mailbox_address) REFERENCES mailboxes(address) ON DELETE CASCADE
@@ -131,10 +132,23 @@ def get_standalone_db():
     return _connect()
 
 
+def _migrate(conn):
+    # Add columns introduced after initial schema — safe to run on every start
+    migrations = [
+        "ALTER TABLE folders ADD COLUMN color TEXT",
+    ]
+    for sql in migrations:
+        try:
+            conn.execute(sql)
+        except Exception:
+            pass  # column already exists
+
+
 def init_db():
     os.makedirs(os.path.dirname(config.DB_PATH), exist_ok=True)
     conn = _connect()
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     conn.commit()
     conn.close()
 

@@ -29,7 +29,7 @@ async function dispatchWebhook(env, payload) {
 }
 
 export default {
-  // ── Inbound email handler ──────────────────────────────────────────────────
+  // ── Inbound email handler ──────────────────────────────────────────────────-.--...--
   async email(message, env, ctx) {
     try {
       const allowedRecipients = JSON.parse(env.ALLOWED_RECIPIENTS || '[]');
@@ -84,9 +84,7 @@ export default {
     }
   },
 
-  // ── Cron trigger: retry buffered emails in R2 ─────────────────────────────
-  // Configure in Cloudflare dashboard: Workers & Pages → your worker → Triggers
-  // Recommended schedule: every 5 minutes  →  cron: */5 * * * *
+  // ── Cron trigger: retry buffered emails in R2 ─────────────────────────-..-.-.-.-────
   async scheduled(event, env, ctx) {
     console.log("Cron: scanning R2 temp_cache for buffered emails...");
 

@@ -27,12 +27,12 @@ const currentDisplay = computed(() => {
 </script>
 
 <template>
-  <div :class="cn('flex h-[52px] items-center justify-center', isCollapsed ? '' : 'px-2')">
+  <div class="flex min-w-0">
     <SelectRoot v-model="selected">
       <SelectTrigger
         :class="cn(
           'flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring [&>span]:line-clamp-1 [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-2 [&>span]:truncate',
-          isCollapsed ? 'flex h-9 w-9 shrink-0 items-center justify-center p-0 [&>span]:w-auto' : 'w-full',
+          isCollapsed ? 'h-9 w-9 shrink-0 justify-center p-0 [&>span]:w-auto' : 'w-full',
         )"
       >
         <SelectValue :placeholder="isCollapsed ? '' : 'Select account'">

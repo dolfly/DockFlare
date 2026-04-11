@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { Search } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { Search, ArrowDownUp } from 'lucide-vue-next'
 import {
   TabsRoot, TabsList, TabsTrigger, TabsContent,
 } from 'radix-vue'
@@ -14,7 +14,8 @@ import Input from '../ui/Input.vue'
 
 const store = useMailStore()
 const searchValue = ref('')
-let searchTimeout: ReturnType<typeof setTimeout>
+
+const folderColor = computed(() => store.currentFolderObj?.color || '')
 
 const filteredMessages = computed(() => {
   const q = searchValue.value.trim().toLowerCase()
@@ -31,9 +32,19 @@ const unreadMessages = computed(() =>
   filteredMessages.value.filter((m: any) => !m.is_read)
 )
 
-const displayMessages = computed(() =>
-  store.activeTab === 'unread' ? unreadMessages.value : filteredMessages.value
+const starredMessages = computed(() =>
+  filteredMessages.value.filter((m: any) => m.is_starred)
 )
+
+const displayMessages = computed(() => {
+  if (store.activeTab === 'unread') return unreadMessages.value
+  if (store.activeTab === 'starred') return starredMessages.value
+  return filteredMessages.value
+})
+
+const toggleSort = () => {
+  store.sortOrder = store.sortOrder === 'desc' ? 'asc' : 'desc'
+}
 
 const selectMessage = (msg: any) => {
   store.currentMessage = msg
@@ -42,22 +53,37 @@ const selectMessage = (msg: any) => {
 
 <template>
   <TabsRoot v-model="store.activeTab" class="flex h-full flex-col">
-    <div class="flex items-center px-4 py-2">
+    <div class="h-[52px] flex items-center px-4 flex-shrink-0">
       <h1 class="text-xl font-bold">{{ store.currentFolder || 'Inbox' }}</h1>
-      <TabsList class="ml-auto inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
-        <TabsTrigger
-          value="all"
-          class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
+      <div class="ml-auto flex items-center gap-1">
+        <button
+          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          :title="store.sortOrder === 'desc' ? 'Oldest first' : 'Newest first'"
+          @click="toggleSort"
         >
-          All mail
-        </TabsTrigger>
-        <TabsTrigger
-          value="unread"
-          class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
-        >
-          Unread
-        </TabsTrigger>
-      </TabsList>
+          <ArrowDownUp class="size-4" :class="store.sortOrder === 'asc' ? 'rotate-180' : ''" />
+        </button>
+        <TabsList class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+          <TabsTrigger
+            value="all"
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
+          >
+            All
+          </TabsTrigger>
+          <TabsTrigger
+            value="unread"
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
+          >
+            Unread
+          </TabsTrigger>
+          <TabsTrigger
+            value="starred"
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
+          >
+            Starred
+          </TabsTrigger>
+        </TabsList>
+      </div>
     </div>
     <Separator />
     <div class="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -77,6 +103,7 @@ const selectMessage = (msg: any) => {
                 :key="msg.id"
                 :message="msg"
                 :selected="store.currentMessage?.id === msg.id"
+                :folder-color="folderColor"
                 @click="selectMessage(msg)"
               />
             </TransitionGroup>
@@ -101,11 +128,37 @@ const selectMessage = (msg: any) => {
                 :key="msg.id"
                 :message="msg"
                 :selected="store.currentMessage?.id === msg.id"
+                :folder-color="folderColor"
                 @click="selectMessage(msg)"
               />
             </TransitionGroup>
             <div v-if="unreadMessages.length === 0" class="p-8 text-center text-muted-foreground">
               No unread messages.
+            </div>
+          </div>
+        </ScrollAreaViewport>
+        <ScrollAreaScrollbar orientation="vertical" class="flex touch-none select-none bg-transparent p-0.5 transition-colors w-2.5">
+          <ScrollAreaThumb class="relative flex-1 rounded-full bg-border" />
+        </ScrollAreaScrollbar>
+      </ScrollAreaRoot>
+    </TabsContent>
+
+    <TabsContent value="starred" class="m-0 flex-1 overflow-hidden">
+      <ScrollAreaRoot class="h-full">
+        <ScrollAreaViewport class="h-full">
+          <div class="flex flex-col gap-2 p-4 pt-0">
+            <TransitionGroup name="list" appear>
+              <MessageListItem
+                v-for="msg in starredMessages"
+                :key="msg.id"
+                :message="msg"
+                :selected="store.currentMessage?.id === msg.id"
+                :folder-color="folderColor"
+                @click="selectMessage(msg)"
+              />
+            </TransitionGroup>
+            <div v-if="starredMessages.length === 0" class="p-8 text-center text-muted-foreground">
+              No starred messages.
             </div>
           </div>
         </ScrollAreaViewport>

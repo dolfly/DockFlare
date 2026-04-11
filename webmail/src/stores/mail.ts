@@ -11,18 +11,41 @@ export const useMailStore = defineStore('mail', () => {
   const isComposeOpen = ref(false)
   const composeDefaults = ref<{ to?: string; subject?: string; body?: string } | null>(null)
   const composeBody = ref('')
-  const activeTab = ref<'all' | 'unread'>('all')
+  const activeTab = ref<'all' | 'unread' | 'starred'>('all')
   const isCollapsed = ref(false)
+  const sortOrder = ref<'asc' | 'desc'>('desc')
+  const isDark = ref(localStorage.getItem('theme') === 'dark')
 
   const unreadMessages = computed(() =>
     messages.value.filter((m: any) => !m.is_read)
   )
 
+  const starredMessages = computed(() =>
+    messages.value.filter((m: any) => m.is_starred)
+  )
+
+  const currentFolderObj = computed(() =>
+    folders.value.find((f: any) => f.name === currentFolder.value) || null
+  )
+
+  function toggleTheme() {
+    isDark.value = !isDark.value
+    if (isDark.value) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }
+
   return {
     mailboxes, currentMailbox,
-    folders, currentFolder,
+    folders, currentFolder, currentFolderObj,
     messages, currentMessage,
     isComposeOpen, composeDefaults, composeBody,
-    activeTab, isCollapsed, unreadMessages,
+    activeTab, isCollapsed,
+    sortOrder, isDark, toggleTheme,
+    unreadMessages, starredMessages,
   }
 })

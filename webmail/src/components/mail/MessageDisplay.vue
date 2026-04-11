@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import DOMPurify from 'dompurify'
 import { format } from 'date-fns'
 import {
   Archive, Trash2, Reply, ReplyAll, Forward,
-  MoreVertical, MailOpen, Star,
+  MoreVertical, MailOpen, Star, Printer, FolderInput,
 } from 'lucide-vue-next'
 import {
   TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal,
 } from 'radix-vue'
 import {
   DropdownMenuRoot, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuPortal,
+  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuPortal,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
 } from 'radix-vue'
 import Avatar from '../ui/Avatar.vue'
 import Button from '../ui/Button.vue'
@@ -29,20 +30,73 @@ const store = useMailStore()
 const replyText = ref('')
 const sendingReply = ref(false)
 
+const emailIframe = ref<HTMLIFrameElement | null>(null)
+
 const safeHtml = computed(() => {
   if (!props.message?.html_body) return ''
-  return DOMPurify.sanitize(props.message.html_body)
+  const body = DOMPurify.sanitize(props.message.html_body, { USE_PROFILES: { html: true } })
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.5; color: #1a1a1a; word-break: break-word; }
+    img { max-width: 100%; height: auto; }
+    a { color: #2563eb; }
+    pre, code { white-space: pre-wrap; word-break: break-all; }
+    table { border-collapse: collapse; }
+    /* Let email-internal containers expand to fill available width */
+    body > table, body > div, body > center { width: 100% !important; max-width: 100% !important; }
+  </style></head><body>${body}</body></html>`
+})
+
+const resizeIframe = () => {
+  const iframe = emailIframe.value
+  if (!iframe) return
+  try {
+    const doc = iframe.contentDocument || iframe.contentWindow?.document
+    if (doc) {
+      // Reset first so shrinking also works correctly
+      iframe.style.height = '0px'
+      iframe.style.height = doc.documentElement.scrollHeight + 'px'
+    }
+  } catch {}
+}
+
+// Re-measure when message changes
+watch(() => props.message?.id, async () => {
+  await nextTick()
+  resizeIframe()
+})
+
+// Re-measure whenever the iframe's container is resized (panel drag)
+let resizeObserver: ResizeObserver | null = null
+
+watch(emailIframe, (el) => {
+  resizeObserver?.disconnect()
+  if (!el) return
+  resizeObserver = new ResizeObserver(() => resizeIframe())
+  // Observe the iframe's parent (the scrollable container) for width changes
+  if (el.parentElement) resizeObserver.observe(el.parentElement)
+})
+
+onUnmounted(() => resizeObserver?.disconnect())
+
+const displayTimestamp = computed(() => {
+  const ts = props.message?.received_at || props.message?.sent_at
+  return ts ? format(new Date(ts), 'PPpp') : ''
 })
 
 const quotedBody = computed(() => {
   if (!props.message) return ''
   const from = props.message.from_address || ''
-  const date = props.message.received_at
-    ? format(new Date(props.message.received_at), 'PPpp')
+  const date = (props.message.received_at || props.message.sent_at)
+    ? format(new Date(props.message.received_at || props.message.sent_at), 'PPpp')
     : ''
   const original = props.message.html_body || `<pre>${props.message.text_body || ''}</pre>`
   return `<br><blockquote style="border-left:2px solid #ccc;padding-left:1em;color:#555;margin:1em 0;"><p>On ${date}, ${from} wrote:</p>${original}</blockquote>`
 })
+
+const otherFolders = computed(() =>
+  store.folders.filter((f: any) => f.name !== store.currentFolder)
+)
 
 const replyTo = () => {
   if (!props.message) return
@@ -121,6 +175,22 @@ const toggleStar = async () => {
   }
 }
 
+const moveToFolder = async (targetFolder: any) => {
+  if (!props.message || !store.currentMailbox) return
+  try {
+    await mailApi.moveMessages(store.currentMailbox, {
+      message_ids: [props.message.id],
+      folder_id: targetFolder.id,
+    })
+    store.messages = store.messages.filter((m: any) => m.id !== props.message!.id)
+    store.currentMessage = null
+  } catch (e) {
+    console.error('Failed to move message', e)
+  }
+}
+
+const printMessage = () => window.print()
+
 const sendInlineReply = async () => {
   if (!props.message || !store.currentMailbox || !replyText.value.trim()) return
   sendingReply.value = true
@@ -144,8 +214,8 @@ const sendInlineReply = async () => {
 </script>
 
 <template>
-  <div class="flex h-full flex-col">
-    <div class="flex items-center p-2">
+  <div class="flex h-full flex-col" id="print-message-area">
+    <div class="h-[52px] flex items-center px-2 flex-shrink-0 print-hide">
       <div class="flex items-center gap-2">
         <TooltipRoot :delay-duration="0">
           <TooltipTrigger as-child>
@@ -156,6 +226,19 @@ const sendInlineReply = async () => {
           <TooltipPortal>
             <TooltipContent class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
               Move to trash
+            </TooltipContent>
+          </TooltipPortal>
+        </TooltipRoot>
+
+        <TooltipRoot :delay-duration="0">
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" :disabled="!message" @click="printMessage">
+              <Printer class="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipPortal>
+            <TooltipContent class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
+              Print
             </TooltipContent>
           </TooltipPortal>
         </TooltipRoot>
@@ -231,6 +314,30 @@ const sendInlineReply = async () => {
               <Star class="mr-2 size-4" />
               {{ message?.is_starred ? 'Unstar' : 'Star' }}
             </DropdownMenuItem>
+            <DropdownMenuSeparator class="my-1 h-px bg-border" />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+              >
+                <FolderInput class="mr-2 size-4" />
+                Move to…
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent
+                  class="z-50 min-w-[140px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                >
+                  <DropdownMenuItem
+                    v-for="f in otherFolders"
+                    :key="f.id"
+                    class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                    @click="moveToFolder(f)"
+                  >
+                    <span v-if="f.color" class="mr-2 inline-block h-2 w-2 rounded-full flex-shrink-0" :style="`background:${f.color}`" />
+                    {{ f.name }}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenuPortal>
       </DropdownMenuRoot>
@@ -239,6 +346,13 @@ const sendInlineReply = async () => {
     <Separator />
 
     <template v-if="message">
+      <!-- Print header (only visible when printing) -->
+      <div class="print-header hidden print:block p-4 border-b">
+        <div class="text-lg font-bold">{{ message.subject }}</div>
+        <div class="text-sm text-muted-foreground mt-1">From: {{ message.from_name ? `${message.from_name} <${message.from_address}>` : message.from_address }}</div>
+        <div class="text-sm text-muted-foreground">Date: {{ displayTimestamp }}</div>
+      </div>
+
       <div class="flex items-start p-4">
         <div class="flex items-start gap-4 text-sm">
           <Avatar :initials="message.from_name?.[0] || message.from_address?.[0] || '?'" />
@@ -250,23 +364,32 @@ const sendInlineReply = async () => {
             </div>
           </div>
         </div>
-        <div v-if="message.received_at" class="ml-auto text-xs text-muted-foreground">
-          {{ format(new Date(message.received_at), 'PPpp') }}
+        <div v-if="displayTimestamp" class="ml-auto text-xs text-muted-foreground">
+          {{ displayTimestamp }}
         </div>
       </div>
 
       <Separator />
 
-      <div class="flex-1 overflow-y-auto whitespace-pre-wrap p-4 text-sm">
-        <div v-if="message.html_body" v-html="safeHtml" class="prose max-w-none dark:prose-invert"></div>
-        <div v-else>{{ message.text_body }}</div>
+      <div class="flex-1 overflow-y-auto">
+        <iframe
+          v-if="message.html_body"
+          ref="emailIframe"
+          :srcdoc="safeHtml"
+          sandbox="allow-same-origin allow-popups"
+          referrerpolicy="no-referrer"
+          class="w-full border-0 block"
+          style="min-height: 200px"
+          @load="resizeIframe"
+        />
+        <div v-else class="p-4 text-sm whitespace-pre-wrap">{{ message.text_body }}</div>
       </div>
 
       <AttachmentBar :attachments="message.attachments" />
 
-      <Separator class="mt-auto" />
+      <Separator class="mt-auto print-hide" />
 
-      <div class="p-4">
+      <div class="p-4 print-hide">
         <form @submit.prevent="sendInlineReply">
           <div class="grid gap-4">
             <Textarea

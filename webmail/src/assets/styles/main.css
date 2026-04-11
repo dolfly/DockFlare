@@ -57,3 +57,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  /* Hide everything except the message content */
+  body > * { display: none !important; }
+  #print-message-area { display: flex !important; flex-direction: column; width: 100%; }
+  .print-hide { display: none !important; }
+  /* Show the print header block */
+  .print\:block { display: block !important; }
+  /* Expand message body */
+  #print-message-area .flex-1 { overflow: visible !important; }
+}

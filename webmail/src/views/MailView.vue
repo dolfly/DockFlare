@@ -6,6 +6,18 @@ import MailLayout from '../components/mail/MailLayout.vue'
 
 const { store, loadMailboxes } = useMail()
 
+const loadMessages = async (addr: string, folder: string) => {
+  if (!addr || !folder) return
+  try {
+    const mRes = await mailApi.getMessages(addr, { folder, order: store.sortOrder })
+    const payload = mRes.data
+    store.messages = Array.isArray(payload) ? payload : payload.items || []
+    store.currentMessage = null
+  } catch (e) {
+    console.error('Failed to load messages', e)
+  }
+}
+
 onMounted(() => {
   loadMailboxes()
 })
@@ -16,23 +28,20 @@ watch(() => store.currentMailbox, async (addr) => {
     const fRes = await mailApi.getFolders(addr)
     store.folders = fRes.data
     if (store.folders.length > 0) {
-      store.currentFolder = store.folders[0].name
+      const inbox = store.folders.find((f: any) => f.name.toLowerCase() === 'inbox')
+      store.currentFolder = inbox ? inbox.name : store.folders[0].name
     }
   } catch (e) {
     console.error('Failed to load folders', e)
   }
 })
 
-watch(() => [store.currentMailbox, store.currentFolder], async ([addr, folder]) => {
-  if (!addr || !folder) return
-  try {
-    const mRes = await mailApi.getMessages(addr as string, { folder })
-    const payload = mRes.data
-    store.messages = Array.isArray(payload) ? payload : payload.items || []
-    store.currentMessage = null
-  } catch (e) {
-    console.error('Failed to load messages', e)
-  }
+watch(() => [store.currentMailbox, store.currentFolder], ([addr, folder]) => {
+  loadMessages(addr as string, folder as string)
+})
+
+watch(() => store.sortOrder, () => {
+  loadMessages(store.currentMailbox, store.currentFolder)
 })
 
 watch(() => store.currentMessage, async (msg) => {

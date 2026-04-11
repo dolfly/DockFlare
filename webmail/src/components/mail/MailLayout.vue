@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import {
   SplitterGroup, SplitterPanel, SplitterResizeHandle,
+  TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal,
 } from 'radix-vue'
-import { TooltipProvider } from 'radix-vue'
+import { PenSquare, Sun, Moon, LogOut } from 'lucide-vue-next'
 import { cn } from '../../lib/utils'
 import Separator from '../ui/Separator.vue'
 import MailboxSelector from './MailboxSelector.vue'
@@ -11,11 +12,18 @@ import MessageList from './MessageList.vue'
 import MessageDisplay from './MessageDisplay.vue'
 import ComposeDialog from './ComposeDialog.vue'
 import { useMailStore } from '../../stores/mail'
+import { useAuth } from '../../composables/useAuth'
 
 const store = useMailStore()
+const { logout } = useAuth()
 
 const onCollapse = () => { store.isCollapsed = true }
 const onExpand = () => { store.isCollapsed = false }
+
+const compose = () => {
+  store.composeDefaults = null
+  store.isComposeOpen = true
+}
 </script>
 
 <template>
@@ -39,8 +47,103 @@ const onExpand = () => { store.isCollapsed = false }
         @collapse="onCollapse"
         @expand="onExpand"
       >
-        <MailboxSelector :is-collapsed="store.isCollapsed" />
-        <Separator />
+        <!-- ── Single header row (same height as middle + right panel headers) ── -->
+        <div
+          :class="cn(
+            'h-[52px] flex items-center gap-1 px-2 border-b border-border flex-shrink-0',
+            store.isCollapsed ? 'flex-col justify-center py-1' : 'flex-row',
+          )"
+        >
+          <template v-if="!store.isCollapsed">
+            <!-- Mailbox selector fills available space -->
+            <div class="flex-1 min-w-0">
+              <MailboxSelector :is-collapsed="false" />
+            </div>
+            <!-- Compose -->
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex-shrink-0"
+                  @click="compose"
+                >
+                  <PenSquare class="size-4" />
+                  Compose
+                </button>
+              </TooltipTrigger>
+            </TooltipRoot>
+            <!-- Theme toggle -->
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
+                  @click="store.toggleTheme()"
+                >
+                  <Sun v-if="store.isDark" class="size-4" />
+                  <Moon v-else class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="bottom" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
+                  {{ store.isDark ? 'Light mode' : 'Dark mode' }}
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <!-- Logout -->
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
+                  @click="logout"
+                >
+                  <LogOut class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="bottom" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
+                  Logout
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+          </template>
+
+          <!-- Collapsed: stacked icon buttons -->
+          <template v-else>
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors" @click="compose">
+                  <PenSquare class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="right" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">Compose</TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors" @click="store.toggleTheme()">
+                  <Sun v-if="store.isDark" class="size-4" />
+                  <Moon v-else class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="right" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">{{ store.isDark ? 'Light mode' : 'Dark mode' }}</TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors" @click="logout">
+                  <LogOut class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="right" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">Logout</TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <!-- Collapsed mailbox icon below -->
+            <MailboxSelector :is-collapsed="true" />
+          </template>
+        </div>
+
         <FolderNav :is-collapsed="store.isCollapsed" />
       </SplitterPanel>
 
