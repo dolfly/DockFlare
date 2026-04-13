@@ -3,7 +3,8 @@ import {
   SplitterGroup, SplitterPanel, SplitterResizeHandle,
   TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal,
 } from 'radix-vue'
-import { PenSquare, Sun, Moon, LogOut } from 'lucide-vue-next'
+import { defineAsyncComponent } from 'vue'
+import { PenSquare, Sun, Moon, LogOut, Settings, Columns2, Maximize2 } from 'lucide-vue-next'
 import { cn } from '../../lib/utils'
 import Separator from '../ui/Separator.vue'
 import MailboxSelector from './MailboxSelector.vue'
@@ -13,6 +14,8 @@ import MessageDisplay from './MessageDisplay.vue'
 import ComposeDialog from './ComposeDialog.vue'
 import { useMailStore } from '../../stores/mail'
 import { useAuth } from '../../composables/useAuth'
+
+const SettingsDialog = defineAsyncComponent(() => import('./SettingsDialog.vue'))
 
 const store = useMailStore()
 const { logout } = useAuth()
@@ -78,8 +81,8 @@ const compose = () => {
                   class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
                   @click="store.toggleViewMode()"
                 >
-                  <Columns v-if="store.viewMode === 'full'" class="size-4" />
-                  <Maximize v-else class="size-4" />
+                  <Columns2 v-if="store.viewMode === 'full'" class="size-4" />
+                  <Maximize2 v-else class="size-4" />
                 </button>
               </TooltipTrigger>
               <TooltipPortal>
@@ -102,6 +105,22 @@ const compose = () => {
               <TooltipPortal>
                 <TooltipContent side="bottom" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
                   {{ store.isDark ? 'Light mode' : 'Dark mode' }}
+                </TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <!-- Settings -->
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button
+                  class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors flex-shrink-0"
+                  @click="store.isSettingsOpen = true"
+                >
+                  <Settings class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="bottom" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">
+                  Settings
                 </TooltipContent>
               </TooltipPortal>
             </TooltipRoot>
@@ -144,6 +163,16 @@ const compose = () => {
               </TooltipTrigger>
               <TooltipPortal>
                 <TooltipContent side="right" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">{{ store.isDark ? 'Light mode' : 'Dark mode' }}</TooltipContent>
+              </TooltipPortal>
+            </TooltipRoot>
+            <TooltipRoot :delay-duration="0">
+              <TooltipTrigger as-child>
+                <button class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent transition-colors" @click="store.isSettingsOpen = true">
+                  <Settings class="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipPortal>
+                <TooltipContent side="right" class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md">Settings</TooltipContent>
               </TooltipPortal>
             </TooltipRoot>
             <TooltipRoot :delay-duration="0">
@@ -214,5 +243,6 @@ const compose = () => {
     </SplitterGroup>
 
     <ComposeDialog />
+    <SettingsDialog />
   </TooltipProvider>
 </template>

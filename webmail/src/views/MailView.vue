@@ -1,14 +1,20 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useMail } from '../composables/useMail'
 import { useMailPolling } from '../composables/useMailPolling'
+import { useNotificationsStore } from '../stores/notifications'
 import { mailApi } from '../api/mail'
 import MailLayout from '../components/mail/MailLayout.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { store, loadMailboxes } = useMail()
+const mailStore = store
+const notificationsStore = useNotificationsStore()
 useMailPolling()
+
+const showNotifPrompt = ref(false)
 
 const loadMessages = async (addr: string, folder: string) => {
   if (!addr || !folder) return
@@ -22,6 +28,20 @@ const loadMessages = async (addr: string, folder: string) => {
   }
 }
 
+async function enableNotifications() {
+  await notificationsStore.requestPermission()
+  showNotifPrompt.value = false
+  localStorage.setItem('notif_prompted', '1')
+  if (notificationsStore.isGranted) {
+    mailStore.isSettingsOpen = true
+  }
+}
+
+function dismissPrompt() {
+  showNotifPrompt.value = false
+  localStorage.setItem('notif_prompted', '1')
+}
+
 onMounted(async () => {
   await loadMailboxes()
 
@@ -29,6 +49,10 @@ onMounted(async () => {
   if (mailboxParam) {
     const found = store.mailboxes.find((b: any) => b.address === mailboxParam)
     if (found) store.currentMailbox = mailboxParam
+  }
+
+  if (Notification.permission === 'default' && !localStorage.getItem('notif_prompted')) {
+    showNotifPrompt.value = true
   }
 
   if ('serviceWorker' in navigator) {
@@ -98,5 +122,28 @@ watch(() => store.currentMessage, async (msg) => {
 </script>
 
 <template>
-  <MailLayout />
+  <div class="relative h-full">
+    <MailLayout />
+
+    <Transition name="slide-up">
+      <div
+        v-if="showNotifPrompt"
+        class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 rounded-xl border bg-background shadow-lg px-5 py-3.5 text-sm"
+      >
+        <span class="text-muted-foreground">Enable notifications for new mail?</span>
+        <button
+          class="inline-flex items-center justify-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          @click="enableNotifications"
+        >
+          Enable
+        </button>
+        <button
+          class="text-muted-foreground hover:text-foreground transition-colors"
+          @click="dismissPrompt"
+        >
+          Dismiss
+        </button>
+      </div>
+    </Transition>
+  </div>
 </template>

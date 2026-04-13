@@ -1,6 +1,5 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { mailApi } from '@/api/mail'
-import { useNotificationsStore } from '@/stores/notifications'
 import { useMailStore } from '@/stores/mail'
 
 interface MailboxStatus {
@@ -19,7 +18,6 @@ function updateBadge(count: number) {
 }
 
 export function useMailPolling() {
-  const notificationsStore = useNotificationsStore()
   const mailStore = useMailStore()
   const lastSeen = ref<Record<string, string | null>>({})
   const initialized = ref(false)
@@ -42,8 +40,6 @@ export function useMailPolling() {
         return
       }
 
-      if (!notificationsStore.isGranted) return
-
       for (const s of statuses) {
         const prev = lastSeen.value[s.address]
         if (
@@ -51,7 +47,21 @@ export function useMailPolling() {
           (prev === undefined || prev === null || s.latest_received_at > prev)
         ) {
           lastSeen.value[s.address] = s.latest_received_at
-          fireNotification(s.address, s.unread_count)
+
+          if (s.address === mailStore.currentMailbox && mailStore.currentFolder) {
+            try {
+              const mRes = await mailApi.getMessages(s.address, {
+                folder: mailStore.currentFolder,
+                order: mailStore.sortOrder,
+              })
+              const payload = mRes.data
+              mailStore.messages = Array.isArray(payload) ? payload : payload.items || []
+            } catch { /* network error — skip */ }
+          }
+
+          if (Notification.permission === 'granted') {
+            fireNotification(s.address, s.unread_count)
+          }
         }
       }
     } catch {

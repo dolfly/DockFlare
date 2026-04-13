@@ -88,8 +88,7 @@ def push_subscribe():
     db.execute("""
         INSERT INTO push_subscriptions (mailbox_address, endpoint, p256dh, auth, created_at)
         VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(endpoint) DO UPDATE SET
-            mailbox_address=excluded.mailbox_address,
+        ON CONFLICT(mailbox_address, endpoint) DO UPDATE SET
             p256dh=excluded.p256dh,
             auth=excluded.auth,
             created_at=excluded.created_at

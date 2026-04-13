@@ -8,7 +8,7 @@ server {
     listen 80;
     server_name _;
     client_max_body_size 25m;
-    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self'; connect-src 'self';";
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' https://static.cloudflareinsights.com; worker-src 'self'; connect-src 'self' https://fcm.googleapis.com https://*.googleapis.com https://cloudflareinsights.com;";
 
     location /api/ {
         proxy_pass http://dockflare-mail-manager:8025/api/;

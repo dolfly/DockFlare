@@ -19,6 +19,17 @@ def _dispatch(mailbox_address: str, payload: dict):
     if not private_key:
         return
 
+    # pywebpush expects a base64url-encoded DER private key.
+    # DockFlare Master stores VAPID keys as PEM — convert if needed.
+    if private_key.strip().startswith('-----'):
+        from cryptography.hazmat.primitives.serialization import (
+            load_pem_private_key, Encoding, PrivateFormat, NoEncryption
+        )
+        import base64
+        key_obj = load_pem_private_key(private_key.encode(), password=None)
+        der = key_obj.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
+        private_key = base64.urlsafe_b64encode(der).rstrip(b'=').decode()
+
     from pywebpush import webpush, WebPushException
     from app.core.database import get_standalone_db
 

@@ -163,7 +163,29 @@ def _migrate(conn):
         try:
             conn.execute(sql)
         except Exception:
-            pass  
+            pass
+
+    try:
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS push_subscriptions_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mailbox_address TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (mailbox_address) REFERENCES mailboxes(address) ON DELETE CASCADE,
+                UNIQUE(mailbox_address, endpoint)
+            );
+            INSERT OR IGNORE INTO push_subscriptions_new
+                SELECT id, mailbox_address, endpoint, p256dh, auth, created_at
+                FROM push_subscriptions;
+            DROP TABLE push_subscriptions;
+            ALTER TABLE push_subscriptions_new RENAME TO push_subscriptions;
+            CREATE INDEX IF NOT EXISTS idx_push_subscriptions_mailbox ON push_subscriptions(mailbox_address);
+        """)
+    except Exception:
+        pass
 
 
 def init_db():
