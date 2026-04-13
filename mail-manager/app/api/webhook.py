@@ -33,6 +33,9 @@ def _verify_signature(req, secret):
 
 @webhook_bp.route('/inbound', methods=['POST'])
 def inbound():
+    if getattr(config, 'IN_MAINTENANCE', False):
+        return jsonify({"error": "Service unavailable during maintenance"}), 503
+
     domain = request.headers.get('X-DockFlare-Domain', '').strip()
 
     if domain and domain != 'undefined':

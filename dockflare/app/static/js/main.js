@@ -2109,3 +2109,49 @@ async function emailRedeployWorkers() {
         console.error(e);
     }
 }
+
+async function emailRestoreBackup() {
+    const fileInput = document.getElementById('emailRestoreFile');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        return;
+    }
+    if (!await dfConfirm(t('email.restore_confirm'), t('email.restore_title'))) {
+        return;
+    }
+    const btn = document.getElementById('emailRestoreBtn');
+    const feedback = document.getElementById('emailRestoreFeedback');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> ' + t('common.loading');
+    feedback.classList.remove('hidden', 'text-error', 'text-success');
+    feedback.textContent = 'Uploading and restoring...';
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+
+    try {
+        const response = await fetch('/email/restore', {
+            method: 'POST',
+            headers: buildApiHeaders(),
+            body: formData
+        });
+        const data = await response.json();
+        if (data.success) {
+            feedback.classList.add('text-success');
+            feedback.textContent = t('email.restore_success');
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+        } else {
+            feedback.classList.add('text-error');
+            feedback.textContent = 'Error: ' + (data.error || 'Unknown error');
+            btn.disabled = false;
+            btn.textContent = t('email.restore_backup');
+        }
+    } catch (e) {
+        feedback.classList.add('text-error');
+        feedback.textContent = 'Error: ' + e.message;
+        btn.disabled = false;
+        btn.textContent = t('email.restore_backup');
+        console.error(e);
+    }
+}

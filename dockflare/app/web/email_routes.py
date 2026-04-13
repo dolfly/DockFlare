@@ -453,6 +453,50 @@ def mailbox_login():
     response.headers['Access-Control-Allow-Origin'] = origin
     return response
 
+@email_bp.route('/backup', methods=['GET'])
+@login_required
+def email_backup():
+    import requests
+    from flask import Response, stream_with_context
+    token = _generate_jwt(current_user.get_id(), role='admin')
+    if not token:
+        return jsonify({'error': 'JWT configuration missing'}), 500
+    url = f"{config.MAIL_MANAGER_INTERNAL_URL}/api/v1/system/backup"
+    try:
+        req = requests.get(url, headers={'Authorization': f'Bearer {token}'}, stream=True, timeout=30)
+        req.raise_for_status()
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    return Response(
+        stream_with_context(req.iter_content(chunk_size=8192)),
+        content_type=req.headers.get('content-type', 'application/zip'),
+        headers={'Content-Disposition': req.headers.get('content-disposition', 'attachment; filename="dockflare_email_backup.zip"')}
+    )
+
+@email_bp.route('/restore', methods=['POST'])
+@login_required
+def email_restore():
+    import requests
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+    file = request.files['file']
+    if not file.filename.endswith('.zip'):
+        return jsonify({'success': False, 'error': 'Must be a ZIP file'}), 400
+    token = _generate_jwt(current_user.get_id(), role='admin')
+    if not token:
+        return jsonify({'success': False, 'error': 'JWT configuration missing'}), 500
+    url = f"{config.MAIL_MANAGER_INTERNAL_URL}/api/v1/system/restore"
+    try:
+        resp = requests.post(url, headers={'Authorization': f'Bearer {token}'}, files={'file': (file.filename, file.stream, file.mimetype)}, timeout=300)
+        resp.raise_for_status()
+        return jsonify({'success': True})
+    except Exception as e:
+        try:
+            err_data = resp.json()
+            return jsonify({'success': False, 'error': err_data.get('error', str(e))}), 500
+        except Exception:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
 def _check_internal_request():
     # Block any request that carries Cloudflare edge headers (all public internet
     # requests via the CF tunnel have CF-Ray; internal Docker requests never do)

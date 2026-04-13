@@ -158,6 +158,31 @@
 
     <div class="card bg-base-100 shadow-xl mb-8">
         <div class="card-body">
+            <h2 class="card-title">{{ t('email.backup_restore') }}</h2>
+            <div class="divider mt-0 mb-4"></div>
+            <div>
+                <h3 class="text-lg font-semibold">{{ t('email.backup_title') }}</h3>
+                <p class="text-sm opacity-80 mb-2">{{ t('email.backup_description') }}</p>
+                <div class="badge badge-warning mb-4 p-3 h-auto whitespace-normal text-left">{{ t('email.backup_security_warning') }}</div>
+                <br>
+                <a href="{{ url_for('email.email_backup') }}" class="btn btn-primary btn-sm">{{ t('email.download_backup') }}</a>
+            </div>
+            <div class="divider"></div>
+            <div>
+                <h3 class="text-lg font-semibold">{{ t('email.restore_title') }}</h3>
+                <p class="text-sm opacity-80 mb-2">{{ t('email.restore_description') }}</p>
+                <div class="badge badge-error mb-4 p-3 h-auto whitespace-normal text-left">{{ t('email.restore_warning') }}</div>
+                <div class="flex gap-2">
+                    <input type="file" id="emailRestoreFile" accept=".zip" class="file-input file-input-bordered file-input-sm w-full max-w-xs" />
+                    <button class="btn btn-error btn-sm" id="emailRestoreBtn" onclick="emailRestoreBackup()">{{ t('email.restore_backup') }}</button>
+                </div>
+                <p id="emailRestoreFeedback" class="text-sm mt-2 font-semibold hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card bg-base-100 shadow-xl mb-8">
+        <div class="card-body">
             <h2 class="card-title">{{ t('email.container_status') }}</h2>
             <div class="alert alert-info">
                 <div>

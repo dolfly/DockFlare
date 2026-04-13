@@ -68,3 +68,4 @@ class _Config:
 
 
 config = _Config()
+config.IN_MAINTENANCE = False

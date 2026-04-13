@@ -774,5 +774,16 @@
     "email.teardown": "Teardown",
     "email.no_domains": "No domains configured.",
     "email.choose_domain": "Choose a domain...",
-    "email.select_zone": "Select Cloudflare Zone"
+    "email.select_zone": "Select Cloudflare Zone",
+    "email.backup_restore": "System Backup & Restore",
+    "email.backup_title": "Create System Backup",
+    "email.backup_description": "Download a full backup of your email database and attachments (.zip).",
+    "email.backup_security_warning": "Security Warning: This backup contains highly sensitive data (emails and attachments) in plain text. Please store it securely.",
+    "email.download_backup": "Download Backup",
+    "email.restore_title": "Restore from Backup",
+    "email.restore_description": "Upload a backup archive to restore your email database and attachments.",
+    "email.restore_warning": "Warning: Restoring a backup will permanently overwrite your current email data and attachments. This action cannot be undone.",
+    "email.restore_backup": "Restore Backup",
+    "email.restore_confirm": "Are you absolutely sure you want to restore this backup? All current email data will be overwritten.",
+    "email.restore_success": "Restore successful. Restarting mail system..."
 }
