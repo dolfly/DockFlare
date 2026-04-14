@@ -57,6 +57,11 @@ export function useMailPolling() {
               const payload = mRes.data
               mailStore.messages = Array.isArray(payload) ? payload : payload.items || []
             } catch { /* network error — skip */ }
+
+            try {
+              const fRes = await mailApi.getFolders(s.address)
+              mailStore.folders = fRes.data
+            } catch { /* network error — skip */ }
           }
 
           if (Notification.permission === 'granted') {

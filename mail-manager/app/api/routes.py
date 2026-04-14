@@ -181,6 +181,11 @@ def get_mailboxes():
         mb['received_count'] = received.get(addr, 0)
         mb['sent_count'] = sent.get(addr, 0)
         mb['storage_bytes'] = storage.get(addr, 0)
+        if mb['quota_bytes'] and mb['quota_bytes'] > 0:
+            if storage.get(addr, 0) <= mb['quota_bytes'] and mb['quota_exceeded_count'] > 0:
+                db.execute("UPDATE mailboxes SET quota_exceeded_count=0 WHERE address=?", (addr,))
+                mb['quota_exceeded_count'] = 0
+    db.commit()
     return jsonify(mailboxes)
 
 

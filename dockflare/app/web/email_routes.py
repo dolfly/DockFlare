@@ -1075,7 +1075,7 @@ def internal_mail_config():
             'outbound_worker_url': d.get('outbound_worker_url', ''),
             'outbound_auth_secret': d.get('outbound_auth_secret', ''),
             'mailboxes': {
-                addr: {'display_name': m.get('display_name', '')}
+                addr: {'display_name': m.get('display_name', ''), 'quota_bytes': m.get('quota_bytes', 10737418240)}
                 for addr, m in d.get('mailboxes', {}).items()
             }
         }

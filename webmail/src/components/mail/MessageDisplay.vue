@@ -153,6 +153,8 @@ const trash = async () => {
     await mailApi.deleteMessage(store.currentMailbox, props.message.id)
     store.messages = store.messages.filter((m: any) => m.id !== props.message!.id)
     store.currentMessage = null
+    const fRes = await mailApi.getFolders(store.currentMailbox)
+    store.folders = fRes.data
   } catch (e) {
     console.error('Failed to trash message', e)
   }
@@ -164,9 +166,25 @@ const markUnread = async () => {
     await mailApi.updateMessage(store.currentMailbox, props.message.id, { is_read: false })
     const idx = store.messages.findIndex((m: any) => m.id === props.message!.id)
     if (idx !== -1) store.messages[idx] = { ...store.messages[idx], is_read: 0 }
-    store.currentMessage = null
+    store.currentMessage = { ...store.currentMessage, is_read: 0 }
+    const fRes = await mailApi.getFolders(store.currentMailbox)
+    store.folders = fRes.data
   } catch (e) {
     console.error('Failed to mark unread', e)
+  }
+}
+
+const markRead = async () => {
+  if (!props.message || !store.currentMailbox) return
+  try {
+    await mailApi.updateMessage(store.currentMailbox, props.message.id, { is_read: true })
+    const idx = store.messages.findIndex((m: any) => m.id === props.message!.id)
+    if (idx !== -1) store.messages[idx] = { ...store.messages[idx], is_read: 1 }
+    store.currentMessage = { ...store.currentMessage, is_read: 1 }
+    const fRes = await mailApi.getFolders(store.currentMailbox)
+    store.folders = fRes.data
+  } catch (e) {
+    console.error('Failed to mark read', e)
   }
 }
 
@@ -192,6 +210,8 @@ const moveToFolder = async (targetFolder: any) => {
     })
     store.messages = store.messages.filter((m: any) => m.id !== props.message!.id)
     store.currentMessage = null
+    const fRes = await mailApi.getFolders(store.currentMailbox)
+    store.folders = fRes.data
   } catch (e) {
     console.error('Failed to move message', e)
   }
@@ -401,11 +421,20 @@ const sendInlineReply = async () => {
             class="z-50 min-w-[160px] rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
             <DropdownMenuItem
+              v-if="props.message?.is_read"
               class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
               @click="markUnread"
             >
               <MailOpen class="mr-2 size-4" />
               Mark as unread
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              v-else
+              class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+              @click="markRead"
+            >
+              <MailOpen class="mr-2 size-4" />
+              Mark as read
             </DropdownMenuItem>
             <DropdownMenuItem
               class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"

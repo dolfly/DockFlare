@@ -1460,7 +1460,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fixResourcesAndBase();
     themeManager.initialize();
     initializeAllTomSelects();
-      
+
     const manualServiceTypeSelect = document.getElementById('manual_service_type');
     if (manualServiceTypeSelect) {
         manualServiceTypeSelect.addEventListener('change', updateManualRuleServiceFields);

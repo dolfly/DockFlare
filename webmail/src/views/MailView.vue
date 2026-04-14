@@ -97,15 +97,16 @@ watch(() => store.sortOrder, () => {
 })
 
 watch(() => store.currentMessage, async (msg) => {
-  if (!msg || msg.attachments !== undefined) return
+  if (!msg) return
   try {
-    const res = await mailApi.getMessage(store.currentMailbox, msg.id)
-    const fullMsg = res.data
-    store.currentMessage = fullMsg
-
     const idx = store.messages.findIndex((m: any) => m.id === msg.id)
-    if (idx !== -1) {
-      store.messages[idx] = fullMsg
+    let fullMsg = msg
+
+    if (msg.attachments === undefined) {
+      const res = await mailApi.getMessage(store.currentMailbox, msg.id)
+      fullMsg = res.data
+      store.currentMessage = fullMsg
+      if (idx !== -1) store.messages[idx] = fullMsg
     }
 
     if (!fullMsg.is_read) {
@@ -114,6 +115,8 @@ watch(() => store.currentMessage, async (msg) => {
         store.messages[idx] = { ...store.messages[idx], is_read: 1 }
       }
       store.currentMessage = { ...store.currentMessage, is_read: 1 }
+      const fRes = await mailApi.getFolders(store.currentMailbox)
+      store.folders = fRes.data
     }
   } catch (e) {
     console.error('Failed to load message', e)

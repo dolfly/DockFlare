@@ -145,9 +145,9 @@ const confirmEdit = async () => {
               class="z-50 rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md flex items-center gap-4"
             >
               {{ f.name }}
-              <span class="ml-auto text-muted-foreground flex gap-1">
+              <span v-if="f.total_count > 0" class="ml-auto text-muted-foreground flex gap-1">
                 <span v-if="f.unread_count" class="font-bold">{{ f.unread_count }} /</span>
-                <span>{{ f.total_count || 0 }}</span>
+                <span>{{ f.total_count }}</span>
               </span>
             </TooltipContent>
           </TooltipPortal>
@@ -199,13 +199,14 @@ const confirmEdit = async () => {
             <component :is="getIcon(f.name)" class="size-4 flex-shrink-0" :style="f.color ? `color:${f.color}` : ''" />
             <span class="truncate">{{ f.name }}</span>
             <span
+              v-if="f.total_count > 0"
               :class="cn(
                 'ml-auto text-xs flex-shrink-0 flex gap-1',
                 store.currentFolder === f.name ? 'text-primary-foreground' : 'text-muted-foreground',
               )"
             >
               <span v-if="f.unread_count" class="font-bold">{{ f.unread_count }} /</span>
-              <span>{{ f.total_count || 0 }}</span>
+              <span>{{ f.total_count }}</span>
             </span>
           </button>
           <!-- Custom folder actions — absolutely positioned so they don't affect count alignment -->
@@ -251,6 +252,12 @@ const confirmEdit = async () => {
             :style="`background:${c}; border-color:${newFolderColor === c ? '#000' : 'transparent'}`"
             @click="newFolderColor = newFolderColor === c ? '' : c"
           />
+          <button
+            class="h-5 w-5 rounded-full border-2 text-xs flex items-center justify-center text-muted-foreground hover:bg-accent"
+            :style="`border-color:${!newFolderColor ? '#888' : 'transparent'}`"
+            title="No colour"
+            @click="newFolderColor = ''"
+          >✕</button>
         </div>
         <div class="flex gap-1 justify-end">
           <button class="text-xs px-2 py-1 rounded hover:bg-accent text-muted-foreground" @click="cancelNewFolder">Cancel</button>
