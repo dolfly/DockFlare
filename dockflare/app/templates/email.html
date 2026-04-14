@@ -460,12 +460,13 @@
         <p class="text-sm opacity-60 mb-1" id="emailEditQuotaTarget"></p>
         <p class="text-sm mb-4" id="emailEditQuotaUsage"></p>
         <div>
-            <input type="range" id="editMailboxQuota" min="0" max="10" step="1" value="6" class="range range-sm w-full" oninput="emailUpdateQuotaLabel('editMailboxQuotaLabel', this.value)" />
+            <input type="range" id="editMailboxQuota" min="0" max="10" step="1" value="6" class="range range-sm w-full" oninput="emailUpdateQuotaLabel('editMailboxQuotaLabel', this.value, 'emailEditQuotaGraceInfo')" />
             <div class="flex justify-between text-xs mt-1">
                 <span class="opacity-50">100 MB</span>
                 <span id="editMailboxQuotaLabel" class="font-semibold">10 GB</span>
                 <span class="opacity-50">Unlimited</span>
             </div>
+            <p id="emailEditQuotaGraceInfo" class="text-xs opacity-50 mt-1"></p>
         </div>
         <div class="modal-action">
             <form method="dialog"><button class="btn btn-ghost">Cancel</button></form>

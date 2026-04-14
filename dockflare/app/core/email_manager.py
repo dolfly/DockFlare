@@ -310,6 +310,25 @@ def scrub_email_dns_records(zone_id, zone_name):
         errors.append(f"DNS list CNAME: {e}")
     return errors
 
+def create_kv_namespace(title):
+    res = cf_api_request('POST', f'/accounts/{config.CF_ACCOUNT_ID}/storage/kv/namespaces',
+                         json_data={'title': title})
+    return res.get('result', {}).get('id')
+
+def update_kv_entry(namespace_id, key, value_dict):
+    url = f"{config.CF_API_BASE_URL}/accounts/{config.CF_ACCOUNT_ID}/storage/kv/namespaces/{namespace_id}/values/{key}"
+    headers = {"Authorization": f"Bearer {config.CF_API_TOKEN}", "Content-Type": "text/plain"}
+    response = requests.put(url, data=json.dumps(value_dict), headers=headers, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+def delete_kv_entry(namespace_id, key):
+    try:
+        cf_api_request('DELETE',
+                       f'/accounts/{config.CF_ACCOUNT_ID}/storage/kv/namespaces/{namespace_id}/values/{key}')
+    except Exception as e:
+        logging.warning(f"Could not delete KV entry {key} from {namespace_id}: {e}")
+
 def setup_catchall_routing_rule(zone_id, worker_name):
     data = {
         "matchers": [{"type": "all"}],

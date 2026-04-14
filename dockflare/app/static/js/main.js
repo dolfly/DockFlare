@@ -2331,9 +2331,27 @@ function _fmtBytes(b) {
     return b.toFixed(1) + '\u00a0' + u[i];
 }
 
-function emailUpdateQuotaLabel(labelId, stepIndex) {
+function _calcGrace(quotaBytes) {
+    if (!quotaBytes || quotaBytes <= 0) return 0;
+    return Math.max(Math.round(quotaBytes * 0.15), 10 * 1024 * 1024);
+}
+
+function emailUpdateQuotaLabel(labelId, stepIndex, graceInfoId) {
     const el = document.getElementById(labelId);
-    if (el) el.textContent = QUOTA_STEPS[parseInt(stepIndex)]?.label ?? '10 GB';
+    const step = QUOTA_STEPS[parseInt(stepIndex)];
+    if (el) el.textContent = step?.label ?? '10 GB';
+    if (graceInfoId) {
+        const graceEl = document.getElementById(graceInfoId);
+        if (graceEl) {
+            const quota = step?.bytes ?? 0;
+            if (quota > 0) {
+                const grace = _calcGrace(quota);
+                graceEl.textContent = `Hard limit: ${_fmtBytes(quota + grace)} (includes ${_fmtBytes(grace)} grace buffer)`;
+            } else {
+                graceEl.textContent = '';
+            }
+        }
+    }
 }
 
 function emailLoadStats() {
@@ -2983,7 +3001,7 @@ function emailEditQuota(address, domain, currentQuotaBytes) {
     const stepIndex = QUOTA_STEPS.findIndex(s => s.bytes === currentQuotaBytes);
     const slider = document.getElementById('editMailboxQuota');
     slider.value = stepIndex >= 0 ? stepIndex : 6;
-    emailUpdateQuotaLabel('editMailboxQuotaLabel', slider.value);
+    emailUpdateQuotaLabel('editMailboxQuotaLabel', slider.value, 'emailEditQuotaGraceInfo');
     const submitBtn = document.getElementById('emailEditQuotaSubmitBtn');
     const handler = async () => {
         submitBtn.removeEventListener('click', handler);

@@ -206,6 +206,9 @@ def _migrate(conn):
         "CREATE INDEX IF NOT EXISTS idx_bounce_log_received_at ON bounce_log(received_at DESC)",
         "CREATE INDEX IF NOT EXISTS idx_bounce_log_message_id ON bounce_log(original_message_id)",
         "ALTER TABLE domain_configs ADD COLUMN catch_all_mailbox TEXT DEFAULT NULL",
+        "ALTER TABLE mailboxes ADD COLUMN last_quota_warning_at TEXT DEFAULT NULL",
+        "ALTER TABLE domain_configs ADD COLUMN grace_buffer_bytes INTEGER DEFAULT NULL",
+        "ALTER TABLE messages ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0",
     ]:
         try:
             conn.execute(sql)

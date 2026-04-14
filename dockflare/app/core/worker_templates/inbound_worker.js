@@ -39,6 +39,24 @@ export default {
         return;
       }
 
+      // Check quota KV before accepting — reject at SMTP level so sender gets a bounce
+      if (typeof env.QUOTA_KV !== 'undefined') {
+        try {
+          const quota = await env.QUOTA_KV.get(message.to, "json");
+          if (quota && quota.hard_limit_bytes > 0) {
+            const currentSize = quota.current_size_bytes || 0;
+            const msgSize = message.rawSize || 0;
+            if (currentSize + msgSize > quota.hard_limit_bytes) {
+              message.setReject("550 5.2.2 Mailbox full");
+              return;
+            }
+          }
+        } catch (kvErr) {
+          // KV unavailable — fall through, webhook safety net handles enforcement
+          console.warn(`KV quota check failed for ${message.to}: ${kvErr.message}`);
+        }
+      }
+
       const messageId = crypto.randomUUID();
       const r2Key = `temp_cache/${messageId}.eml`;
       const receivedAt = new Date().toISOString();

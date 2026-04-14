@@ -3,6 +3,7 @@ import hmac
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import logging
 import uuid
@@ -18,6 +19,16 @@ from app.core.bounce_handler import log_bounce
 
 log = logging.getLogger(__name__)
 webhook_bp = Blueprint('webhook', __name__)
+
+
+def _fmt_bytes(n):
+    if n >= 1073741824:
+        return f"{n / 1073741824:.1f} GB"
+    if n >= 1048576:
+        return f"{n / 1048576:.1f} MB"
+    if n >= 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n} B"
 
 
 def _detect_and_log_bounce(eml_bytes, parsed):
@@ -282,20 +293,95 @@ def inbound():
         _detect_and_log_bounce(eml_bytes, parsed)
 
         quota_row = db.execute(
-            "SELECT quota_bytes FROM mailboxes WHERE address=?", (to_address,)
+            """SELECT m.quota_bytes, m.last_quota_warning_at, d.grace_buffer_bytes
+               FROM mailboxes m
+               LEFT JOIN domain_configs d ON d.domain_name = m.domain
+               WHERE m.address = ?""",
+            (to_address,)
         ).fetchone()
+
         if quota_row and quota_row['quota_bytes'] and quota_row['quota_bytes'] > 0:
+            quota = quota_row['quota_bytes']
+            raw_buffer = quota_row['grace_buffer_bytes']
+            grace = raw_buffer if raw_buffer else max(int(quota * 0.15), 10 * 1024 * 1024)
+            hard_limit = quota + grace
+
             used = db.execute(
-                "SELECT COALESCE(SUM(size_bytes), 0) FROM messages WHERE mailbox_address=?",
+                "SELECT COALESCE(SUM(size_bytes), 0) FROM messages WHERE mailbox_address=? AND is_system=0",
                 (to_address,),
             ).fetchone()[0]
-            if used > quota_row['quota_bytes']:
+
+            if used > quota:
                 db.execute(
                     "UPDATE mailboxes SET quota_exceeded_count = quota_exceeded_count + 1 WHERE address=?",
                     (to_address,),
                 )
+                log.warning("Quota exceeded for %s: %s used / %s limit", to_address, _fmt_bytes(used), _fmt_bytes(quota))
+
+                if not quota_row['last_quota_warning_at']:
+                    inbox = db.execute(
+                        "SELECT id FROM folders WHERE mailbox_address=? AND name='Inbox'",
+                        (to_address,)
+                    ).fetchone()
+                    if inbox:
+                        db.execute("""
+                            INSERT INTO messages (
+                                message_id, mailbox_address, folder_id,
+                                from_address, from_name, to_addresses,
+                                cc_addresses, bcc_addresses, subject,
+                                text_body, html_body, received_at,
+                                is_read, is_starred, is_draft,
+                                in_reply_to, reference_ids, size_bytes,
+                                has_attachments, headers_json, created_at, is_system
+                            ) VALUES (?, ?, ?, 'noreply@dockflare', 'DockFlare System', ?,
+                                '[]', '[]',
+                                'Action Required: Your mailbox is nearly full',
+                                ?, '', ?, 0, 0, 0, NULL, NULL, 0, 0, '{}', ?, 1)
+                        """, (
+                            f"quota-warning-{to_address}-{now}",
+                            to_address,
+                            inbox['id'],
+                            f'["{to_address}"]',
+                            (
+                                f"Your mailbox ({to_address}) has reached its storage quota "
+                                f"({_fmt_bytes(quota)}). You have a grace buffer of "
+                                f"{_fmt_bytes(grace)} before new emails are rejected.\n\n"
+                                f"Current usage: {_fmt_bytes(used)}\n"
+                                f"Soft limit:    {_fmt_bytes(quota)}\n"
+                                f"Hard limit:    {_fmt_bytes(hard_limit)}\n\n"
+                                f"Please delete old messages or contact your administrator "
+                                f"to increase your quota."
+                            ),
+                            now, now,
+                        ))
+                    db.execute(
+                        "UPDATE mailboxes SET last_quota_warning_at=? WHERE address=?",
+                        (now, to_address)
+                    )
+
+            elif used < quota * 0.90 and quota_row['last_quota_warning_at']:
+                db.execute(
+                    "UPDATE mailboxes SET last_quota_warning_at=NULL WHERE address=?",
+                    (to_address,)
+                )
+
+            db.commit()
+
+            if used > hard_limit:
+                att_dir = os.path.join(config.ATTACHMENTS_PATH, str(msg_id))
+                if os.path.isdir(att_dir):
+                    shutil.rmtree(att_dir, ignore_errors=True)
+                db.execute("DELETE FROM messages WHERE id=?", (msg_id,))
                 db.commit()
-                log.warning("Quota exceeded for %s: %d bytes used / %d bytes limit", to_address, used, quota_row['quota_bytes'])
+                log.warning(
+                    "Hard quota exceeded for %s: %s used / %s hard limit — message %d rejected",
+                    to_address, _fmt_bytes(used), _fmt_bytes(hard_limit), msg_id
+                )
+                try:
+                    delete_from_r2(r2_key, domain_cfg)
+                except Exception:
+                    pass
+                return jsonify({"status": "rejected", "reason": "over_hard_quota"}), 200
 
         send_push_notifications(to_address, {
             'message_id': msg_id,
@@ -304,6 +390,27 @@ def inbound():
             'mailbox': to_address,
         })
         _check_and_send_auto_reply(db, to_address, parsed, domain_cfg)
+
+        master_url = os.environ.get('DOCKFLARE_MASTER_URL', '').rstrip('/')
+        if master_url:
+            try:
+                current_size = db.execute(
+                    "SELECT COALESCE(SUM(size_bytes),0) FROM messages WHERE mailbox_address=? AND is_system=0",
+                    (to_address,)
+                ).fetchone()[0]
+                _http_requests.post(
+                    f"{master_url}/email/internal/quota-kv-sync",
+                    json={
+                        'domain': to_address.split('@')[1],
+                        'address': to_address,
+                        'current_size_bytes': int(current_size),
+                    },
+                    headers={'X-Bootstrap-Token': os.environ.get('INTERNAL_BOOTSTRAP_SECRET', '')},
+                    timeout=3,
+                )
+            except Exception:
+                pass
+
         delete_from_r2(r2_key, domain_cfg)
 
         log.info("Inbound delivered: message=%s to=%s db_id=%s",

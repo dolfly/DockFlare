@@ -132,6 +132,14 @@ def setup_email_domain():
         webmail_hostname = f"mail.{zone_name}"
         webhook_url = f"https://{webmail_hostname}/api/v1/webhook/inbound"
 
+        quota_kv_ns_id = None
+        try:
+            quota_kv_ns_id = email_manager.create_kv_namespace(
+                f"dockflare-quota-{zone_name.replace('.', '-')}"
+            )
+        except Exception as e:
+            logging.warning(f"Could not create quota KV namespace for {zone_name}: {e}")
+
         inbound_bindings = [
             {"type": "r2_bucket", "name": "EMAIL_BUCKET", "bucket_name": bucket_name},
             {"type": "plain_text", "name": "WEBHOOK_URL", "text": webhook_url},
@@ -139,6 +147,10 @@ def setup_email_domain():
             {"type": "plain_text", "name": "ALLOWED_RECIPIENTS", "text": "[]"},
             {"type": "plain_text", "name": "DOMAIN_NAME", "text": zone_name}
         ]
+        if quota_kv_ns_id:
+            inbound_bindings.append(
+                {"type": "kv_namespace", "name": "QUOTA_KV", "namespace_id": quota_kv_ns_id}
+            )
 
         email_manager.deploy_worker(inbound_worker_name, _read_worker_template('inbound_worker.js'), inbound_bindings)
         email_manager.set_worker_cron(inbound_worker_name, ['*/5 * * * *'])
@@ -166,6 +178,7 @@ def setup_email_domain():
             'outbound_worker_name': outbound_worker_name,
             'outbound_worker_url': outbound_worker_url,
             'outbound_auth_secret': outbound_auth_secret,
+            'quota_kv_namespace_id': quota_kv_ns_id,
             'mailboxes': {}
         }
 
@@ -370,6 +383,19 @@ def _redeploy_inbound_worker(email_cfg, domain):
     all_addresses = list(d['mailboxes'].keys())
     webmail_hostname = f"mail.{domain}"
     webhook_url = f"https://{webmail_hostname}/api/v1/webhook/inbound"
+
+    kv_ns_id = d.get('quota_kv_namespace_id')
+    if not kv_ns_id:
+        try:
+            kv_ns_id = email_manager.create_kv_namespace(
+                f"dockflare-quota-{domain.replace('.', '-')}"
+            )
+            email_cfg['domains'][domain]['quota_kv_namespace_id'] = kv_ns_id
+            save_email_config(email_cfg)
+            logging.info(f"Created quota KV namespace for existing domain {domain}: {kv_ns_id}")
+        except Exception as e:
+            logging.warning(f"Could not create quota KV namespace for {domain}: {e}")
+
     inbound_bindings = [
         {"type": "r2_bucket", "name": "EMAIL_BUCKET", "bucket_name": d['r2_bucket']},
         {"type": "plain_text", "name": "WEBHOOK_URL", "text": webhook_url},
@@ -377,6 +403,11 @@ def _redeploy_inbound_worker(email_cfg, domain):
         {"type": "plain_text", "name": "ALLOWED_RECIPIENTS", "text": json.dumps(all_addresses)},
         {"type": "plain_text", "name": "DOMAIN_NAME", "text": domain}
     ]
+    if kv_ns_id:
+        inbound_bindings.append(
+            {"type": "kv_namespace", "name": "QUOTA_KV", "namespace_id": kv_ns_id}
+        )
+
     email_manager.deploy_worker(d['inbound_worker_name'], _read_worker_template('inbound_worker.js'), inbound_bindings)
     email_manager.set_worker_cron(d['inbound_worker_name'], ['*/5 * * * *'])
 
@@ -464,6 +495,31 @@ def set_mailbox_quota():
             )
         except Exception:
             pass
+
+    kv_ns_id = email_cfg['domains'][domain].get('quota_kv_namespace_id')
+    if kv_ns_id and quota_bytes and quota_bytes > 0 and token:
+        try:
+            current_size = 0
+            mb_resp = requests.get(
+                f"{config.MAIL_MANAGER_INTERNAL_URL}/api/v1/mailboxes",
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=5,
+            )
+            if mb_resp.ok:
+                for mb in mb_resp.json():
+                    if mb.get('address') == address:
+                        current_size = mb.get('storage_bytes', 0)
+                        break
+            grace = max(int(quota_bytes * 0.15), 10 * 1024 * 1024)
+            email_manager.update_kv_entry(kv_ns_id, address, {
+                "hard_limit_bytes": quota_bytes + grace,
+                "current_size_bytes": current_size,
+            })
+        except Exception as e:
+            logging.warning(f"Could not update quota KV for {address}: {e}")
+    elif kv_ns_id and quota_bytes == 0:
+        email_manager.delete_kv_entry(kv_ns_id, address)
+
     return jsonify({'success': True})
 
 @email_bp.route('/mailbox-stats', methods=['GET'])
@@ -1074,6 +1130,7 @@ def internal_mail_config():
             'webhook_secret': d.get('webhook_secret', ''),
             'outbound_worker_url': d.get('outbound_worker_url', ''),
             'outbound_auth_secret': d.get('outbound_auth_secret', ''),
+            'quota_kv_namespace_id': d.get('quota_kv_namespace_id', ''),
             'mailboxes': {
                 addr: {'display_name': m.get('display_name', ''), 'quota_bytes': m.get('quota_bytes', 10737418240)}
                 for addr, m in d.get('mailboxes', {}).items()
@@ -1089,6 +1146,38 @@ def internal_mail_config():
         'vapid_public_key': cfg.get('vapid_public_key', ''),
         'domains': domains_out
     })
+
+@email_bp.route('/internal/quota-kv-sync', methods=['POST'])
+def quota_kv_sync():
+    if not _check_internal_request():
+        return jsonify({'error': 'forbidden'}), 403
+    data = request.get_json(force=True, silent=True) or {}
+    domain = data.get('domain')
+    address = data.get('address')
+    current_size_bytes = data.get('current_size_bytes', 0)
+    if not domain or not address:
+        return jsonify({'error': 'missing domain or address'}), 400
+    cfg = config.EMAIL_CONFIG
+    if not cfg or domain not in cfg.get('domains', {}):
+        return jsonify({'status': 'domain_not_found'}), 200
+    d = cfg['domains'][domain]
+    kv_ns_id = d.get('quota_kv_namespace_id')
+    if not kv_ns_id:
+        return jsonify({'status': 'no_kv'}), 200
+    quota_bytes = d.get('mailboxes', {}).get(address, {}).get('quota_bytes', 0)
+    if not quota_bytes or quota_bytes <= 0:
+        return jsonify({'status': 'unlimited'}), 200
+    grace = max(int(quota_bytes * 0.15), 10 * 1024 * 1024)
+    try:
+        email_manager.update_kv_entry(kv_ns_id, address, {
+            "hard_limit_bytes": quota_bytes + grace,
+            "current_size_bytes": current_size_bytes,
+        })
+    except Exception as e:
+        logging.warning(f"quota-kv-sync failed for {address}: {e}")
+        return jsonify({'error': str(e)}), 500
+    return jsonify({'status': 'ok'})
+
 
 def _restart_mail_container():
     try:

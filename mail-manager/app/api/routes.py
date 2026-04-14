@@ -170,7 +170,7 @@ def get_mailboxes():
     """).fetchall()}
     storage = {r['mailbox_address']: r['bytes'] for r in db.execute("""
         SELECT mailbox_address, COALESCE(SUM(size_bytes), 0) as bytes
-        FROM messages GROUP BY mailbox_address
+        FROM messages WHERE is_system=0 GROUP BY mailbox_address
     """).fetchall()}
     sent = {r['from_address']: r['cnt'] for r in db.execute("""
         SELECT from_address, COUNT(*) as cnt FROM send_log
@@ -244,7 +244,10 @@ def update_mailbox(address):
     if not db.execute("SELECT 1 FROM mailboxes WHERE address=?", (address,)).fetchone():
         return jsonify({"error": "not found"}), 404
     if 'quota_bytes' in data:
-        db.execute("UPDATE mailboxes SET quota_bytes=?, quota_exceeded_count=0 WHERE address=?", (data['quota_bytes'], address))
+        db.execute(
+            "UPDATE mailboxes SET quota_bytes=?, quota_exceeded_count=0, last_quota_warning_at=NULL WHERE address=?",
+            (data['quota_bytes'], address)
+        )
     if 'display_name' in data:
         db.execute("UPDATE mailboxes SET display_name=? WHERE address=?", (data['display_name'], address))
     db.commit()
