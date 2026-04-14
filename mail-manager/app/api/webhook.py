@@ -230,6 +230,12 @@ def inbound():
 
         now = datetime.now(timezone.utc).isoformat()
 
+        actual_size = sum(len(att['data']) for att in parsed['attachments'])
+        if parsed.get('text_body'):
+            actual_size += len(parsed['text_body'].encode('utf-8'))
+        if parsed.get('html_body'):
+            actual_size += len(parsed['html_body'].encode('utf-8'))
+
         cur = db.execute("""
             INSERT INTO messages (
                 message_id, mailbox_address, folder_id, from_address, from_name,
@@ -246,7 +252,7 @@ def inbound():
             json.dumps(parsed['bcc_addresses']),
             parsed['subject'], parsed['text_body'], parsed['html_body'],
             parsed['received_at'], parsed['in_reply_to'],
-            parsed['references'], data.get('size_bytes', 0),
+            parsed['references'], actual_size,
             1 if parsed['attachments'] else 0,
             json.dumps(parsed['headers_json']), now,
         ))
