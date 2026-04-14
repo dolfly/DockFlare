@@ -2296,6 +2296,11 @@ def login():
         p for p in current_app.config.get('OAUTH_PROVIDERS', []) if p.get('enabled', True)
     ]
 
+    from .email_routes import _get_webmail_hostname
+    webmail_hostname = _get_webmail_hostname()
+    webmail_available = bool(webmail_hostname)
+    webmail_url = f"https://{webmail_hostname}" if webmail_available else url_for('email.sso_callback')
+
     return render_template(
         'login.html',
         title="Login",
@@ -2303,7 +2308,8 @@ def login():
         password_login_enabled=password_login_enabled,
         oauth_providers=oauth_providers,
         email_enabled=current_app.config.get('EMAIL_ENABLED', False),
-        webmail_url=url_for('email.sso_callback')
+        webmail_url=webmail_url,
+        webmail_available=webmail_available
     )
 
 @bp.route('/login/<provider_id>')
