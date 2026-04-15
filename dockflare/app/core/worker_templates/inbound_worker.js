@@ -33,10 +33,19 @@ export default {
   // ── Inbound email handler ──────────────────────────────────────────────────-.--...--
   async email(message, env, ctx) {
     try {
-      const allowedRecipients = JSON.parse(env.ALLOWED_RECIPIENTS || '[]');
-      if (!allowedRecipients.includes(message.to)) {
-        message.setReject("Recipient not allowed");
-        return;
+      const catchAllEnabled = env.CATCH_ALL_ENABLED === 'true';
+      if (catchAllEnabled) {
+        const domain = (env.DOMAIN_NAME || '').toLowerCase();
+        if (!message.to.toLowerCase().endsWith('@' + domain)) {
+          message.setReject("Recipient not allowed");
+          return;
+        }
+      } else {
+        const allowedRecipients = JSON.parse(env.ALLOWED_RECIPIENTS || '[]');
+        if (!allowedRecipients.includes(message.to)) {
+          message.setReject("Recipient not allowed");
+          return;
+        }
       }
 
       // Check quota KV before accepting — reject at SMTP level so sender gets a bounce

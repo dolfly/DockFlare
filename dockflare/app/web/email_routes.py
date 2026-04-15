@@ -396,12 +396,16 @@ def _redeploy_inbound_worker(email_cfg, domain):
         except Exception as e:
             logging.warning(f"Could not create quota KV namespace for {domain}: {e}")
 
+    catch_all_address = d.get('catch_all_address', '')
+    catch_all_enabled = 'true' if catch_all_address else 'false'
+
     inbound_bindings = [
         {"type": "r2_bucket", "name": "EMAIL_BUCKET", "bucket_name": d['r2_bucket']},
         {"type": "plain_text", "name": "WEBHOOK_URL", "text": webhook_url},
         {"type": "secret_text", "name": "WEBHOOK_SECRET", "text": d['webhook_secret']},
         {"type": "plain_text", "name": "ALLOWED_RECIPIENTS", "text": json.dumps(all_addresses)},
-        {"type": "plain_text", "name": "DOMAIN_NAME", "text": domain}
+        {"type": "plain_text", "name": "DOMAIN_NAME", "text": domain},
+        {"type": "plain_text", "name": "CATCH_ALL_ENABLED", "text": catch_all_enabled}
     ]
     if kv_ns_id:
         inbound_bindings.append(
@@ -832,6 +836,13 @@ def catch_all_enable():
             headers={'Authorization': f'Bearer {token}'},
             timeout=5,
         )
+        if resp.ok:
+            email_cfg['domains'][domain]['catch_all_address'] = target
+            save_email_config(email_cfg)
+            try:
+                _redeploy_inbound_worker(email_cfg, domain)
+            except Exception as e:
+                logging.warning(f"catch_all_enable: worker redeploy failed: {e}")
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
         return jsonify({'error': str(e)}), 502
@@ -852,6 +863,15 @@ def catch_all_disable():
             headers={'Authorization': f'Bearer {token}'},
             timeout=5,
         )
+        if resp.ok:
+            email_cfg = config.EMAIL_CONFIG
+            if domain in email_cfg.get('domains', {}):
+                email_cfg['domains'][domain].pop('catch_all_address', None)
+                save_email_config(email_cfg)
+                try:
+                    _redeploy_inbound_worker(email_cfg, domain)
+                except Exception as e:
+                    logging.warning(f"catch_all_disable: worker redeploy failed: {e}")
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
         return jsonify({'error': str(e)}), 502
