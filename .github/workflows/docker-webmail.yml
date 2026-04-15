@@ -1,5 +1,5 @@
-# .github/workflows/docker-image.yml
-name: Docker Image - DockFlare
+# .github/workflows/docker-webmail.yml
+name: Docker Image - Webmail
 
 on:
   push:
@@ -12,7 +12,7 @@ on:
       - "v*.*.*"
       - "v*.*.*-*"
     paths:
-      - "dockflare/**"
+      - "webmail/**"
   pull_request:
     branches:
       - "stable"
@@ -20,7 +20,7 @@ on:
       - "dev"
       - "dockflare-mail"
     paths:
-      - "dockflare/**"
+      - "webmail/**"
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -57,7 +57,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: alplat/dockflare
+          images: alplat/dockflare-webmail
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{version}},suffix=-{{premajor}}-{{prerelease}}
@@ -73,7 +73,7 @@ jobs:
         id: build_and_push
         uses: docker/build-push-action@v5
         with:
-          context: ./dockflare
+          context: ./webmail
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -107,7 +107,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: alplat/dockflare
+          images: alplat/dockflare-webmail
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{version}},suffix=-{{premajor}}-{{prerelease}}
@@ -123,7 +123,7 @@ jobs:
         id: build_and_push
         uses: docker/build-push-action@v5
         with:
-          context: ./dockflare
+          context: ./webmail
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
