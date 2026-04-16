@@ -33,15 +33,15 @@ services:
 
   dockflare:
     #build: ./dockflare
-    image: alplat/dockflare:unstable
+    image: alplat/dockflare:stable
     container_name: dockflare
     restart: unless-stopped
     ports:
-      - "5001:5000"
+      - "5000:5000"
     labels: # -- Cloudflare Tunnel Configuration (via DockFlare) OPTIONAL --
       # Main DockFlare with access policy
       - dockflare.enable=true
-      - dockflare.hostname=unstable.dockflare.app
+      - dockflare.hostname=dockflare.TLD  # replace with your domain
       - dockflare.service=http://dockflare:5000
       #- dockflare.access.group=YOUR-ACCESS-GROUP-ID  # your custom access policy
       # -- OAuth Callback Path (Bypass Access Policy) OPTIONAL --
@@ -88,7 +88,7 @@ services:
 
   dockflare-mail-manager:
     #build: ./mail-manager
-    image: alplat/dockflare-mail-manager:unstable
+    image: alplat/dockflare-mail-manager:stable
     container_name: dockflare-mail-manager
     restart: unless-stopped
     profiles: ["email"]
@@ -106,15 +106,15 @@ services:
 
   dockflare-webmail:
     #build: ./webmail
-    image: alplat/dockflare-webmail:unstable
+    image: alplat/dockflare-webmail:stable
     container_name: dockflare-webmail
     restart: unless-stopped
     profiles: ["email"]
     environment:
-      - DOCKFLARE_MASTER_URL=https://unstable.dockflare.app
+      - DOCKFLARE_MASTER_URL=https://dockflare.TLD  # replace with your domain
     labels:
       - dockflare.enable=true
-      - dockflare.hostname=mail.dockflare.app  # replace with your domain
+      - dockflare.hostname=mail.dockflare.TLD  # replace with your domain
       - dockflare.service=http://dockflare-webmail:80
     depends_on:
       dockflare-mail-manager:

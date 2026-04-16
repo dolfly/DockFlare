@@ -58,11 +58,19 @@ def save_email_config(email_config_data):
         logging.error(f"Failed to save email config: {e}")
         return False
 
+def _get_mail_manager_state():
+    try:
+        container = docker_client.containers.get('dockflare-mail-manager')
+        return 'running' if container.status == 'running' else 'stopped'
+    except Exception:
+        return 'missing'
+
 @email_bp.route('', methods=['GET'])
 @login_required
 def email_page():
     zones = list_account_zones() or []
-    return render_template('email.html', zones=zones, email_config=config.EMAIL_CONFIG, email_enabled=config.EMAIL_ENABLED)
+    mail_manager_state = _get_mail_manager_state()
+    return render_template('email.html', zones=zones, email_config=config.EMAIL_CONFIG, email_enabled=config.EMAIL_ENABLED, mail_manager_state=mail_manager_state)
 
 @email_bp.route('/setup-domain', methods=['POST'])
 @login_required

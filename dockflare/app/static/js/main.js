@@ -2083,7 +2083,8 @@ async function emailCheckPermissions() {
             document.getElementById('permWorkers').innerText = p.workers ? '✅' : '❌';
             const r2Label = p.r2 ? '✅' : (p.r2_note ? '❌ ' + p.r2_note : '❌');
             document.getElementById('permR2').innerText = r2Label;
-            const allGranted = p.email_routing && p.workers && p.r2;
+            document.getElementById('permKv').innerText = p.workers_kv ? '✅' : '❌';
+            const allGranted = p.email_routing && p.workers && p.r2 && p.workers_kv;
             const banner = document.getElementById('emailPermissionsBanner');
             if (banner) {
                 banner.classList.toggle('hidden', allGranted);

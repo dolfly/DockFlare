@@ -11,7 +11,8 @@ def check_token_permissions():
         perms = {
             "email_routing": False,
             "workers": False,
-            "r2": False
+            "r2": False,
+            "workers_kv": False
         }
         token = getattr(config, 'CF_API_TOKEN', '') or ''
         if token.startswith('cfat_'):
@@ -37,10 +38,15 @@ def check_token_permissions():
             perms["r2"] = False
             if '10042' in str(e):
                 perms["r2_note"] = "R2 must be enabled in the Cloudflare Dashboard before use"
+        try:
+            cf_api_request('GET', f'/accounts/{config.CF_ACCOUNT_ID}/storage/kv/namespaces?per_page=1')
+            perms["workers_kv"] = True
+        except Exception:
+            perms["workers_kv"] = False
         return perms
     except Exception as e:
         logging.error(f"Error checking token permissions: {e}")
-        return {"email_routing": False, "workers": False, "r2": False}
+        return {"email_routing": False, "workers": False, "r2": False, "workers_kv": False}
 
 def enable_email_routing(zone_id):
     try:
