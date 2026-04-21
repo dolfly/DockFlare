@@ -60,6 +60,20 @@ def enable_email_routing(zone_id):
         logging.error(f"Error enabling email routing: {e}")
         raise
 
+def enable_email_sending(zone_id, zone_name):
+    try:
+        subdomain = f"mail.{zone_name}"
+        res = cf_api_request('POST', f'/zones/{zone_id}/email/sending/subdomains', data={"name": subdomain})
+        logging.info(f"Email sending enabled for {zone_name} (subdomain: {subdomain})")
+        return res
+    except Exception as e:
+        err_str = str(e)
+        if 'already exists' in err_str.lower() or '2004' in err_str or 'duplicate' in err_str.lower():
+            logging.info(f"Email sending subdomain already exists for {zone_name}, continuing")
+            return {}
+        logging.warning(f"Could not enable email sending for {zone_name} (may require manual activation in CF Dashboard): {e}")
+        return None
+
 def get_email_routing_status(zone_id):
     try:
         res = cf_api_request('GET', f'/zones/{zone_id}/email/routing')
@@ -176,11 +190,13 @@ def create_r2_bucket(bucket_name):
         raise
 
 def get_r2_s3_credentials():
+    import hashlib
     token_verify = cf_api_request('GET', f'/accounts/{config.CF_ACCOUNT_ID}/tokens/verify')
     token_id = token_verify.get('result', {}).get('id', '')
+    secret = hashlib.sha256(config.CF_API_TOKEN.encode()).hexdigest()
     return {
         'access_key_id': token_id,
-        'secret_access_key': config.CF_API_TOKEN,
+        'secret_access_key': secret,
         'endpoint_url': f"https://{config.CF_ACCOUNT_ID}.r2.cloudflarestorage.com"
     }
 

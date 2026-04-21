@@ -2496,9 +2496,9 @@ async function emailVerifyDns(domain, event) {
 }
 
 async function emailUpdateR2(domain, event) {
-    const accessKeyId = prompt('R2 Access Key ID (from CF Dashboard → R2 → Manage R2 API Tokens):');
+    const accessKeyId = await dfPrompt('R2 Access Key ID (from CF Dashboard → R2 → Manage R2 API Tokens):', '', 'R2 Access Key ID');
     if (!accessKeyId) return;
-    const secretAccessKey = prompt('R2 Secret Access Key:');
+    const secretAccessKey = await dfPrompt('R2 Secret Access Key:', '', 'R2 Secret Access Key');
     if (!secretAccessKey) return;
     const btn = event?.currentTarget;
     const originalHTML = btn?.innerHTML;

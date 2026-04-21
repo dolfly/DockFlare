@@ -104,6 +104,7 @@ def wipe_domain():
         for row in rows:
             shutil.rmtree(os.path.join(config.ATTACHMENTS_PATH, str(row['id'])), ignore_errors=True)
         conn.execute("DELETE FROM mailboxes WHERE address LIKE ?", (f'%@{domain}',))
+        conn.execute("DELETE FROM domain_configs WHERE domain_name=?", (domain,))
         conn.commit()
         conn.close()
         def _vacuum():
@@ -131,6 +132,7 @@ def wipe_all():
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("DELETE FROM mailboxes")
+        conn.execute("DELETE FROM domain_configs")
         conn.commit()
         conn.close()
         def _vacuum():
