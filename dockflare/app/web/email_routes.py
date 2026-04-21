@@ -137,7 +137,7 @@ def setup_email_domain():
         outbound_auth_secret = secrets.token_hex(32)
         inbound_worker_name = f"dockflare-mail-inbound-{zone_name.replace('.', '-')}"
         outbound_worker_name = f"dockflare-mail-outbound-{zone_name.replace('.', '-')}"
-        webmail_hostname = f"mail.{zone_name}"
+        webmail_hostname = _get_webmail_hostname() or f"mail.{zone_name}"
         webhook_url = f"https://{webmail_hostname}/api/v1/webhook/inbound"
 
         quota_kv_ns_id = None
@@ -163,6 +163,11 @@ def setup_email_domain():
         email_manager.deploy_worker(inbound_worker_name, _read_worker_template('inbound_worker.js'), inbound_bindings)
         email_manager.set_worker_cron(inbound_worker_name, ['*/5 * * * *'])
         email_manager.setup_catchall_routing_rule(zone_id, inbound_worker_name)
+
+        try:
+            email_manager.enable_email_sending(zone_id, zone_name)
+        except Exception as sending_err:
+            logging.warning(f"Could not enable email sending for {zone_name} (may need manual enable in CF Dashboard): {sending_err}")
 
         outbound_bindings = [
             {"type": "send_email", "name": "SEND_EMAIL"},
@@ -389,7 +394,7 @@ def _redeploy_outbound_worker(email_cfg, domain):
 def _redeploy_inbound_worker(email_cfg, domain):
     d = email_cfg['domains'][domain]
     all_addresses = list(d['mailboxes'].keys())
-    webmail_hostname = f"mail.{domain}"
+    webmail_hostname = _get_webmail_hostname() or f"mail.{domain}"
     webhook_url = f"https://{webmail_hostname}/api/v1/webhook/inbound"
 
     kv_ns_id = d.get('quota_kv_namespace_id')
