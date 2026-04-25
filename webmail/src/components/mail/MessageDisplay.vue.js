@@ -332,6 +332,10 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['df-reply-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['df-reply-wrapper']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "flex h-full flex-col" },
     id: "print-message-area",
@@ -1242,18 +1246,21 @@ if (__VLS_ctx.message) {
         ...{ onSubmit: (__VLS_ctx.sendInlineReply) },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "grid gap-4" },
+        ...{ class: "grid gap-3" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "df-reply-wrapper rounded-2xl p-3" },
     });
     /** @type {[typeof Textarea, ]} */ ;
     // @ts-ignore
     const __VLS_305 = __VLS_asFunctionalComponent(Textarea, new Textarea({
         modelValue: (__VLS_ctx.replyText),
-        ...{ class: "p-4 min-h-[100px]" },
+        ...{ class: "p-2 min-h-[80px] bg-transparent border-0 shadow-none focus-visible:ring-0" },
         placeholder: (`Reply ${__VLS_ctx.message.from_name || __VLS_ctx.message.from_address}...`),
     }));
     const __VLS_306 = __VLS_305({
         modelValue: (__VLS_ctx.replyText),
-        ...{ class: "p-4 min-h-[100px]" },
+        ...{ class: "p-2 min-h-[80px] bg-transparent border-0 shadow-none focus-visible:ring-0" },
         placeholder: (`Reply ${__VLS_ctx.message.from_name || __VLS_ctx.message.from_address}...`),
     }, ...__VLS_functionalComponentArgsRest(__VLS_305));
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
@@ -1513,9 +1520,16 @@ else {
 /** @type {__VLS_StyleScopedClasses['p-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['print-hide']} */ ;
 /** @type {__VLS_StyleScopedClasses['grid']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['p-4']} */ ;
-/** @type {__VLS_StyleScopedClasses['min-h-[100px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['df-reply-wrapper']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-2xl']} */ ;
+/** @type {__VLS_StyleScopedClasses['p-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['p-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['min-h-[80px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-transparent']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['shadow-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus-visible:ring-0']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['ml-auto']} */ ;

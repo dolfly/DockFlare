@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ArrowDownUp, Trash2 } from 'lucide-vue-next'
+
+const props = defineProps({
+  hideTitle: { type: Boolean, default: false },
+})
 import {
   TabsRoot, TabsList, TabsTrigger, TabsContent,
 } from 'radix-vue'
@@ -86,47 +90,44 @@ const performEmptyTrash = async () => {
 
 <template>
   <TabsRoot v-model="store.activeTab" class="flex h-full flex-col">
-    <div class="h-[52px] flex items-center px-4 flex-shrink-0">
-      <h1 class="text-xl font-bold">{{ store.currentFolder || 'Inbox' }}</h1>
-      <div class="ml-auto flex items-center gap-1">
+    <div class="flex items-center px-4 flex-shrink-0" :class="hideTitle ? 'h-[44px]' : 'h-[52px]'">
+      <h1 v-if="!hideTitle" class="text-xl font-bold">{{ store.currentFolder || 'Inbox' }}</h1>
+      <div class="flex items-center gap-1" :class="hideTitle ? 'w-full justify-between' : 'ml-auto'">
         <button
           v-if="store.currentFolder === 'Trash' && store.messages.length > 0"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
           title="Empty Trash"
           @click="emptyTrash"
         >
           <Trash2 class="size-4" />
         </button>
         <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
           :title="store.sortOrder === 'desc' ? 'Oldest first' : 'Newest first'"
           @click="toggleSort"
         >
           <ArrowDownUp class="size-4" :class="store.sortOrder === 'asc' ? 'rotate-180' : ''" />
         </button>
-        <TabsList class="inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground">
+        <TabsList class="inline-flex h-9 items-center gap-1 bg-transparent">
           <TabsTrigger
             value="all"
-            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
-          >
-            All
-          </TabsTrigger>
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-full py-1.5 px-3 text-sm font-medium transition-all data-[state=active]:font-semibold data-[state=inactive]:text-muted-foreground focus-visible:outline-none min-h-[36px]"
+            :style="store.activeTab === 'all' ? 'background: rgba(251,166,18,0.12); color: #FBA612;' : ''"
+          >All</TabsTrigger>
           <TabsTrigger
             value="unread"
-            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
-          >
-            Unread
-          </TabsTrigger>
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-full py-1.5 px-3 text-sm font-medium transition-all data-[state=active]:font-semibold data-[state=inactive]:text-muted-foreground focus-visible:outline-none min-h-[36px]"
+            :style="store.activeTab === 'unread' ? 'background: rgba(251,166,18,0.12); color: #FBA612;' : ''"
+          >Unread</TabsTrigger>
           <TabsTrigger
             value="starred"
-            class="inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow"
-          >
-            Starred
-          </TabsTrigger>
+            class="inline-flex items-center justify-center whitespace-nowrap rounded-full py-1.5 px-3 text-sm font-medium transition-all data-[state=active]:font-semibold data-[state=inactive]:text-muted-foreground focus-visible:outline-none min-h-[36px]"
+            :style="store.activeTab === 'starred' ? 'background: rgba(251,166,18,0.12); color: #FBA612;' : ''"
+          >Starred</TabsTrigger>
         </TabsList>
       </div>
     </div>
-    <div class="bg-background/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div class="px-[10px] pb-2">
       <SearchBar />
     </div>
 

@@ -36,10 +36,12 @@ if (__VLS_ctx.store.isSettingsOpen) {
                     return;
                 __VLS_ctx.store.isSettingsOpen = false;
             } },
-        ...{ class: "fixed inset-0 z-50 flex items-center justify-center bg-black/50" },
+        ...{ class: "fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm" },
+        ...{ style: {} },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "relative w-full max-w-5xl rounded-xl border bg-background shadow-xl mx-4 max-h-[90vh] overflow-y-auto" },
+        ...{ class: "df-settings-dialog relative w-full max-w-5xl mx-4 max-h-[90vh] overflow-y-auto" },
+        ...{ style: {} },
     });
     __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
         ...{ onClick: (...[$event]) => {
@@ -71,14 +73,11 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['justify-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-black/50']} */ ;
+/** @type {__VLS_StyleScopedClasses['backdrop-blur-sm']} */ ;
+/** @type {__VLS_StyleScopedClasses['df-settings-dialog']} */ ;
 /** @type {__VLS_StyleScopedClasses['relative']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['max-w-5xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['rounded-xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['border']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-background']} */ ;
-/** @type {__VLS_StyleScopedClasses['shadow-xl']} */ ;
 /** @type {__VLS_StyleScopedClasses['mx-4']} */ ;
 /** @type {__VLS_StyleScopedClasses['max-h-[90vh]']} */ ;
 /** @type {__VLS_StyleScopedClasses['overflow-y-auto']} */ ;

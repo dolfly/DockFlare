@@ -545,12 +545,14 @@ const sendInlineReply = async () => {
 
       <div class="p-4 print-hide">
         <form @submit.prevent="sendInlineReply">
-          <div class="grid gap-4">
-            <Textarea
-              v-model="replyText"
-              class="p-4 min-h-[100px]"
-              :placeholder="`Reply ${message.from_name || message.from_address}...`"
-            />
+          <div class="grid gap-3">
+            <div class="df-reply-wrapper rounded-2xl p-3">
+              <Textarea
+                v-model="replyText"
+                class="p-2 min-h-[80px] bg-transparent border-0 shadow-none focus-visible:ring-0"
+                :placeholder="`Reply ${message.from_name || message.from_address}...`"
+              />
+            </div>
             <div class="flex items-center">
               <Button
                 type="submit"
@@ -571,3 +573,25 @@ const sendInlineReply = async () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.df-reply-wrapper {
+  background: rgba(255,255,255,0.6);
+  border: 1px solid rgba(0,0,0,0.07);
+  transition: box-shadow 0.14s;
+}
+.df-reply-wrapper:focus-within {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04), 0 0 0 2px rgba(251,166,18,0.18);
+}
+.df-reply-wrapper :deep(textarea) {
+  background: transparent !important;
+}
+:global(.dark) .df-reply-wrapper {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+}
+:global(.dark) .df-reply-wrapper :deep(textarea) {
+  color: hsl(210 40% 92%);
+  caret-color: hsl(210 40% 92%);
+}
+</style>

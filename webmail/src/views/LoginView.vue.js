@@ -55,19 +55,26 @@ const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex h-screen w-screen items-center justify-center bg-background" },
+    ...{ class: "flex h-screen w-screen items-center justify-center" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "w-full max-w-sm space-y-6 rounded-lg border p-8 shadow-sm" },
+    ...{ class: "w-full max-w-sm space-y-6 p-8" },
+    ...{ style: {} },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex flex-col space-y-2 text-center" },
+    ...{ class: "flex flex-col space-y-1 text-center" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.h1, __VLS_intrinsicElements.h1)({
-    ...{ class: "text-2xl font-semibold tracking-tight" },
+    ...{ class: "font-['Outfit'] font-extrabold text-[28px] tracking-[-0.02em] leading-none" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "text-[#194466] dark:text-[#5EB1E5]" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+    ...{ class: "text-[#FBA612]" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
-    ...{ class: "text-sm text-muted-foreground" },
+    ...{ class: "text-sm text-muted-foreground mt-1" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.form, __VLS_intrinsicElements.form)({
     ...{ onSubmit: (__VLS_ctx.handleLogin) },
@@ -77,14 +84,16 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     type: "email",
     placeholder: "you@example.com",
     required: true,
-    ...{ class: "input input-bordered w-full" },
+    ...{ class: "w-full rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[rgba(251,166,18,0.4)]" },
+    ...{ style: {} },
 });
 (__VLS_ctx.email);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.input)({
     type: "password",
     placeholder: "Password",
     required: true,
-    ...{ class: "input input-bordered w-full" },
+    ...{ class: "w-full rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[rgba(251,166,18,0.4)]" },
+    ...{ style: {} },
 });
 (__VLS_ctx.password);
 if (__VLS_ctx.error) {
@@ -145,30 +154,46 @@ var __VLS_5;
 /** @type {__VLS_StyleScopedClasses['w-screen']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['justify-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-background']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['max-w-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['space-y-6']} */ ;
-/** @type {__VLS_StyleScopedClasses['rounded-lg']} */ ;
-/** @type {__VLS_StyleScopedClasses['border']} */ ;
 /** @type {__VLS_StyleScopedClasses['p-8']} */ ;
-/** @type {__VLS_StyleScopedClasses['shadow-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
-/** @type {__VLS_StyleScopedClasses['space-y-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['space-y-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-center']} */ ;
-/** @type {__VLS_StyleScopedClasses['text-2xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['tracking-tight']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-[\'Outfit\']']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-extrabold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-[28px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['tracking-[-0.02em]']} */ ;
+/** @type {__VLS_StyleScopedClasses['leading-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-[#194466]']} */ ;
+/** @type {__VLS_StyleScopedClasses['dark:text-[#5EB1E5]']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-[#FBA612]']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-muted-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['mt-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['space-y-3']} */ ;
-/** @type {__VLS_StyleScopedClasses['input']} */ ;
-/** @type {__VLS_StyleScopedClasses['input-bordered']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
-/** @type {__VLS_StyleScopedClasses['input']} */ ;
-/** @type {__VLS_StyleScopedClasses['input-bordered']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-xl']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-muted-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-[rgba(251,166,18,0.4)]']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-xl']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['placeholder:text-muted-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:outline-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['focus:ring-[rgba(251,166,18,0.4)]']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-destructive']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-full']} */ ;

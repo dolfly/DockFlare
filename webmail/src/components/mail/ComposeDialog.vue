@@ -403,9 +403,9 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
   <div
     v-if="store.isComposeOpen && (effectivePanelMode || !store.isComposeFullView)"
     :class="effectivePanelMode
-      ? 'flex flex-col h-full w-full bg-background'
-      : 'fixed bottom-0 right-6 z-50 flex flex-col rounded-t-xl shadow-2xl border border-border bg-background'"
-    :style="!effectivePanelMode ? (minimized ? 'width:320px' : 'width:620px') : ''"
+      ? 'flex flex-col h-full w-full'
+      : 'df-compose-popup fixed bottom-4 right-6 z-50 flex flex-col'"
+    :style="!effectivePanelMode ? (minimized ? 'width:320px' : 'width:620px') : 'background: var(--df-pane-bg);'"
   >
     <!-- Panel mode title bar -->
     <div v-if="effectivePanelMode" class="h-[52px] flex items-center gap-2 px-4 border-b border-border flex-shrink-0">
@@ -419,15 +419,15 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
     </div>
 
     <!-- Popup mode title bar -->
-    <div v-else-if="!effectivePanelMode" class="flex items-center gap-2 rounded-t-xl bg-primary px-4 py-2.5 cursor-pointer select-none" @click="toggleMinimize">
-      <span class="flex-1 text-sm font-semibold text-primary-foreground truncate">{{ subject || 'New Message' }}</span>
-      <button type="button" class="rounded p-0.5 text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/10 transition-colors" title="Full view" @click.stop="toggleFullView">
+    <div v-else-if="!effectivePanelMode" class="flex items-center gap-2 px-4 py-3 cursor-pointer select-none flex-shrink-0" style="border-bottom: 1px solid rgba(128,128,128,0.1);" @click="toggleMinimize">
+      <span class="flex-1 text-sm font-semibold text-foreground truncate">{{ subject || 'New Message' }}</span>
+      <button type="button" class="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors" title="Full view" @click.stop="toggleFullView">
         <Maximize2 class="size-4" />
       </button>
-      <button type="button" class="rounded p-0.5 text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/10 transition-colors" title="Minimize" @click.stop="toggleMinimize">
+      <button type="button" class="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors" title="Minimize" @click.stop="toggleMinimize">
         <Minus class="size-4" />
       </button>
-      <button type="button" class="rounded p-0.5 text-primary-foreground/70 hover:text-primary-foreground hover:bg-white/10 transition-colors" title="Close" @click.stop="close">
+      <button type="button" class="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors" title="Close" @click.stop="close">
         <X class="size-4" />
       </button>
     </div>
@@ -454,7 +454,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
             <input
               v-model="toInput"
               placeholder="Add recipient…"
-              class="flex-1 min-w-[120px] bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none py-0.5"
+              class="flex-1 min-w-[120px] bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none py-0.5"
+              style="font-size: 16px;"
               @keydown="toHandlers.onKeydown"
               @blur="toHandlers.onBlur"
               @paste="toHandlers.onPaste"
@@ -513,14 +514,14 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
         <!-- From row (aliases) -->
         <div v-if="aliases.length" class="flex items-center border-b border-border">
           <span class="px-4 py-2 text-sm text-muted-foreground shrink-0">From</span>
-          <select v-model="fromAddress" class="flex-1 px-2 py-2 text-sm bg-background text-foreground focus:outline-none">
+          <select v-model="fromAddress" class="flex-1 px-2 py-2 bg-transparent text-foreground focus:outline-none" style="font-size: 16px;">
             <option :value="store.currentMailbox">{{ store.currentMailbox }}</option>
             <option v-for="alias in aliases" :key="alias" :value="alias">{{ alias }} (alias)</option>
           </select>
         </div>
 
         <!-- Subject -->
-        <input v-model="subject" placeholder="Subject" class="w-full px-4 py-2 text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none" />
+        <input v-model="subject" placeholder="Subject" class="w-full px-4 py-2 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none" style="font-size: 16px;" />
       </div>
 
       <!-- Editor -->
@@ -573,9 +574,9 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="flex items-center justify-between gap-2 border-t border-border px-4 py-2.5 flex-shrink-0 bg-background">
+      <div class="flex items-center justify-between gap-2 border-t border-border px-4 py-2.5 flex-shrink-0">
         <div class="flex items-center gap-1">
-          <Button as="button" type="button" size="sm" class="rounded-full px-5 font-semibold tracking-wide" @click.prevent="send" :disabled="sending || (!toTags.length && !toInput)">
+          <Button as="button" type="button" size="sm" class="rounded-full px-5 font-semibold tracking-wide" style="background: #FBA612; color: white; box-shadow: 0 2px 10px rgba(251,166,18,0.32); border: none;" @click.prevent="send" :disabled="sending || (!toTags.length && !toInput)">
             {{ sending ? 'Sending…' : 'Send' }}
           </Button>
           <button type="button" class="ml-1 rounded p-1.5 transition-colors" :class="savedDraft ? 'text-green-500' : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'" :disabled="savingDraft" title="Save draft" @click="saveDraft">
@@ -664,6 +665,22 @@ onUnmounted(() => document.removeEventListener('mousedown', onEmojiClickOutside)
   color: hsl(var(--primary));
   text-decoration: underline;
   cursor: pointer;
+}
+
+.df-compose-popup {
+  background: rgba(252, 254, 255, 0.90);
+  backdrop-filter: blur(32px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 22px;
+  box-shadow: 0 20px 52px rgba(0,0,0,0.13), 0 6px 18px rgba(0,0,0,0.07);
+}
+.dark .df-compose-popup {
+  background: rgba(12, 24, 52, 0.92);
+  border-color: rgba(255,255,255,0.10);
+}
+.dark .df-compose-popup select option {
+  background: #0f1e3a;
+  color: #e8edf5;
 }
 
 .compose-pop-enter-active { transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease; }

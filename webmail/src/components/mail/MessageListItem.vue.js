@@ -11,6 +11,10 @@ const props = defineProps({
     selected: { type: Boolean, default: false },
     folderColor: { type: String, default: '' },
 });
+const initials = computed(() => {
+    const name = props.message.from_name || props.message.from_address || '?';
+    return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+});
 const store = useMailStore();
 const timestamp = computed(() => props.message.received_at || props.message.sent_at);
 const relativeTime = computed(() => timestamp.value ? formatDistanceToNow(new Date(timestamp.value), { addSuffix: true }) : '');
@@ -40,26 +44,34 @@ debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
 let __VLS_directives;
+/** @type {__VLS_StyleScopedClasses['df-msg-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['df-msg-item']} */ ;
+/** @type {__VLS_StyleScopedClasses['dark']} */ ;
+/** @type {__VLS_StyleScopedClasses['df-msg-selected']} */ ;
+// CSS variable injection 
+// CSS variable injection end 
 __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-    ...{ class: (__VLS_ctx.cn('flex flex-col items-start gap-2 rounded-lg border p-3 text-left text-sm transition-all hover:bg-accent w-full', __VLS_ctx.selected && 'bg-muted')) },
-    ...{ style: (__VLS_ctx.folderColor ? `border-left: 3px solid ${__VLS_ctx.folderColor}` : '') },
+    ...{ class: (__VLS_ctx.cn('df-msg-item flex items-start gap-3 rounded-xl p-3 text-left text-sm w-full', __VLS_ctx.selected && 'df-msg-selected')) },
+    ...{ style: (__VLS_ctx.folderColor ? `border-left: 3px solid ${__VLS_ctx.folderColor}; border-radius: 12px 0 0 12px;` : '') },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex w-full flex-col gap-1" },
+    ...{ class: "flex-shrink-0 h-9 w-9 rounded-full flex items-center justify-center text-[13px] font-semibold text-white select-none mt-0.5" },
+    ...{ style: {} },
 });
+(__VLS_ctx.initials);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "flex items-center" },
+    ...{ class: "flex flex-col gap-1 min-w-0 flex-1" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
     ...{ class: "flex items-center gap-2" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "font-semibold" },
+    ...{ class: "font-semibold truncate flex-1" },
 });
 (__VLS_ctx.recipientLabel ?? (__VLS_ctx.message.from_name || __VLS_ctx.message.from_address));
 if (!__VLS_ctx.message.is_read) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span)({
-        ...{ class: "flex h-2 w-2 rounded-full bg-primary" },
+        ...{ class: "flex-shrink-0 h-2 w-2 rounded-full bg-[#FBA612]" },
     });
 }
 if (__VLS_ctx.message.is_starred) {
@@ -67,10 +79,10 @@ if (__VLS_ctx.message.is_starred) {
     /** @type {[typeof __VLS_components.Star, ]} */ ;
     // @ts-ignore
     const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
-        ...{ class: "size-3 fill-yellow-400 text-yellow-400" },
+        ...{ class: "flex-shrink-0 size-3 fill-yellow-400 text-yellow-400" },
     }));
     const __VLS_2 = __VLS_1({
-        ...{ class: "size-3 fill-yellow-400 text-yellow-400" },
+        ...{ class: "flex-shrink-0 size-3 fill-yellow-400 text-yellow-400" },
     }, ...__VLS_functionalComponentArgsRest(__VLS_1));
 }
 if (__VLS_ctx.timestamp) {
@@ -95,7 +107,7 @@ if (__VLS_ctx.timestamp) {
     }, ...__VLS_functionalComponentArgsRest(__VLS_9));
     __VLS_11.slots.default;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: (__VLS_ctx.cn('ml-auto text-xs cursor-default', __VLS_ctx.selected ? 'text-foreground' : 'text-muted-foreground')) },
+        ...{ class: (__VLS_ctx.cn('flex-shrink-0 text-xs cursor-default', __VLS_ctx.selected ? 'text-foreground' : 'text-muted-foreground')) },
     });
     (__VLS_ctx.relativeTime);
     var __VLS_11;
@@ -121,13 +133,13 @@ if (__VLS_ctx.timestamp) {
     var __VLS_7;
 }
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "text-xs font-medium" },
+    ...{ class: "text-xs font-medium truncate" },
 });
 (__VLS_ctx.message.subject);
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "line-clamp-2 text-xs text-muted-foreground" },
+    ...{ class: "line-clamp-1 text-xs text-muted-foreground" },
 });
-(__VLS_ctx.message.text_body?.substring(0, 300) || 'No content');
+(__VLS_ctx.message.text_body?.substring(0, 200) || 'No content');
 if (__VLS_ctx.message.has_attachments) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "flex items-center gap-1" },
@@ -154,21 +166,35 @@ if (__VLS_ctx.message.has_attachments) {
     }, ...__VLS_functionalComponentArgsRest(__VLS_24));
     var __VLS_22;
 }
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
-/** @type {__VLS_StyleScopedClasses['w-full']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
-/** @type {__VLS_StyleScopedClasses['gap-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-shrink-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['h-9']} */ ;
+/** @type {__VLS_StyleScopedClasses['w-9']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['justify-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-[13px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-white']} */ ;
+/** @type {__VLS_StyleScopedClasses['select-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['mt-0.5']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['min-w-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
 /** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['truncate']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-shrink-0']} */ ;
 /** @type {__VLS_StyleScopedClasses['h-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['w-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-full']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-[#FBA612]']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-shrink-0']} */ ;
 /** @type {__VLS_StyleScopedClasses['size-3']} */ ;
 /** @type {__VLS_StyleScopedClasses['fill-yellow-400']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-yellow-400']} */ ;
@@ -183,7 +209,8 @@ if (__VLS_ctx.message.has_attachments) {
 /** @type {__VLS_StyleScopedClasses['shadow-md']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 /** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
-/** @type {__VLS_StyleScopedClasses['line-clamp-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['truncate']} */ ;
+/** @type {__VLS_StyleScopedClasses['line-clamp-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-muted-foreground']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
@@ -203,6 +230,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             TooltipPortal: TooltipPortal,
             cn: cn,
             Badge: Badge,
+            initials: initials,
             timestamp: timestamp,
             relativeTime: relativeTime,
             exactTime: exactTime,
