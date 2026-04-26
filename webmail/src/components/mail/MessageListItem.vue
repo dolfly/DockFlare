@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { Paperclip, Star, Check } from 'lucide-vue-next'
 import { TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal } from 'radix-vue'
 import { cn } from '../../lib/utils'
@@ -26,9 +26,7 @@ const timestamp = computed(() => props.message.received_at || props.message.sent
 const relativeTime = computed(() =>
   timestamp.value ? formatDistanceToNow(new Date(timestamp.value), { addSuffix: true }) : ''
 )
-const exactTime = computed(() =>
-  timestamp.value ? format(new Date(timestamp.value), 'PPpp') : ''
-)
+const exactTime = computed(() => store.formatDate(timestamp.value))
 
 const isSentOrDrafts = computed(() => {
   const name = store.currentFolderObj?.name?.toLowerCase() ?? ''

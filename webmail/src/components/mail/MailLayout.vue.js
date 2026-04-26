@@ -1,16 +1,17 @@
 /// <reference types="../../../node_modules/.vue-global-types/vue_3.5_0_0_0.d.ts" />
 import { SplitterGroup, SplitterPanel, SplitterResizeHandle, TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal, } from 'radix-vue';
-import { defineAsyncComponent, ref, watch, computed } from 'vue';
-import { PenSquare, Sun, Moon, LogOut, Settings, Columns2, ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next';
+import { ref, watch, computed } from 'vue';
+import { PenSquare, Sun, Moon, LogOut, Settings, Columns2, ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen, ArrowLeft } from 'lucide-vue-next';
 import MailboxSelector from './MailboxSelector.vue';
 import FolderNav from './FolderNav.vue';
 import MessageList from './MessageList.vue';
 import MessageDisplay from './MessageDisplay.vue';
 import ComposeDialog from './ComposeDialog.vue';
+import SettingsNav from '../settings/SettingsNav.vue';
+import SettingsPanel from '../settings/SettingsPanel.vue';
 import { useMailStore } from '../../stores/mail';
 import { useAuth } from '../../composables/useAuth';
 import { useBreakpoint } from '../../composables/useBreakpoint';
-const SettingsDialog = defineAsyncComponent(() => import('./SettingsDialog.vue'));
 const store = useMailStore();
 const { logout } = useAuth();
 const { isMobile } = useBreakpoint();
@@ -20,6 +21,7 @@ const compose = () => {
 };
 const mobilePanel = ref('list');
 watch(() => store.currentFolder, () => {
+    store.isSettingsOpen = false;
     if (isMobile.value)
         mobilePanel.value = 'list';
 });
@@ -788,163 +790,183 @@ else {
         var __VLS_181;
         var __VLS_169;
     }
-    const __VLS_186 = {}.SplitterGroup;
-    /** @type {[typeof __VLS_components.SplitterGroup, typeof __VLS_components.SplitterGroup, ]} */ ;
-    // @ts-ignore
-    const __VLS_187 = __VLS_asFunctionalComponent(__VLS_186, new __VLS_186({
-        id: "mail-layout",
-        direction: "horizontal",
-        ...{ class: "flex-1 h-full items-stretch" },
-    }));
-    const __VLS_188 = __VLS_187({
-        id: "mail-layout",
-        direction: "horizontal",
-        ...{ class: "flex-1 h-full items-stretch" },
-    }, ...__VLS_functionalComponentArgsRest(__VLS_187));
-    __VLS_189.slots.default;
-    if (__VLS_ctx.store.viewMode === 'split') {
-        const __VLS_190 = {}.SplitterPanel;
-        /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
-        // @ts-ignore
-        const __VLS_191 = __VLS_asFunctionalComponent(__VLS_190, new __VLS_190({
-            id: "mail-list",
-            defaultSize: (35),
-            minSize: (25),
-            ...{ class: "flex flex-col overflow-hidden" },
+    if (__VLS_ctx.store.isSettingsOpen) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "flex-none h-full overflow-y-auto border-r border-border" },
             ...{ style: {} },
-        }));
-        const __VLS_192 = __VLS_191({
-            id: "mail-list",
-            defaultSize: (35),
-            minSize: (25),
-            ...{ class: "flex flex-col overflow-hidden" },
-            ...{ style: {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_191));
-        __VLS_193.slots.default;
-        /** @type {[typeof MessageList, ]} */ ;
+        });
+        /** @type {[typeof SettingsNav, ]} */ ;
         // @ts-ignore
-        const __VLS_194 = __VLS_asFunctionalComponent(MessageList, new MessageList({}));
-        const __VLS_195 = __VLS_194({}, ...__VLS_functionalComponentArgsRest(__VLS_194));
-        var __VLS_193;
-        const __VLS_197 = {}.SplitterResizeHandle;
-        /** @type {[typeof __VLS_components.SplitterResizeHandle, ]} */ ;
-        // @ts-ignore
-        const __VLS_198 = __VLS_asFunctionalComponent(__VLS_197, new __VLS_197({
-            id: "display-handle",
-            ...{ class: "self-stretch w-px bg-transparent hover:bg-border/30 active:bg-border/60 transition-colors" },
-        }));
-        const __VLS_199 = __VLS_198({
-            id: "display-handle",
-            ...{ class: "self-stretch w-px bg-transparent hover:bg-border/30 active:bg-border/60 transition-colors" },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_198));
-        const __VLS_201 = {}.SplitterPanel;
-        /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
-        // @ts-ignore
-        const __VLS_202 = __VLS_asFunctionalComponent(__VLS_201, new __VLS_201({
-            id: "mail-display",
-            defaultSize: (65),
-            minSize: (30),
-            ...{ class: "flex flex-col overflow-hidden" },
+        const __VLS_186 = __VLS_asFunctionalComponent(SettingsNav, new SettingsNav({}));
+        const __VLS_187 = __VLS_186({}, ...__VLS_functionalComponentArgsRest(__VLS_186));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "flex-1 h-full overflow-hidden" },
             ...{ style: {} },
-        }));
-        const __VLS_203 = __VLS_202({
-            id: "mail-display",
-            defaultSize: (65),
-            minSize: (30),
-            ...{ class: "flex flex-col overflow-hidden" },
-            ...{ style: {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_202));
-        __VLS_204.slots.default;
-        if (__VLS_ctx.store.isComposeOpen && __VLS_ctx.store.isComposeFullView) {
-            /** @type {[typeof ComposeDialog, ]} */ ;
-            // @ts-ignore
-            const __VLS_205 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
-                panelMode: (true),
-            }));
-            const __VLS_206 = __VLS_205({
-                panelMode: (true),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_205));
-        }
-        else {
-            /** @type {[typeof MessageDisplay, ]} */ ;
-            // @ts-ignore
-            const __VLS_208 = __VLS_asFunctionalComponent(MessageDisplay, new MessageDisplay({
-                message: (__VLS_ctx.store.currentMessage ?? undefined),
-            }));
-            const __VLS_209 = __VLS_208({
-                message: (__VLS_ctx.store.currentMessage ?? undefined),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_208));
-        }
-        var __VLS_204;
+        });
+        /** @type {[typeof SettingsPanel, ]} */ ;
+        // @ts-ignore
+        const __VLS_189 = __VLS_asFunctionalComponent(SettingsPanel, new SettingsPanel({}));
+        const __VLS_190 = __VLS_189({}, ...__VLS_functionalComponentArgsRest(__VLS_189));
     }
     else {
-        const __VLS_211 = {}.SplitterPanel;
-        /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
+        const __VLS_192 = {}.SplitterGroup;
+        /** @type {[typeof __VLS_components.SplitterGroup, typeof __VLS_components.SplitterGroup, ]} */ ;
         // @ts-ignore
-        const __VLS_212 = __VLS_asFunctionalComponent(__VLS_211, new __VLS_211({
-            id: "mail-content",
-            defaultSize: (100),
-            minSize: (30),
-            ...{ class: "flex flex-col overflow-hidden" },
-            ...{ style: {} },
+        const __VLS_193 = __VLS_asFunctionalComponent(__VLS_192, new __VLS_192({
+            id: "mail-layout",
+            direction: "horizontal",
+            ...{ class: "flex-1 h-full items-stretch" },
         }));
-        const __VLS_213 = __VLS_212({
-            id: "mail-content",
-            defaultSize: (100),
-            minSize: (30),
-            ...{ class: "flex flex-col overflow-hidden" },
-            ...{ style: {} },
-        }, ...__VLS_functionalComponentArgsRest(__VLS_212));
-        __VLS_214.slots.default;
-        if (__VLS_ctx.store.isComposeOpen && __VLS_ctx.store.isComposeFullView) {
-            /** @type {[typeof ComposeDialog, ]} */ ;
+        const __VLS_194 = __VLS_193({
+            id: "mail-layout",
+            direction: "horizontal",
+            ...{ class: "flex-1 h-full items-stretch" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_193));
+        __VLS_195.slots.default;
+        if (__VLS_ctx.store.viewMode === 'split') {
+            const __VLS_196 = {}.SplitterPanel;
+            /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
             // @ts-ignore
-            const __VLS_215 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
-                panelMode: (true),
+            const __VLS_197 = __VLS_asFunctionalComponent(__VLS_196, new __VLS_196({
+                id: "mail-list",
+                defaultSize: (35),
+                minSize: (25),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
             }));
-            const __VLS_216 = __VLS_215({
-                panelMode: (true),
-            }, ...__VLS_functionalComponentArgsRest(__VLS_215));
-        }
-        else {
-            if (!__VLS_ctx.store.currentMessage) {
-                /** @type {[typeof MessageList, ]} */ ;
+            const __VLS_198 = __VLS_197({
+                id: "mail-list",
+                defaultSize: (35),
+                minSize: (25),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_197));
+            __VLS_199.slots.default;
+            /** @type {[typeof MessageList, ]} */ ;
+            // @ts-ignore
+            const __VLS_200 = __VLS_asFunctionalComponent(MessageList, new MessageList({}));
+            const __VLS_201 = __VLS_200({}, ...__VLS_functionalComponentArgsRest(__VLS_200));
+            var __VLS_199;
+            const __VLS_203 = {}.SplitterResizeHandle;
+            /** @type {[typeof __VLS_components.SplitterResizeHandle, ]} */ ;
+            // @ts-ignore
+            const __VLS_204 = __VLS_asFunctionalComponent(__VLS_203, new __VLS_203({
+                id: "display-handle",
+                ...{ class: "self-stretch w-px bg-transparent hover:bg-border/30 active:bg-border/60 transition-colors" },
+            }));
+            const __VLS_205 = __VLS_204({
+                id: "display-handle",
+                ...{ class: "self-stretch w-px bg-transparent hover:bg-border/30 active:bg-border/60 transition-colors" },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_204));
+            const __VLS_207 = {}.SplitterPanel;
+            /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
+            // @ts-ignore
+            const __VLS_208 = __VLS_asFunctionalComponent(__VLS_207, new __VLS_207({
+                id: "mail-display",
+                defaultSize: (65),
+                minSize: (30),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
+            }));
+            const __VLS_209 = __VLS_208({
+                id: "mail-display",
+                defaultSize: (65),
+                minSize: (30),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_208));
+            __VLS_210.slots.default;
+            if (__VLS_ctx.store.isComposeOpen && __VLS_ctx.store.isComposeFullView) {
+                /** @type {[typeof ComposeDialog, ]} */ ;
                 // @ts-ignore
-                const __VLS_218 = __VLS_asFunctionalComponent(MessageList, new MessageList({}));
-                const __VLS_219 = __VLS_218({}, ...__VLS_functionalComponentArgsRest(__VLS_218));
+                const __VLS_211 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
+                    panelMode: (true),
+                }));
+                const __VLS_212 = __VLS_211({
+                    panelMode: (true),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_211));
             }
             else {
                 /** @type {[typeof MessageDisplay, ]} */ ;
                 // @ts-ignore
-                const __VLS_221 = __VLS_asFunctionalComponent(MessageDisplay, new MessageDisplay({
+                const __VLS_214 = __VLS_asFunctionalComponent(MessageDisplay, new MessageDisplay({
                     message: (__VLS_ctx.store.currentMessage ?? undefined),
                 }));
-                const __VLS_222 = __VLS_221({
+                const __VLS_215 = __VLS_214({
                     message: (__VLS_ctx.store.currentMessage ?? undefined),
+                }, ...__VLS_functionalComponentArgsRest(__VLS_214));
+            }
+            var __VLS_210;
+        }
+        else {
+            const __VLS_217 = {}.SplitterPanel;
+            /** @type {[typeof __VLS_components.SplitterPanel, typeof __VLS_components.SplitterPanel, ]} */ ;
+            // @ts-ignore
+            const __VLS_218 = __VLS_asFunctionalComponent(__VLS_217, new __VLS_217({
+                id: "mail-content",
+                defaultSize: (100),
+                minSize: (30),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
+            }));
+            const __VLS_219 = __VLS_218({
+                id: "mail-content",
+                defaultSize: (100),
+                minSize: (30),
+                ...{ class: "flex flex-col overflow-hidden" },
+                ...{ style: {} },
+            }, ...__VLS_functionalComponentArgsRest(__VLS_218));
+            __VLS_220.slots.default;
+            if (__VLS_ctx.store.isComposeOpen && __VLS_ctx.store.isComposeFullView) {
+                /** @type {[typeof ComposeDialog, ]} */ ;
+                // @ts-ignore
+                const __VLS_221 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
+                    panelMode: (true),
+                }));
+                const __VLS_222 = __VLS_221({
+                    panelMode: (true),
                 }, ...__VLS_functionalComponentArgsRest(__VLS_221));
             }
+            else {
+                if (!__VLS_ctx.store.currentMessage) {
+                    /** @type {[typeof MessageList, ]} */ ;
+                    // @ts-ignore
+                    const __VLS_224 = __VLS_asFunctionalComponent(MessageList, new MessageList({}));
+                    const __VLS_225 = __VLS_224({}, ...__VLS_functionalComponentArgsRest(__VLS_224));
+                }
+                else {
+                    /** @type {[typeof MessageDisplay, ]} */ ;
+                    // @ts-ignore
+                    const __VLS_227 = __VLS_asFunctionalComponent(MessageDisplay, new MessageDisplay({
+                        message: (__VLS_ctx.store.currentMessage ?? undefined),
+                    }));
+                    const __VLS_228 = __VLS_227({
+                        message: (__VLS_ctx.store.currentMessage ?? undefined),
+                    }, ...__VLS_functionalComponentArgsRest(__VLS_227));
+                }
+            }
+            var __VLS_220;
         }
-        var __VLS_214;
+        var __VLS_195;
     }
-    var __VLS_189;
 }
 if (!__VLS_ctx.isMobile) {
     /** @type {[typeof ComposeDialog, ]} */ ;
     // @ts-ignore
-    const __VLS_224 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({}));
-    const __VLS_225 = __VLS_224({}, ...__VLS_functionalComponentArgsRest(__VLS_224));
+    const __VLS_230 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({}));
+    const __VLS_231 = __VLS_230({}, ...__VLS_functionalComponentArgsRest(__VLS_230));
 }
 else {
-    const __VLS_227 = {}.Teleport;
+    const __VLS_233 = {}.Teleport;
     /** @type {[typeof __VLS_components.Teleport, typeof __VLS_components.Teleport, ]} */ ;
     // @ts-ignore
-    const __VLS_228 = __VLS_asFunctionalComponent(__VLS_227, new __VLS_227({
+    const __VLS_234 = __VLS_asFunctionalComponent(__VLS_233, new __VLS_233({
         to: "body",
     }));
-    const __VLS_229 = __VLS_228({
+    const __VLS_235 = __VLS_234({
         to: "body",
-    }, ...__VLS_functionalComponentArgsRest(__VLS_228));
-    __VLS_230.slots.default;
+    }, ...__VLS_functionalComponentArgsRest(__VLS_234));
+    __VLS_236.slots.default;
     if (__VLS_ctx.store.isComposeOpen) {
         __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
             ...{ class: "fixed inset-0 z-50 flex flex-col pt-safe" },
@@ -952,20 +974,70 @@ else {
         });
         /** @type {[typeof ComposeDialog, ]} */ ;
         // @ts-ignore
-        const __VLS_231 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
+        const __VLS_237 = __VLS_asFunctionalComponent(ComposeDialog, new ComposeDialog({
             panelMode: (true),
         }));
-        const __VLS_232 = __VLS_231({
+        const __VLS_238 = __VLS_237({
             panelMode: (true),
-        }, ...__VLS_functionalComponentArgsRest(__VLS_231));
+        }, ...__VLS_functionalComponentArgsRest(__VLS_237));
     }
-    var __VLS_230;
+    if (__VLS_ctx.store.isSettingsOpen) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "fixed inset-0 z-50 flex flex-col pt-safe" },
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "flex items-center gap-2 px-3 pb-2 border-b border-border flex-shrink-0" },
+            ...{ style: {} },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+            ...{ onClick: (...[$event]) => {
+                    if (!!(!__VLS_ctx.isMobile))
+                        return;
+                    if (!(__VLS_ctx.store.isSettingsOpen))
+                        return;
+                    __VLS_ctx.store.isSettingsOpen = false;
+                } },
+            ...{ class: "inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground active:bg-accent transition-colors" },
+        });
+        const __VLS_240 = {}.ArrowLeft;
+        /** @type {[typeof __VLS_components.ArrowLeft, ]} */ ;
+        // @ts-ignore
+        const __VLS_241 = __VLS_asFunctionalComponent(__VLS_240, new __VLS_240({
+            ...{ class: "size-5" },
+        }));
+        const __VLS_242 = __VLS_241({
+            ...{ class: "size-5" },
+        }, ...__VLS_functionalComponentArgsRest(__VLS_241));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+            ...{ class: "text-[15px] font-semibold" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "flex flex-1 min-h-0 overflow-hidden" },
+        });
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "w-44 flex-shrink-0 border-r border-border overflow-y-auto" },
+            ...{ style: {} },
+        });
+        /** @type {[typeof SettingsNav, ]} */ ;
+        // @ts-ignore
+        const __VLS_244 = __VLS_asFunctionalComponent(SettingsNav, new SettingsNav({}));
+        const __VLS_245 = __VLS_244({}, ...__VLS_functionalComponentArgsRest(__VLS_244));
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+            ...{ class: "flex-1 overflow-hidden" },
+            ...{ style: {} },
+        });
+        /** @type {[typeof SettingsPanel, ]} */ ;
+        // @ts-ignore
+        const __VLS_247 = __VLS_asFunctionalComponent(SettingsPanel, new SettingsPanel({
+            hideHeader: (true),
+        }));
+        const __VLS_248 = __VLS_247({
+            hideHeader: (true),
+        }, ...__VLS_functionalComponentArgsRest(__VLS_247));
+    }
+    var __VLS_236;
 }
-const __VLS_234 = {}.SettingsDialog;
-/** @type {[typeof __VLS_components.SettingsDialog, ]} */ ;
-// @ts-ignore
-const __VLS_235 = __VLS_asFunctionalComponent(__VLS_234, new __VLS_234({}));
-const __VLS_236 = __VLS_235({}, ...__VLS_functionalComponentArgsRest(__VLS_235));
 var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
@@ -1314,6 +1386,14 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-popover-foreground']} */ ;
 /** @type {__VLS_StyleScopedClasses['shadow-md']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-none']} */ ;
+/** @type {__VLS_StyleScopedClasses['h-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['overflow-y-auto']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-r']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-border']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['h-full']} */ ;
+/** @type {__VLS_StyleScopedClasses['overflow-hidden']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
 /** @type {__VLS_StyleScopedClasses['h-full']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-stretch']} */ ;
@@ -1338,6 +1418,43 @@ var __VLS_3;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
 /** @type {__VLS_StyleScopedClasses['pt-safe']} */ ;
+/** @type {__VLS_StyleScopedClasses['fixed']} */ ;
+/** @type {__VLS_StyleScopedClasses['inset-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['z-50']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-col']} */ ;
+/** @type {__VLS_StyleScopedClasses['pt-safe']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['pb-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-b']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-border']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-shrink-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['inline-flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['h-10']} */ ;
+/** @type {__VLS_StyleScopedClasses['w-10']} */ ;
+/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['justify-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['rounded-xl']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-muted-foreground']} */ ;
+/** @type {__VLS_StyleScopedClasses['active:bg-accent']} */ ;
+/** @type {__VLS_StyleScopedClasses['transition-colors']} */ ;
+/** @type {__VLS_StyleScopedClasses['size-5']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-[15px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['min-h-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['overflow-hidden']} */ ;
+/** @type {__VLS_StyleScopedClasses['w-44']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-shrink-0']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-r']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-border']} */ ;
+/** @type {__VLS_StyleScopedClasses['overflow-y-auto']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['overflow-hidden']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
@@ -1360,12 +1477,14 @@ const __VLS_self = (await import('vue')).defineComponent({
             Menu: Menu,
             PanelLeftClose: PanelLeftClose,
             PanelLeftOpen: PanelLeftOpen,
+            ArrowLeft: ArrowLeft,
             MailboxSelector: MailboxSelector,
             FolderNav: FolderNav,
             MessageList: MessageList,
             MessageDisplay: MessageDisplay,
             ComposeDialog: ComposeDialog,
-            SettingsDialog: SettingsDialog,
+            SettingsNav: SettingsNav,
+            SettingsPanel: SettingsPanel,
             store: store,
             logout: logout,
             isMobile: isMobile,

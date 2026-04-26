@@ -1,5 +1,11 @@
 import { defineStore } from 'pinia';
 import { ref, shallowRef, computed } from 'vue';
+import { format as dateFnsFormat } from 'date-fns';
+const DATE_FORMATS = {
+    us: 'PPpp',
+    eu: 'dd.MM.yyyy, HH:mm:ss',
+    iso: 'yyyy-MM-dd HH:mm:ss',
+};
 export const useMailStore = defineStore('mail', () => {
     const mailboxes = ref([]);
     const currentMailbox = ref('');
@@ -21,6 +27,17 @@ export const useMailStore = defineStore('mail', () => {
     const isCollapsed = ref(false);
     const sortOrder = ref('desc');
     const isDark = ref(localStorage.getItem('theme') === 'dark');
+    const dateFormat = ref(localStorage.getItem('dateFormat') || 'us');
+    const settingsCategory = ref('notifications');
+    function formatDate(ts) {
+        if (!ts)
+            return '';
+        return dateFnsFormat(new Date(ts), DATE_FORMATS[dateFormat.value]);
+    }
+    function setDateFormat(key) {
+        dateFormat.value = key;
+        localStorage.setItem('dateFormat', key);
+    }
     const viewMode = ref(localStorage.getItem('viewMode') || 'split');
     const toast = ref(null);
     let toastTimer = null;
@@ -64,6 +81,8 @@ export const useMailStore = defineStore('mail', () => {
         isComposeOpen, isComposeFullView, isSettingsOpen, composeDefaults, composeBody,
         activeTab, isCollapsed,
         sortOrder, isDark, toggleTheme,
+        dateFormat, setDateFormat, formatDate,
+        settingsCategory,
         viewMode, toggleViewMode,
         unreadMessages, starredMessages,
         toast, showToast,

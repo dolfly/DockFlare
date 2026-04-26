@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onUnmounted } from 'vue'
 import DOMPurify from 'dompurify'
-import { format } from 'date-fns'
 import {
   Archive, Trash2, Reply, ReplyAll, Forward,
   MoreVertical, MailOpen, Star, Printer, FolderInput,
@@ -90,17 +89,14 @@ const toDisplay = computed(() => parseAddrs(props.message?.to_addresses))
 const ccDisplay = computed(() => parseAddrs(props.message?.cc_addresses))
 const bccDisplay = computed(() => parseAddrs(props.message?.bcc_addresses))
 
-const displayTimestamp = computed(() => {
-  const ts = props.message?.received_at || props.message?.sent_at
-  return ts ? format(new Date(ts), 'PPpp') : ''
-})
+const displayTimestamp = computed(() =>
+  store.formatDate(props.message?.received_at || props.message?.sent_at)
+)
 
 const quotedBody = computed(() => {
   if (!props.message) return ''
   const from = props.message.from_address || ''
-  const date = (props.message.received_at || props.message.sent_at)
-    ? format(new Date(props.message.received_at || props.message.sent_at), 'PPpp')
-    : ''
+  const date = store.formatDate(props.message.received_at || props.message.sent_at)
   const original = props.message.html_body || `<pre>${props.message.text_body || ''}</pre>`
   return `<br><blockquote style="border-left:2px solid #ccc;padding-left:1em;color:#555;margin:1em 0;"><p>On ${date}, ${from} wrote:</p>${original}</blockquote>`
 })

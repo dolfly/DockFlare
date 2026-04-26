@@ -3,18 +3,18 @@ import {
   SplitterGroup, SplitterPanel, SplitterResizeHandle,
   TooltipProvider, TooltipRoot, TooltipTrigger, TooltipContent, TooltipPortal,
 } from 'radix-vue'
-import { defineAsyncComponent, ref, watch, computed } from 'vue'
-import { PenSquare, Sun, Moon, LogOut, Settings, Columns2, Maximize2, ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import { ref, watch, computed } from 'vue'
+import { PenSquare, Sun, Moon, LogOut, Settings, Columns2, Maximize2, ChevronLeft, Menu, PanelLeftClose, PanelLeftOpen, ArrowLeft } from 'lucide-vue-next'
 import MailboxSelector from './MailboxSelector.vue'
 import FolderNav from './FolderNav.vue'
 import MessageList from './MessageList.vue'
 import MessageDisplay from './MessageDisplay.vue'
 import ComposeDialog from './ComposeDialog.vue'
+import SettingsNav from '../settings/SettingsNav.vue'
+import SettingsPanel from '../settings/SettingsPanel.vue'
 import { useMailStore } from '../../stores/mail'
 import { useAuth } from '../../composables/useAuth'
 import { useBreakpoint } from '../../composables/useBreakpoint'
-
-const SettingsDialog = defineAsyncComponent(() => import('./SettingsDialog.vue'))
 
 const store = useMailStore()
 const { logout } = useAuth()
@@ -30,6 +30,7 @@ type MobilePanel = 'folders' | 'list' | 'detail'
 const mobilePanel = ref<MobilePanel>('list')
 
 watch(() => store.currentFolder, () => {
+  store.isSettingsOpen = false
   if (isMobile.value) mobilePanel.value = 'list'
 })
 
@@ -310,8 +311,22 @@ const mobileTitle = computed(() => {
         </div>
       </div>
 
+      <!-- Inline settings panel -->
+      <template v-if="store.isSettingsOpen">
+        <div
+          class="flex-none h-full overflow-y-auto border-r border-border"
+          style="width: 200px; background: var(--df-list-bg);"
+        >
+          <SettingsNav />
+        </div>
+        <div class="flex-1 h-full overflow-hidden" style="background: var(--df-pane-bg);">
+          <SettingsPanel />
+        </div>
+      </template>
+
       <!-- Splitter for message list + display panels -->
       <SplitterGroup
+        v-else
         id="mail-layout"
         direction="horizontal"
         class="flex-1 h-full items-stretch"
@@ -364,7 +379,7 @@ const mobileTitle = computed(() => {
       </SplitterGroup>
     </div><!-- end desktop layout -->
 
-    <!-- Floating compose (desktop only) + settings dialog -->
+    <!-- Floating compose (desktop only) -->
     <template v-if="!isMobile">
       <ComposeDialog />
     </template>
@@ -372,8 +387,27 @@ const mobileTitle = computed(() => {
       <div v-if="store.isComposeOpen" class="fixed inset-0 z-50 flex flex-col pt-safe" style="background: var(--df-pane-bg); backdrop-filter: blur(12px);">
         <ComposeDialog :panel-mode="true" />
       </div>
+      <!-- Mobile settings fullscreen -->
+      <div v-if="store.isSettingsOpen" class="fixed inset-0 z-50 flex flex-col pt-safe" style="background: var(--df-pane-bg);">
+        <div class="flex items-center gap-2 px-3 pb-2 border-b border-border flex-shrink-0" style="min-height: calc(52px + env(safe-area-inset-top, 0px)); background: var(--df-sidebar-bg);">
+          <button
+            class="inline-flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground active:bg-accent transition-colors"
+            @click="store.isSettingsOpen = false"
+          >
+            <ArrowLeft class="size-5" />
+          </button>
+          <span class="text-[15px] font-semibold">Settings</span>
+        </div>
+        <div class="flex flex-1 min-h-0 overflow-hidden">
+          <div class="w-44 flex-shrink-0 border-r border-border overflow-y-auto" style="background: var(--df-list-bg);">
+            <SettingsNav />
+          </div>
+          <div class="flex-1 overflow-hidden" style="background: var(--df-pane-bg);">
+            <SettingsPanel :hide-header="true" />
+          </div>
+        </div>
+      </div>
     </Teleport>
-    <SettingsDialog />
   </TooltipProvider>
 </template>
 
