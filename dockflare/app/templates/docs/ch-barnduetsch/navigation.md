@@ -28,6 +28,14 @@ DockFlare isch e sälber hosteti Ingress-Lösig, wo dir d Verwaltig vo Cloudflar
     *   [Graceful Deletion verstah](Understanding-Graceful-Deletion.md)
     *   [Web UI bruuche](Using-the-Web-UI.md)
     *   [Backup & Restore](Backup-and-Restore.md)
+*   **E-Mail-Suite**
+    *   [Überblick & Architektur](Email-Overview.md)
+    *   [Voraussetzige & CF-Istellig](Email-Prerequisites.md)
+    *   [Docker-Deployment](Email-Docker-Deployment.md)
+    *   [Domain-Konfiguration](Email-Domain-Setup.md)
+    *   [Postfach- & Quota-Verwaltig](Email-Mailbox-Management.md)
+    *   [Webmail bruuche (PWA)](Email-Using-Webmail.md)
+    *   [Wartig & Problem löse](Email-Maintenance.md)
 *   **Fortgschritte**
     *   [Externe `cloudflared`-Modus](External-cloudflared-Mode.md)
     *   [Zwüsche de Modis wächsle](Switching-Between-Modes.md)
