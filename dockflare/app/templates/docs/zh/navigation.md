@@ -30,6 +30,14 @@ DockFlare 是一款功能强大的自托管入口控制器，可简化 Cloudflar
     * [了解优雅删除](Understanding-Graceful-Deletion.md)
     * [使用网页管理界面](Using-the-Web-UI.md)
     * [备份与恢复](Backup-and-Restore.md)
+* **邮件套件**
+    * [概述与架构](Email-Overview.md)
+    * [前提条件与 CF 配置](Email-Prerequisites.md)
+    * [Docker 部署](Email-Docker-Deployment.md)
+    * [域名配置](Email-Domain-Setup.md)
+    * [邮箱与配额管理](Email-Mailbox-Management.md)
+    * [使用网页邮件 (PWA)](Email-Using-Webmail.md)
+    * [维护与故障排除](Email-Maintenance.md)
 * **高级主题**
     * [外部 `cloudflared` 模式](External-cloudflared-Mode.md)
     * [模式切换](Switching-Between-Modes.md)

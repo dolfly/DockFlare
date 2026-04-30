@@ -30,6 +30,14 @@ Esta documentación proporciona información completa sobre DockFlare. Ya seas u
     * [Comprensión de la eliminación ordenada](Understanding-Graceful-Deletion.md)
     * [Uso de la interfaz web](Using-the-Web-UI.md)
     * [Copia de seguridad y restauración](Backup-and-Restore.md)
+* **Suite de correo electrónico**
+    * [Descripción general y arquitectura](Email-Overview.md)
+    * [Requisitos previos y configuración CF](Email-Prerequisites.md)
+    * [Despliegue Docker](Email-Docker-Deployment.md)
+    * [Configuración de dominio](Email-Domain-Setup.md)
+    * [Gestión de buzones y cuotas](Email-Mailbox-Management.md)
+    * [Usar el webmail (PWA)](Email-Using-Webmail.md)
+    * [Mantenimiento y solución de problemas](Email-Maintenance.md)
 * **Temas avanzados**
     * [Modo `cloudflared` externo](External-cloudflared-Mode.md)
     * [Cambiar entre modos](Switching-Between-Modes.md)

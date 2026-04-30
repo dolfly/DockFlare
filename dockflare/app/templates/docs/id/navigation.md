@@ -30,6 +30,14 @@ Dokumentasi ini menyajikan panduan lengkap untuk DockFlare. Baik Anda pengguna b
     *   [Memahami Graceful Deletion](Understanding-Graceful-Deletion.md)
     *   [Menggunakan Web UI](Using-the-Web-UI.md)
     *   [Backup & Restore](Backup-and-Restore.md)
+*   **Email Suite**
+    *   [Gambaran Umum & Arsitektur](Email-Overview.md)
+    *   [Prasyarat & Konfigurasi CF](Email-Prerequisites.md)
+    *   [Deployment Docker](Email-Docker-Deployment.md)
+    *   [Konfigurasi Domain](Email-Domain-Setup.md)
+    *   [Manajemen Mailbox & Kuota](Email-Mailbox-Management.md)
+    *   [Menggunakan Webmail (PWA)](Email-Using-Webmail.md)
+    *   [Pemeliharaan & Troubleshooting](Email-Maintenance.md)
 *   **Topik Lanjutan**
     *   [Mode `cloudflared` Eksternal](External-cloudflared-Mode.md)
     *   [Berpindah Antar Mode](Switching-Between-Modes.md)
