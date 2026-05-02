@@ -219,6 +219,11 @@ def inbound():
                 break
 
         if not to_address:
+            raw_resolved = data.get('resolved_mailbox', '')
+            if raw_resolved and db.execute("SELECT 1 FROM mailboxes WHERE address=?", (raw_resolved,)).fetchone():
+                to_address = raw_resolved
+
+        if not to_address:
             via_alias = data.get('via_alias', False)
             raw_resolved = data.get('resolved_mailbox', '')
 
@@ -259,6 +264,10 @@ def inbound():
 
         if not to_address:
             log.info("Inbound ignored: no matching mailbox for %s", parsed['to_addresses'])
+            try:
+                delete_from_r2(r2_key, domain_cfg)
+            except Exception:
+                pass
             return jsonify({"status": "ignored", "reason": "unknown recipient"}), 200
 
         cur = db.execute(

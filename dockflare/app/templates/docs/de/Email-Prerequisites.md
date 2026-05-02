@@ -5,8 +5,12 @@ Bevor Sie die E-Mail-Suite aktivieren, stellen Sie sicher, dass Ihre Umgebung un
 ## Cloudflare-Anforderungen
 
 1.  **Domain-Verwaltung:** Ihre Domain muss in Cloudflare aktiv sein.
-2.  **E-Mail-Routing:** Die Domain muss für Cloudflare E-Mail-Routing berechtigt sein (auf den meisten Tarifen verfügbar, einschließlich Free) und für Cloudflare E-Mail-Versand (Beta-Zugang für ausgehende Mails erforderlich).
-3.  **R2-Speicher:** R2 muss in Ihrem Cloudflare-Dashboard aktiviert sein. R2 beinhaltet ein kostenloses Kontingent von 10 GB; zur Aktivierung kann jedoch eine Zahlungsmethode erforderlich sein.
+2.  **E-Mail-Routing (Eingehend):** Cloudflare Email Routing ist auf allen Tarifen verfügbar, einschließlich Free. DockFlare konfiguriert die erforderlichen MX-, SPF- und DMARC-Einträge automatisch.
+3.  **E-Mail-Versand (Ausgehend):** Cloudflare Email Sending befindet sich derzeit in der Beta-Phase. DockFlare konfiguriert die DKIM-Signierschlüssel und die Versandsubdomain automatisch. Für den Versand an externe Adressen ist jedoch Folgendes erforderlich:
+    - Ein **Cloudflare Workers Paid Plan** (5 $/Monat).
+    - Manuelle Aktivierung von **CF Email Sending (Beta)** im Cloudflare-Dashboard unter **E-Mail → E-Mail-Versand**.
+    - Ohne diese Schritte ist der ausgehende Versand auf verifizierte Cloudflare-Adressen beschränkt.
+4.  **R2-Speicher:** R2 muss in Ihrem Cloudflare-Dashboard aktiviert sein. R2 beinhaltet ein kostenloses Kontingent von 10 GB; zur Aktivierung kann jedoch eine Zahlungsmethode erforderlich sein.
 
 ## API-Token-Berechtigungen
 

@@ -5,8 +5,12 @@
 ## Cloudflare 要求
 
 1.  **域名管理：** 您的域名必须在 Cloudflare 上处于活动状态。
-2.  **邮件路由：** 该域名必须符合 Cloudflare Email Routing 的使用条件（大多数套餐可用，包括免费套餐），以及 Cloudflare Email Sending（发件功能需要 Beta 访问权限）。
-3.  **R2 存储：** 必须在 Cloudflare 控制台中启用 R2。R2 包含 10 GB 免费额度，但可能需要添加付款方式才能激活。
+2.  **邮件路由（收件）：** Cloudflare Email Routing 在所有套餐均可使用，包括免费套餐。DockFlare 会自动配置所需的 MX、SPF 和 DMARC 记录。
+3.  **邮件发送（发件）：** Cloudflare Email Sending 目前处于 Beta 阶段。DockFlare 会自动配置 DKIM 签名记录和发送子域名。但是，向外部地址发送邮件需要：
+    - **Cloudflare Workers 付费套餐**（每月 5 美元）。
+    - 在 Cloudflare 控制台的 **Email → Email Sending** 下手动激活 **CF Email Sending（Beta）**。
+    - 未完成以上步骤时，外发邮件仅限于发送至已在 Cloudflare 账户中验证的地址。
+4.  **R2 存储：** 必须在 Cloudflare 控制台中启用 R2。R2 包含 10 GB 免费额度，但可能需要添加付款方式才能激活。
 
 ## API 令牌权限
 

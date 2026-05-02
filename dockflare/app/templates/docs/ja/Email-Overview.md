@@ -19,6 +19,22 @@ Cloudflare のインフラストラクチャ上にメールの内容が永続的
 *   **送信フロー:** Webmail UI → Mail Manager API → Outbound Worker → Cloudflare `send_email` → インターネット。
 *   **データ主権:** すべてのメールはローカルの SQLite データベースに解析・保存され、添付ファイルはローカルのファイルシステムに保存されます。
 
+## 送信メール – プランと制限
+
+Cloudflare Email Sending (Beta) は、Cloudflare のプランに応じて 2 つのレベルがあります。
+
+| 送信先 | 無料プラン | Workers 有料プラン (月額 5 ドル) |
+| :--- | :--- | :--- |
+| Cloudflare 確認済みアドレス (CF アカウントで確認したアドレス) | ✅ 可能 | ✅ 可能 |
+| 任意の外部アドレス | ❌ 不可 | ✅ 可能 |
+
+DockFlare は、ドメイン設定中に DKIM 署名レコードと送信サブドメイン (`mail.yourdomain.com`) を自動的に設定します。ただし、**外部への完全な送信には 2 つの追加の手動手順が必要です:**
+
+1. **Cloudflare Workers 有料プランへのアップグレード** – Cloudflare ダッシュボードで月額 5 ドルで利用できます。
+2. **CF Email Sending (Beta) の有効化** – [Cloudflare ダッシュボード → Email → Email Sending](https://dash.cloudflare.com/) にアクセスし、アカウントでこの機能を有効にしてください。
+
+これらの手順が完了するまで、Webmail クライアントからの送信メールは Cloudflare アカウントで確認済みのメールアドレスにのみ配信されます。DockFlare のメール管理ページのドメインステータスバッジは、DKIM が設定済みかどうか (`Sending: Active`) または未設定かどうか (`Sending: Pending`) を反映します。
+
 ## 主な機能
 
 *   **マルチドメイン対応:** Cloudflare で管理しているドメインの数だけメールをホストできます。

@@ -19,6 +19,22 @@ Le système se compose de plusieurs composants intégrés :
 *   **Flux sortant :** Interface Webmail → API Mail Manager → Outbound Worker → Cloudflare `send_email` → Internet.
 *   **Souveraineté des données :** Tous les e-mails sont analysés et stockés dans une base de données SQLite locale, avec les pièces jointes sauvegardées sur votre système de fichiers local.
 
+## Envoi sortant – Plans et limitations
+
+Cloudflare Email Sending (Beta) propose deux niveaux selon votre plan Cloudflare :
+
+| Destinataire | Plan gratuit | Workers Paid Plan (5 $/mois) |
+| :--- | :--- | :--- |
+| Adresses Cloudflare vérifiées (confirmées dans votre compte CF) | ✅ Autorisé | ✅ Autorisé |
+| Toute adresse externe | ❌ Non autorisé | ✅ Autorisé |
+
+DockFlare configure automatiquement les enregistrements de signature DKIM et le sous-domaine d'envoi (`mail.votredomaine.com`) lors de la configuration du domaine. Cependant, **l'envoi externe complet nécessite deux étapes manuelles supplémentaires :**
+
+1. **Passer au Cloudflare Workers Paid Plan** – disponible à 5 $/mois dans votre tableau de bord Cloudflare.
+2. **Activer CF Email Sending (Beta)** – accédez à votre [Tableau de bord Cloudflare → Email → Email Sending](https://dash.cloudflare.com/) et activez la fonctionnalité pour votre compte.
+
+Tant que ces étapes ne sont pas effectuées, les e-mails sortants de votre client webmail ne seront délivrés qu'aux adresses vérifiées dans votre compte Cloudflare. Le badge de statut du domaine sur la page de gestion des e-mails de DockFlare indique si DKIM est configuré (`Sending: Active`) ou pas encore mis en place (`Sending: Pending`).
+
 ## Fonctionnalités principales
 
 *   **Support multi-domaine :** Hébergez la messagerie pour autant de domaines que vous en gérez dans Cloudflare.

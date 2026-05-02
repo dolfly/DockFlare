@@ -32,7 +32,7 @@ _cache_lock = threading.Lock()
 
 dns_semaphore = threading.Semaphore(config.MAX_CONCURRENT_DNS_OPS)
 
-def cf_api_request(method, endpoint, json_data=None, params=None):
+def cf_api_request(method, endpoint, json_data=None, params=None, log_errors=True):
 
     url = f"{config.CF_API_BASE_URL}{endpoint}"
     error_msg = None
@@ -75,9 +75,10 @@ def cf_api_request(method, endpoint, json_data=None, params=None):
                         error_code = cf_errors[0].get('code')
                     else:
                         error_msg = f"API reported failure but no error details provided. Response: {response_data}"
-                    logging.error(f"CF API Request Failed ({method} {url}): {error_msg} - Full Errors: {cf_errors}")
+                    if log_errors:
+                        logging.error(f"CF API Request Failed ({method} {url}): {error_msg} - Full Errors: {cf_errors}")
                     api_exception = requests.exceptions.RequestException(error_msg, response=response)
-                    api_exception.cf_error_code = error_code 
+                    api_exception.cf_error_code = error_code
                     raise api_exception
             else:
                 logging.warning(f"CF API response for {method} {url} was valid JSON but missing 'success' field. Status: {response.status_code}. Body: {str(response_data)[:200]}")
@@ -101,10 +102,12 @@ def cf_api_request(method, endpoint, json_data=None, params=None):
                         log_error_msg += f" - API Details: {cf_errors[0].get('message', 'Unknown error')}"
                     else:
                         log_error_msg += f" - HTTP {e.response.status_code} - Response Text (first 100): {e.response.text[:100]}"
-                    logging.error(f"CF API Error Response Body: {error_data}")
+                    if log_errors:
+                        logging.error(f"CF API Error Response Body: {error_data}")
                 except (ValueError, AttributeError, json.JSONDecodeError):
                     log_error_msg += f" - HTTP {e.response.status_code} - Response Text (first 100): {e.response.text[:100]}"
-            logging.error(log_error_msg)
+            if log_errors:
+                logging.error(log_error_msg)
         raise
 
 def get_zone_id_from_name(zone_name):

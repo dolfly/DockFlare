@@ -5,8 +5,12 @@ Przed włączeniem pakietu poczty e-mail upewnij się, że Twoje środowisko i k
 ## Wymagania Cloudflare
 
 1.  **Zarządzanie domeną:** Twoja domena musi być aktywna w Cloudflare.
-2.  **Email Routing:** Domena musi być uprawniona do Cloudflare Email Routing (dostępnego w większości planów, w tym bezpłatnym) oraz Cloudflare Email Sending (wymagany dostęp beta dla poczty wychodzącej).
-3.  **Magazyn R2:** R2 musi być włączony w panelu Cloudflare. R2 obejmuje bezpłatny poziom 10 GB, ale może być konieczne dodanie metody płatności w celu jego aktywacji.
+2.  **Email Routing (Przychodzący):** Cloudflare Email Routing jest dostępny na wszystkich planach, w tym bezpłatnym. DockFlare automatycznie konfiguruje wymagane rekordy MX, SPF i DMARC.
+3.  **Email Sending (Wychodzący):** Cloudflare Email Sending jest obecnie w fazie Beta. DockFlare automatycznie konfiguruje rekordy podpisu DKIM i subdomenę wysyłki. Jednak wysyłanie na zewnętrzne adresy wymaga:
+    - **Cloudflare Workers Paid Plan** (5 $/miesiąc).
+    - Ręcznej aktywacji **CF Email Sending (Beta)** w panelu Cloudflare w sekcji **Email → Email Sending**.
+    - Bez tych kroków poczta wychodząca jest ograniczona wyłącznie do zweryfikowanych adresów Cloudflare.
+4.  **Magazyn R2:** R2 musi być włączony w panelu Cloudflare. R2 obejmuje bezpłatny poziom 10 GB, ale może być konieczne dodanie metody płatności w celu jego aktywacji.
 
 ## Uprawnienia tokenu API
 

@@ -5,8 +5,12 @@ Sebelum mengaktifkan Email Suite, pastikan lingkungan dan akun Cloudflare Anda s
 ## Persyaratan Cloudflare
 
 1.  **Manajemen Domain:** Domain Anda harus aktif di Cloudflare.
-2.  **Email Routing:** Domain harus memenuhi syarat untuk Cloudflare Email Routing (tersedia di sebagian besar paket, termasuk Free) dan Cloudflare Email Sending (Akses Beta diperlukan untuk email keluar).
-3.  **Penyimpanan R2:** R2 harus diaktifkan di dashboard Cloudflare Anda. R2 mencakup tier gratis 10 GB, tetapi Anda mungkin perlu menambahkan metode pembayaran untuk mengaktifkannya.
+2.  **Email Routing (Masuk):** Cloudflare Email Routing tersedia di semua paket, termasuk paket Gratis. DockFlare secara otomatis mengonfigurasi record MX, SPF, dan DMARC yang diperlukan.
+3.  **Email Sending (Keluar):** Cloudflare Email Sending saat ini dalam tahap Beta. DockFlare secara otomatis mengonfigurasi record penandatanganan DKIM dan subdomain pengiriman. Namun, pengiriman ke alamat eksternal memerlukan:
+    - **Cloudflare Workers Paid Plan** ($5/bulan).
+    - Aktivasi manual **CF Email Sending (Beta)** di Dashboard Cloudflare di bawah **Email → Email Sending**.
+    - Tanpa langkah-langkah ini, email keluar dibatasi hanya untuk alamat Cloudflare yang telah diverifikasi.
+4.  **Penyimpanan R2:** R2 harus diaktifkan di dashboard Cloudflare Anda. R2 mencakup tier gratis 10 GB, tetapi Anda mungkin perlu menambahkan metode pembayaran untuk mengaktifkannya.
 
 ## Izin Token API
 

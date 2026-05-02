@@ -217,7 +217,34 @@ def start_core_services():
         if not config.USE_EXTERNAL_CLOUDFLARED and tunnel_state.get("id") and tunnel_state.get("token"):
             logging.info("Checking and reconciling managed cloudflared agent container...")
             start_cloudflared_container()
-    
+
+    if getattr(config, 'EMAIL_CONFIG', {}).get('enabled'):
+        try:
+            container = docker_client.containers.get('dockflare-mail-manager')
+            if container.status == 'running':
+                container.restart()
+                logging.info("Email active: restarted dockflare-mail-manager to sync config.")
+        except Exception as e:
+            logging.debug(f"dockflare-mail-manager not found or could not restart: {e}")
+
+        try:
+            from app.core.email_manager import get_email_sending_status
+            from app.web.email_routes import save_email_config
+            email_cfg = config.EMAIL_CONFIG
+            updated = False
+            for domain, domain_cfg in email_cfg.get('domains', {}).items():
+                if domain_cfg.get('email_sending_status') in (None, 'unknown'):
+                    zone_id = domain_cfg.get('zone_id')
+                    if zone_id:
+                        status = get_email_sending_status(zone_id, domain)
+                        domain_cfg['email_sending_status'] = status
+                        updated = True
+                        logging.info(f"Email sending status for {domain}: {status}")
+            if updated:
+                save_email_config(email_cfg)
+        except Exception as e:
+            logging.debug(f"Could not refresh email sending status on startup: {e}")
+
     run_all_background_tasks()
 
 def perform_initial_setup_and_tasks():

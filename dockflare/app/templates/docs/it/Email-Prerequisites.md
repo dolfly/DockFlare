@@ -5,8 +5,12 @@ Prima di abilitare la Suite e-mail, assicurati che il tuo ambiente e il tuo acco
 ## Requisiti Cloudflare
 
 1.  **Gestione del dominio:** Il tuo dominio deve essere attivo su Cloudflare.
-2.  **Email Routing:** Il dominio deve essere idoneo a Cloudflare Email Routing (disponibile sulla maggior parte dei piani, incluso quello gratuito) e a Cloudflare Email Sending (accesso beta richiesto per la posta in uscita).
-3.  **Archiviazione R2:** R2 deve essere abilitato nella tua dashboard Cloudflare. R2 include un livello gratuito di 10 GB, ma potrebbe essere necessario aggiungere un metodo di pagamento per attivarlo.
+2.  **Email Routing (In entrata):** Cloudflare Email Routing è disponibile su tutti i piani, incluso quello gratuito. DockFlare configura automaticamente i record MX, SPF e DMARC necessari.
+3.  **Email Sending (In uscita):** Cloudflare Email Sending è attualmente in Beta. DockFlare configura automaticamente i record di firma DKIM e il sottodominio di invio. Tuttavia, l'invio a indirizzi esterni richiede:
+    - Un **Cloudflare Workers Paid Plan** (5 $/mese).
+    - L'attivazione manuale di **CF Email Sending (Beta)** nella dashboard Cloudflare sotto **Email → Email Sending**.
+    - Senza questi passaggi, l'invio in uscita è limitato agli indirizzi Cloudflare verificati.
+4.  **Archiviazione R2:** R2 deve essere abilitato nella tua dashboard Cloudflare. R2 include un livello gratuito di 10 GB, ma potrebbe essere necessario aggiungere un metodo di pagamento per attivarlo.
 
 ## Autorizzazioni del token API
 

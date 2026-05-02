@@ -19,6 +19,22 @@ Das System besteht aus mehreren integrierten Komponenten:
 *   **Ausgehend:** Webmail-UI → Mail Manager API → Outbound Worker → Cloudflare `send_email` → Internet.
 *   **Datensouveränität:** Alle E-Mails werden geparst und in einer lokalen SQLite-Datenbank gespeichert; Anhänge werden im lokalen Dateisystem abgelegt.
 
+## Ausgehende Nachrichten – Tarife & Einschränkungen
+
+Cloudflare Email Sending (Beta) bietet je nach Cloudflare-Tarif zwei Stufen:
+
+| Empfänger | Free-Tarif | Workers Paid Plan (5 $/Monat) |
+| :--- | :--- | :--- |
+| Verifizierte Cloudflare-Adressen (im CF-Konto bestätigte Adressen) | ✅ Erlaubt | ✅ Erlaubt |
+| Beliebige externe Adressen | ❌ Nicht erlaubt | ✅ Erlaubt |
+
+DockFlare richtet die DKIM-Signierschlüssel und die Versandsubdomain (`mail.ihredomain.com`) automatisch während der Domain-Einrichtung ein. **Für den vollständigen externen Versand sind jedoch zwei zusätzliche manuelle Schritte erforderlich:**
+
+1. **Upgrade auf den Cloudflare Workers Paid Plan** – verfügbar für 5 $/Monat in Ihrem Cloudflare-Dashboard.
+2. **CF Email Sending (Beta) aktivieren** – navigieren Sie in Ihrem [Cloudflare-Dashboard → E-Mail → E-Mail-Versand](https://dash.cloudflare.com/) und aktivieren Sie die Funktion für Ihr Konto.
+
+Bis diese Schritte abgeschlossen sind, werden ausgehende E-Mails nur an E-Mail-Adressen zugestellt, die in Ihrem Cloudflare-Konto verifiziert sind. Das Domain-Status-Badge auf der DockFlare E-Mail-Verwaltungsseite zeigt an, ob DKIM konfiguriert ist (`Sending: Active`) oder noch nicht eingerichtet wurde (`Sending: Pending`).
+
 ## Hauptfunktionen
 
 *   **Multi-Domain-Unterstützung:** Hosten Sie E-Mails für beliebig viele Domains, die Sie in Cloudflare verwalten.

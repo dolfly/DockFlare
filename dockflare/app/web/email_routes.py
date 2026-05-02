@@ -70,7 +70,7 @@ def _get_mail_manager_state():
 def email_page():
     zones = list_account_zones() or []
     mail_manager_state = _get_mail_manager_state()
-    return render_template('email.html', zones=zones, email_config=config.EMAIL_CONFIG, email_enabled=config.EMAIL_ENABLED, mail_manager_state=mail_manager_state)
+    return render_template('email.html', zones=zones, email_config=config.EMAIL_CONFIG, email_enabled=config.EMAIL_ENABLED, mail_manager_state=mail_manager_state, cf_account_id=config.CF_ACCOUNT_ID or '')
 
 @email_bp.route('/setup-domain', methods=['POST'])
 @login_required
@@ -169,6 +169,8 @@ def setup_email_domain():
         except Exception as sending_err:
             logging.warning(f"Could not enable email sending for {zone_name} (may need manual enable in CF Dashboard): {sending_err}")
 
+        email_sending_status = email_manager.get_email_sending_status(zone_id, zone_name)
+
         outbound_bindings = [
             {"type": "send_email", "name": "SEND_EMAIL"},
             {"type": "secret_text", "name": "AUTH_SECRET", "text": outbound_auth_secret}
@@ -182,6 +184,7 @@ def setup_email_domain():
             'zone_id': zone_id,
             'zone_name': zone_name,
             'email_routing_enabled': True,
+            'email_sending_status': email_sending_status,
             'r2_bucket': bucket_name,
             'r2_access_key_id': r2_access_key_id,
             'r2_secret_access_key': r2_secret_access_key,
@@ -544,7 +547,7 @@ def mailbox_stats():
 def redeploy_workers():
     email_cfg = config.EMAIL_CONFIG.copy()
     domains = email_cfg.get('domains', {})
-    for domain in domains:
+    for domain in list(domains.keys()):
         try:
             _redeploy_inbound_worker(email_cfg, domain)
         except Exception as e:
@@ -553,6 +556,11 @@ def redeploy_workers():
             _redeploy_outbound_worker(email_cfg, domain)
         except Exception as e:
             return jsonify({'success': False, 'error': f'Outbound redeploy failed for {domain}: {e}'}), 500
+        zone_id = domains[domain].get('zone_id')
+        if zone_id:
+            email_cfg['domains'][domain]['email_sending_status'] = email_manager.get_email_sending_status(zone_id, domain)
+    save_email_config(email_cfg)
+    _restart_mail_container()
     return jsonify({'success': True, 'domains': list(domains.keys())})
 
 @email_bp.route('/update-r2-credentials', methods=['POST'])

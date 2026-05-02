@@ -45,6 +45,7 @@
                     <button id="emailSetupBtn" class="btn btn-primary btn-sm shrink-0" onclick="emailSetupDomain(event)" disabled>{{ t('email.setup_email') }}</button>
                 </div>
             </div>
+            <p class="text-xs opacity-50 mb-3">External sending requires CF Email Sending and manual activation. <a href="{{ url_for('help.help_page', page='Email-Overview.md') }}" class="link">Learn more →</a></p>
             <table class="table table-zebra w-full">
                 <colgroup>
                     <col>
@@ -66,7 +67,19 @@
                             <div>{{ domain }}</div>
                             <div class="text-xs opacity-50 mt-1" id="catchAllStatus_{{ domain | replace('.', '_') }}">Catch-All: loading…</div>
                         </td>
-                        <td class="px-4 py-3"><div class="badge badge-success badge-sm">{{ t('email.setup_complete') }}</div></td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-wrap gap-1 items-center">
+                                <div class="badge badge-success badge-sm">{{ t('email.setup_complete') }}</div>
+                                {% set sending_status = cfg.get('email_sending_status') %}
+                                {% if sending_status == 'configured' %}
+                                <div class="badge badge-success badge-sm">Sending: Active</div>
+                                {% elif sending_status == 'not_configured' %}
+                                <div class="badge badge-warning badge-sm">Sending: Pending</div>
+                                {% else %}
+                                <div class="badge badge-ghost badge-sm">Sending: Unknown</div>
+                                {% endif %}
+                            </div>
+                        </td>
                         <td class="px-4 py-3">
                             <div class="flex items-center justify-end gap-1">
                                 <button class="btn btn-sm btn-ghost" onclick="emailVerifyDns('{{ domain }}', event)">{{ t('email.dns_verify') }}</button>

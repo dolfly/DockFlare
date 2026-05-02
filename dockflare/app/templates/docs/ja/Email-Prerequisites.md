@@ -5,8 +5,12 @@
 ## Cloudflare の要件
 
 1.  **ドメイン管理:** お使いのドメインが Cloudflare 上でアクティブになっている必要があります。
-2.  **Email Routing:** ドメインが Cloudflare Email Routing の対象である必要があります (無料プランを含む多くのプランで利用可能)。また、送信メールには Cloudflare Email Sending (ベータアクセスが必要) が必要です。
-3.  **R2 ストレージ:** Cloudflare ダッシュボードで R2 が有効化されている必要があります。R2 には 10 GB の無料枠が含まれていますが、アクティブ化には支払い方法の登録が必要な場合があります。
+2.  **Email Routing（受信）:** Cloudflare Email Routing は無料プランを含むすべてのプランで利用できます。DockFlare は必要な MX、SPF、DMARC レコードを自動的に設定します。
+3.  **Email Sending（送信）:** Cloudflare Email Sending は現在ベータ版です。DockFlare は DKIM 署名レコードと送信サブドメインを自動的に設定します。ただし、外部アドレスへの送信には以下が必要です:
+    - **Cloudflare Workers 有料プラン**（月額 5 ドル）。
+    - Cloudflare ダッシュボードの **Email → Email Sending** にて **CF Email Sending (Beta)** を手動で有効化。
+    - これらの手順を完了しない限り、送信メールは Cloudflare アカウントの確認済みアドレスのみに制限されます。
+4.  **R2 ストレージ:** Cloudflare ダッシュボードで R2 が有効化されている必要があります。R2 には 10 GB の無料枠が含まれていますが、アクティブ化には支払い方法の登録が必要な場合があります。
 
 ## API トークンの権限
 
