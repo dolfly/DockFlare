@@ -19,6 +19,22 @@ Sistem terdiri dari beberapa komponen terintegrasi:
 *   **Alur Keluar:** UI Webmail → API Mail Manager → Outbound Worker → Cloudflare `send_email` → Internet.
 *   **Kedaulatan Data:** Semua email diurai dan disimpan dalam database SQLite lokal dengan lampiran tersimpan di filesystem lokal.
 
+## Pengiriman Keluar – Paket & Batasan
+
+Cloudflare Email Sending (Beta) memiliki dua tingkatan tergantung paket Cloudflare Anda:
+
+| Penerima | Paket Gratis | Workers Paid Plan ($5/bulan) |
+| :--- | :--- | :--- |
+| Alamat Cloudflare terverifikasi (alamat yang dikonfirmasi di akun CF Anda) | ✅ Diizinkan | ✅ Diizinkan |
+| Alamat eksternal mana pun | ❌ Tidak diizinkan | ✅ Diizinkan |
+
+DockFlare secara otomatis mengatur record penandatanganan DKIM dan subdomain pengiriman (`mail.domainanda.com`) selama setup domain. Namun, **pengiriman eksternal penuh memerlukan dua langkah manual tambahan:**
+
+1. **Upgrade ke Cloudflare Workers Paid Plan** – tersedia seharga $5/bulan di dashboard Cloudflare Anda.
+2. **Aktifkan CF Email Sending (Beta)** – buka [Dashboard Cloudflare → Email → Email Sending](https://dash.cloudflare.com/) dan aktifkan fitur ini untuk akun Anda.
+
+Sebelum langkah-langkah ini selesai, email keluar dari klien webmail Anda hanya akan dikirimkan ke alamat email yang telah diverifikasi di akun Cloudflare Anda. Badge status domain di halaman Manajemen Email DockFlare mencerminkan apakah DKIM sudah dikonfigurasi (`Sending: Active`) atau belum disiapkan (`Sending: Pending`).
+
 ## Fitur Utama
 
 *   **Dukungan Multi-Domain:** Host email untuk sebanyak mungkin domain yang Anda kelola di Cloudflare.

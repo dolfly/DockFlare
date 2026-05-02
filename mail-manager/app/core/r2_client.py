@@ -8,7 +8,7 @@ _cache_lock = threading.Lock()
 
 
 def get_r2_client(access_key_id, secret_access_key, endpoint_url):
-    cache_key = (endpoint_url, access_key_id)
+    cache_key = (endpoint_url, access_key_id, secret_access_key)
     with _cache_lock:
         if cache_key not in _client_cache:
             _client_cache[cache_key] = boto3.client(

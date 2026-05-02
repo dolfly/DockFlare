@@ -50,14 +50,16 @@ def check_token_permissions():
 
 def enable_email_routing(zone_id):
     try:
-        return cf_api_request('POST', f'/zones/{zone_id}/email/routing/enable')
+        return cf_api_request('POST', f'/zones/{zone_id}/email/routing/enable', log_errors=False)
     except Exception as e:
-        # 422/conflict means already enabled — safe to continue
         err_str = str(e)
         if '2004' in err_str or 'already enabled' in err_str.lower() or 'Unprocessable' in err_str:
             logging.info(f"Email routing already enabled on zone {zone_id}, continuing")
             return {}
-        logging.error(f"Error enabling email routing: {e}")
+        if '403' in err_str or 'Forbidden' in err_str or '10000' in err_str or 'Authentication' in err_str:
+            logging.info(f"Email routing enable not permitted (zone {zone_id}); CF auto-activates via MX records")
+            return {}
+        logging.warning(f"Could not enable email routing on zone {zone_id}: {e}")
         raise
 
 def enable_email_sending(zone_id, zone_name):
@@ -134,7 +136,7 @@ def _safe_create_dns(zone_id, type, name, content, priority=None):
 
 def setup_email_dns_records(zone_id, zone_name):
     try:
-        res = cf_api_request('GET', f'/zones/{zone_id}/email/routing/dns')
+        res = cf_api_request('GET', f'/zones/{zone_id}/email/routing/dns', log_errors=False)
         required = res.get('result', [])
         for record in required:
             rtype = record.get('type')
@@ -144,12 +146,24 @@ def setup_email_dns_records(zone_id, zone_name):
             if rtype and rname and rcontent:
                 _safe_create_dns(zone_id, rtype, rname, rcontent, priority=rpriority)
     except Exception as e:
-        logging.warning(f"Could not fetch required email routing DNS records from CF API: {e}, falling back to defaults")
+        logging.info(f"Could not fetch email routing DNS from CF API (falling back to defaults): {e}")
         _safe_create_dns(zone_id, 'MX', zone_name, 'route1.mx.cloudflare.net', priority=14)
         _safe_create_dns(zone_id, 'MX', zone_name, 'route2.mx.cloudflare.net', priority=36)
         _safe_create_dns(zone_id, 'MX', zone_name, 'route3.mx.cloudflare.net', priority=88)
         _safe_create_dns(zone_id, 'TXT', zone_name, 'v=spf1 include:_spf.mx.cloudflare.net ~all')
         _safe_create_dns(zone_id, 'TXT', f'_dmarc.{zone_name}', f'v=DMARC1; p=quarantine; rua=mailto:dmarc@{zone_name}')
+
+def get_email_sending_status(zone_id, zone_name):
+    try:
+        res = cf_api_request('GET', f'/zones/{zone_id}/dns_records?type=TXT&search=_domainkey', log_errors=False)
+        records = res.get('result', [])
+        suffix = f'._domainkey.{zone_name}'
+        for r in records:
+            if r.get('name', '').endswith(suffix):
+                return 'configured'
+        return 'not_configured'
+    except Exception:
+        return 'unknown'
 
 def verify_email_dns_records(zone_id, zone_name):
     res = cf_api_request('GET', f'/zones/{zone_id}/dns_records')
