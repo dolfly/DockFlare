@@ -1,6 +1,10 @@
 <p align="center">
   <a href="https://dockflare.app" title="Now you're thinking with tunnels">
-    <img src="images/bannertr.png" width="500px" alt="DockFlare Banner" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="images/logo-files/logo-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="images/logo-files/logo-light.svg">
+      <img src="images/logo-files/logo-light.svg" width="500px" alt="DockFlare Logo" />
+    </picture>
   </a>
 </p>
 
